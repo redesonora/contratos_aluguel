@@ -3181,13 +3181,17 @@ export default function DashboardPage() {
                                   <title>Contrato - ${inquilino}</title>
                                   <style>
                                     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+                                    * { box-sizing: border-box; }
                                     body { 
                                       font-family: 'Inter', sans-serif; 
+                                      font-weight: 400;
                                       padding: 40px; 
                                       line-height: 1.6; 
                                       color: ${fontColor}; 
                                       background: #f1f5f9;
                                       margin: 0;
+                                      -webkit-print-color-adjust: exact;
+                                      print-color-adjust: exact;
                                     }
                                     .paper {
                                       background: white;
@@ -3201,11 +3205,20 @@ export default function DashboardPage() {
                                     .contract-content { 
                                       font-size: ${fontSize}px;
                                       color: #000000;
+                                      font-weight: 400;
                                       text-align: ${co.alinhamento_texto || 'justify'};
                                       white-space: pre-wrap;
                                     }
-                                    .contract-content p { margin-bottom: 1.2em; }
+                                    .contract-content * {
+                                      font-family: inherit;
+                                    }
+                                    .contract-content p { margin-bottom: 1.2em; font-weight: 400; }
                                     .contract-content b, .contract-content strong { font-weight: 700; }
+                                    .contract-content h1, .contract-content h2, .contract-content h3, .contract-content h4, .contract-content h5, .contract-content h6 {
+                                      font-size: inherit;
+                                      font-weight: inherit;
+                                      margin: 0;
+                                    }
                                     .contract-content u { text-decoration: underline; }
                                     .contract-content i { font-style: italic; }
                                     @media print {
