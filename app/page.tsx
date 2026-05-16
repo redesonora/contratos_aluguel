@@ -1508,7 +1508,7 @@ export default function DashboardPage() {
         startOfRenewalStr, 
         newDataFim, 
         novoValorAluguel, 
-        contractToRenew.dia_vencimento
+        contractToRenew.dia_vencimento || 10
       );
 
       await recordLog('RENOVAR', 'contratos', contractToRenew.id, { 
