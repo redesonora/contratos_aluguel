@@ -453,6 +453,8 @@ export default function DashboardPage() {
   const [itemToDelete, setItemToDelete] = useState<{id: string, type: 'contratos' | 'imoveis' | 'inquilinos' | 'proprietarios'} | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [pwdForm, setPwdForm] = useState({ current: '', new: '', confirm: '' });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -534,6 +536,33 @@ export default function DashboardPage() {
     } catch (err: any) {
       console.error('Erro ao atualizar usuário:', err?.message || err || 'Erro desconhecido');
       // Opcional: mostrar toast de erro
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pwdForm.new !== pwdForm.confirm) {
+      setErrorMsg('As senhas não coincidem.');
+      return;
+    }
+    if (pwdForm.new.length < 6) {
+      setErrorMsg('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: pwdForm.new });
+      if (error) throw error;
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      setIsChangePasswordOpen(false);
+      setPwdForm({ current: '', new: '', confirm: '' });
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'Erro ao alterar a senha.');
     } finally {
       setLoading(false);
     }
@@ -2151,11 +2180,12 @@ export default function DashboardPage() {
             documentos_fiador: finalGuarantorDocs
           };
           
-          // Only add guarantor fields if they have value, to avoid schema mismatch if columns are missing
-          if (rawData.nome_fiador) payload.nome_fiador = rawData.nome_fiador;
-          if (rawData.cpf_fiador) payload.cpf_fiador = rawData.cpf_fiador;
-          if (rawData.rg_fiador) payload.rg_fiador = rawData.rg_fiador;
-          if (rawData.endereco_fiador) payload.endereco_fiador = rawData.endereco_fiador;
+          // Fiador fields
+          if (rawData.nome_fiador !== undefined) payload.nome_fiador = rawData.nome_fiador;
+          if (rawData.cpf_fiador !== undefined) payload.cpf_fiador = rawData.cpf_fiador;
+          if (rawData.rg_fiador !== undefined) payload.rg_fiador = rawData.rg_fiador;
+          if (rawData.cep_fiador !== undefined) payload.cep_fiador = rawData.cep_fiador;
+          if (rawData.endereco_fiador !== undefined) payload.endereco_fiador = rawData.endereco_fiador;
 
           let { error: err } = await supabase.from('inquilinos').update(payload).eq('id', editingItem.id);
           
@@ -2269,11 +2299,12 @@ export default function DashboardPage() {
             proprietario_id: userProfile?.role === 'PROPRIETARIO' ? userProfile.proprietario_id : (rawData.proprietario_id || null)
           };
 
-          // Only add guarantor fields if they have value
-          if (rawData.nome_fiador) payload.nome_fiador = rawData.nome_fiador;
-          if (rawData.cpf_fiador) payload.cpf_fiador = rawData.cpf_fiador;
-          if (rawData.rg_fiador) payload.rg_fiador = rawData.rg_fiador;
-          if (rawData.endereco_fiador) payload.endereco_fiador = rawData.endereco_fiador;
+          // Fiador fields
+          if (rawData.nome_fiador !== undefined) payload.nome_fiador = rawData.nome_fiador;
+          if (rawData.cpf_fiador !== undefined) payload.cpf_fiador = rawData.cpf_fiador;
+          if (rawData.rg_fiador !== undefined) payload.rg_fiador = rawData.rg_fiador;
+          if (rawData.cep_fiador !== undefined) payload.cep_fiador = rawData.cep_fiador;
+          if (rawData.endereco_fiador !== undefined) payload.endereco_fiador = rawData.endereco_fiador;
 
           let { error: err } = await supabase.from('inquilinos').insert([payload]);
 
@@ -3205,15 +3236,17 @@ export default function DashboardPage() {
                                     .contract-content { 
                                       font-size: ${fontSize}px;
                                       color: #000000;
-                                      font-weight: 400;
+                                      font-weight: 400 !important;
                                       text-align: ${co.alinhamento_texto || 'justify'};
                                       white-space: pre-wrap;
                                     }
                                     .contract-content * {
                                       font-family: inherit;
                                     }
-                                    .contract-content p { margin-bottom: 1.2em; font-weight: 400; }
-                                    .contract-content b, .contract-content strong { font-weight: 700; }
+                                    .contract-content p, .contract-content span, .contract-content div { 
+                                      font-weight: inherit; 
+                                    }
+                                    .contract-content b, .contract-content strong { font-weight: 700 !important; }
                                     .contract-content h1, .contract-content h2, .contract-content h3, .contract-content h4, .contract-content h5, .contract-content h6 {
                                       font-size: inherit;
                                       font-weight: inherit;
@@ -4385,6 +4418,15 @@ export default function DashboardPage() {
             </div>
             <p className="text-xs font-bold text-slate-700 truncate">{userProfile?.nome || session?.user?.email?.split('@')[0] || 'Gleison Isaias'}</p>
           </div>
+          <button 
+            onClick={() => {
+              setPwdForm({ current: '', new: '', confirm: '' });
+              setIsChangePasswordOpen(true);
+            }}
+            className="text-[10px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest p-2 transition-colors text-left"
+          >
+            Alterar Senha
+          </button>
           <button 
             onClick={handleLogout}
             className="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-widest p-2 transition-colors text-left"
@@ -5802,6 +5844,73 @@ export default function DashboardPage() {
                  >
                    Fechar Guia
                  </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Change Password Modal */}
+      <AnimatePresence>
+        {isChangePasswordOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl relative overflow-hidden flex flex-col"
+            >
+              <div className="px-8 pt-8 pb-4 border-b border-slate-50 flex items-center justify-between">
+                <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2 uppercase">
+                  <Lock size={20} className="text-blue-500" />
+                  Alterar Senha
+                </h3>
+                <button onClick={() => setIsChangePasswordOpen(false)} className="text-slate-300 hover:text-slate-500"><X size={24} /></button>
+              </div>
+
+              <div className="p-8 space-y-4 text-slate-700">
+                <form id="change-pwd-form" onSubmit={handleChangePassword} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Nova Senha</label>
+                    <input 
+                      type="password"
+                      required
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all text-sm"
+                      placeholder="Mínimo 6 caracteres"
+                      value={pwdForm.new}
+                      onChange={(e) => setPwdForm({...pwdForm, new: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Confirmar Nova Senha</label>
+                    <input 
+                      type="password"
+                      required
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all text-sm"
+                      placeholder="Repita a nova senha"
+                      value={pwdForm.confirm}
+                      onChange={(e) => setPwdForm({...pwdForm, confirm: e.target.value})}
+                    />
+                  </div>
+                </form>
+              </div>
+
+              <div className="p-8 bg-slate-50 flex items-center justify-end gap-3 rounded-b-[2.5rem]">
+                <button 
+                  type="button"
+                  onClick={() => setIsChangePasswordOpen(false)}
+                  className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  form="change-pwd-form"
+                  disabled={loading}
+                  className="bg-blue-600 border border-blue-700 text-white px-6 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200/50 flex items-center justify-center gap-2 flex-1 max-w-[160px]"
+                >
+                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Salvar'}
+                </button>
               </div>
             </motion.div>
           </div>
