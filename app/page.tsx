@@ -159,6 +159,10 @@ interface Contrato {
   documentos?: string[];
   imoveis?: { 
     endereco: string;
+    numero?: string;
+    complemento?: string;
+    bairro?: string;
+    cep?: string;
     cidade: string;
     estado: string;
     apelido?: string;
@@ -726,6 +730,7 @@ export default function DashboardPage() {
   cep: string;
   locador: string;
   locador_cpf: string;
+  data: string;
 }
 
 // Receipt State
@@ -742,7 +747,8 @@ export default function DashboardPage() {
     estado: 'UF',
     cep: '00000-000',
     locador: 'Gleison Isaias',
-    locador_cpf: '123.456.789-00'
+    locador_cpf: '123.456.789-00',
+    data: new Date().toLocaleDateString('pt-BR')
   });
 
   /* auth states declared above */
@@ -3312,7 +3318,7 @@ export default function DashboardPage() {
             paymentSearch === '' ||
             (pa.contratos?.inquilinos?.nome || '').toLowerCase().includes(searchLower) ||
             (pa.contratos?.imoveis?.endereco || '').toLowerCase().includes(searchLower) ||
-            pa.valor_pago.toString().includes(paymentSearch);
+            (pa.valor_pago?.toString() || '').includes(paymentSearch);
           
           return matchesYear && matchesMonth && matchesStatus && matchesSearch;
         });
@@ -5843,7 +5849,7 @@ export default function DashboardPage() {
                              .reduce((acc, p) => acc + (p.valor_esperado || 0), 0))}</span>
                         </div>
                         <div className="pt-4 mt-2 border-t border-slate-100 flex flex-col gap-2">
-                           {(selectedContractForFinance.status === 'ativo' || !selectedContractForFinance.status) && (
+                           {(!selectedContractForFinance.arquivado) && (
                              <button
                                onClick={() => {
                                  handleFinishContract(selectedContractForFinance);
