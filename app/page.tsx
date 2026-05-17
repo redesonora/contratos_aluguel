@@ -717,6 +717,7 @@ export default function DashboardPage() {
     );
   };
   
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
   const [contractTemplates, setContractTemplates] = useState<{
     id?: string,
     name: string, 
@@ -725,22 +726,11 @@ export default function DashboardPage() {
     fontColor?: string,
     bold?: boolean,
     alignment?: 'left' | 'center' | 'right' | 'justify'
-  }[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('contratos_templates');
-      return saved ? JSON.parse(saved) : [{ 
-        name: 'Residencial Padrão', 
-        content: `CONTRATO DE LOCAÇÃO RESIDENCIAL\n\nLOCADOR: [DADOS DO PROPRIETÁRIO]\nLOCATÁRIO: {{inquilino}}, CPF: {{cpf}}\n\nOBJETO: O imóvel localizado em {{imovel}}.\n\nCLÁUSULA PRIMEIRA - DO VALOR: O aluguel mensal é de R$ {{valor}}.\n\nCLÁUSULA SEGUNDA - DO PRAZO: O contrato tem início em {{data_inicio}} e término em {{data_fim}}.\n\n[RESTANTE DAS CLÁUSULAS PADRÃO...]`,
-        fontSize: 12,
-        fontColor: '#000000',
-        bold: false,
-        alignment: 'justify'
-      }];
-    }
-    return [];
-  });
+  }[]>([]);
 
   useEffect(() => {
+    if (!templatesLoaded || !session?.user) return;
+    
     localStorage.setItem('contratos_templates', JSON.stringify(contractTemplates));
     
     // Configura um timer para debouncing de 2 segundos antes de salvar no supabase
@@ -803,7 +793,7 @@ export default function DashboardPage() {
     }, 2000);
     
     return () => clearTimeout(timer);
-  }, [contractTemplates, session]);
+  }, [contractTemplates, session, templatesLoaded]);
 
   /* state already declared above */
   
@@ -1215,6 +1205,16 @@ export default function DashboardPage() {
           } catch(e) {
             console.error("Erro ao migrar templates do localStorage", e);
           }
+        } else {
+          // Caso final: Tudo vazio, usar o padrão
+          setContractTemplates([{ 
+            name: 'Residencial Padrão', 
+            content: `CONTRATO DE LOCAÇÃO RESIDENCIAL\n\nLOCADOR: [DADOS DO PROPRIETÁRIO]\nLOCATÁRIO: {{inquilino}}, CPF: {{cpf}}\n\nOBJETO: O imóvel localizado em {{imovel}}.\n\nCLÁUSULA PRIMEIRA - DO VALOR: O aluguel mensal é de R$ {{valor}}.\n\nCLÁUSULA SEGUNDA - DO PRAZO: O contrato tem início em {{data_inicio}} e término em {{data_fim}}.\n\n[RESTANTE DAS CLÁUSULAS PADRÃO...]`,
+            fontSize: 12,
+            fontColor: '#000000',
+            bold: false,
+            alignment: 'justify'
+          }]);
         }
       }
 
@@ -1293,10 +1293,11 @@ export default function DashboardPage() {
       });
 
       setNotifications(combinedAlerts);
+      setTemplatesLoaded(true);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     }
-  }, [session, userProfile, notificationDays, setImoveis, setInquilinos, setProprietarios, setContratos, setPagamentos, setLogs, setNotifications]);
+  }, [session, userProfile, notificationDays, setImoveis, setInquilinos, setProprietarios, setContratos, setPagamentos, setLogs, setNotifications, setTemplatesLoaded]);
 
   const fetchArchivedData = useCallback(async (force = false) => {
     if (!force && (archivedLoaded || archivedLoading)) return;
