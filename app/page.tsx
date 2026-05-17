@@ -904,8 +904,7 @@ export default function DashboardPage() {
               cpf: meta.cpf || null,
               approved,
               plano: 'Nenhum',
-              status_pagamento: 'Sem Assinatura',
-              last_access: new Date().toISOString()
+              status_pagamento: 'Sem Assinatura'
             };
             
             const { error: insertError } = await supabase.from('user_profiles').insert(newProfile);
@@ -942,7 +941,11 @@ export default function DashboardPage() {
           setUserProfile({ id: userId, role: 'ADMIN', nome: 'Admin (Pendente)', approved: true, proprietario_id: null });
         } else if (data) {
           // Atualizar o last_access para usuários existentes
-          await supabase.from('user_profiles').update({ last_access: new Date().toISOString() }).eq('id', userId);
+          try {
+            await supabase.from('user_profiles').update({ last_access: new Date().toISOString() }).eq('id', userId);
+          } catch (err) {
+            console.warn('Falha ao atualizar last_access:', err);
+          }
           setUserProfile(data as UserProfile);
         }
       } else if (data) {
