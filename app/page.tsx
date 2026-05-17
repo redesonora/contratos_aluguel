@@ -465,6 +465,10 @@ export default function DashboardPage() {
   const [paymentSearch, setPaymentSearch] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>('todos');
   const [paymentMonthFilter, setPaymentMonthFilter] = useState<number>(0);
+  const [imovelSearch, setImovelSearch] = useState('');
+  const [imovelCityFilter, setImovelCityFilter] = useState('todas');
+  const [imovelStatusFilter, setImovelStatusFilter] = useState('todos');
+  const [imovelTypeFilter, setImovelTypeFilter] = useState('todos');
   const [selectedTemplateIdx, setSelectedTemplateIdx] = useState<number>(0);
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
   const [guarantorFilesToUpload, setGuarantorFilesToUpload] = useState<File[]>([]);
@@ -2905,23 +2909,91 @@ export default function DashboardPage() {
     }
       
       case 'imoveis': {
-        const dataToUse = showArchived ? archivedImoveis : imoveis;
-        const { data: paginatedImoveis, totalPages: imoveisPages } = getPaginatedAndSortedData(dataToUse, 'imoveis');
+        const rawDataToUse = showArchived ? archivedImoveis : imoveis;
+        const availableCities = Array.from(new Set(rawDataToUse.map(im => im.cidade).filter(Boolean))).sort();
+        const availableTypes = Array.from(new Set(rawDataToUse.map(im => im.tipo_imovel).filter(Boolean))).sort();
+        const availableStatus = Array.from(new Set(rawDataToUse.map(im => im.status).filter(Boolean))).sort();
+
+        const filteredData = rawDataToUse.filter(im => {
+          const matchesCity = imovelCityFilter === 'todas' || im.cidade === imovelCityFilter;
+          const matchesStatus = imovelStatusFilter === 'todos' || im.status === imovelStatusFilter;
+          const matchesType = imovelTypeFilter === 'todos' || im.tipo_imovel === imovelTypeFilter;
+          const searchLower = imovelSearch.toLowerCase();
+          const matchesSearch = 
+            imovelSearch === '' ||
+            (im.endereco || '').toLowerCase().includes(searchLower) ||
+            (im.bairro || '').toLowerCase().includes(searchLower) ||
+            (im.apelido || '').toLowerCase().includes(searchLower) ||
+            (im.cep || '').toLowerCase().includes(searchLower);
+          
+          return matchesCity && matchesStatus && matchesType && matchesSearch;
+        });
+
+        const { data: paginatedImoveis, totalPages: imoveisPages } = getPaginatedAndSortedData(filteredData, 'imoveis');
         
         return (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left min-w-[600px]">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr className="text-slate-500 text-[10px] uppercase tracking-widest font-black">
-                    <SortHeader label="Imóvel / Endereço" sortKey="endereco" activeTab="imoveis" />
-                    <SortHeader label="Bairro" sortKey="bairro" activeTab="imoveis" />
-                    <SortHeader label="Tipo" sortKey="tipo_imovel" activeTab="imoveis" />
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 transition-all text-sm font-medium">
+          <div className="flex flex-col gap-4">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Search size={14} />
+                </span>
+                <input 
+                  type="text"
+                  placeholder="Pesquisar endereço, bairro, cep ou apelido..."
+                  value={imovelSearch}
+                  onChange={(e) => setImovelSearch(e.target.value)}
+                  className="pl-8 pr-4 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all w-full bg-white"
+                />
+              </div>
+
+              <select 
+                value={imovelCityFilter}
+                onChange={(e) => setImovelCityFilter(e.target.value)}
+                className="px-3 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all bg-white"
+              >
+                <option value="todas">Todas as Cidades</option>
+                {availableCities.map(city => (
+                  <option key={city as string} value={city as string}>{city as string}</option>
+                ))}
+              </select>
+
+              <select 
+                value={imovelStatusFilter}
+                onChange={(e) => setImovelStatusFilter(e.target.value)}
+                className="px-3 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all bg-white"
+              >
+                <option value="todos">Todos os Status</option>
+                {availableStatus.map(st => (
+                  <option key={st as string} value={st as string}>{st as string}</option>
+                ))}
+              </select>
+
+              <select 
+                value={imovelTypeFilter}
+                onChange={(e) => setImovelTypeFilter(e.target.value)}
+                className="px-3 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all bg-white"
+              >
+                <option value="todos">Todos os Tipos</option>
+                {availableTypes.map(type => (
+                  <option key={type as string} value={type as string}>{type as string}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left min-w-[600px]">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr className="text-slate-500 text-[10px] uppercase tracking-widest font-black">
+                      <SortHeader label="Imóvel / Endereço" sortKey="endereco" activeTab="imoveis" />
+                      <SortHeader label="Bairro" sortKey="bairro" activeTab="imoveis" />
+                      <SortHeader label="Tipo" sortKey="tipo_imovel" activeTab="imoveis" />
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 transition-all text-sm font-medium">
                   <AnimatePresence mode="popLayout">
                     {paginatedImoveis.map((im, idx) => (
                       <motion.tr 
@@ -3014,6 +3086,7 @@ export default function DashboardPage() {
               </table>
             </div>
             <Pagination tab="imoveis" totalPages={imoveisPages} />
+          </div>
           </div>
         );
       }
