@@ -918,12 +918,13 @@ export default function DashboardPage() {
           const { error: insertError } = await supabase.from('user_profiles').insert(newProfile);
           
           if (insertError) {
-            console.error('Erro ao inserir novo perfil (Cache Schema?):', JSON.stringify(insertError));
-            // Se falhou ao inserir (ex: PGRST204), usamos o fallback completo
+            console.error('ERRO AO SALVAR PERFIL NO BANCO:', JSON.stringify(insertError));
+            // Se falhou ao inserir (ex: PGRST204 ou falta de tabela), usamos o fallback completo
+            // mas marcamos o nome para o admin saber que é um registro local temporário
             const fallbackProfile: UserProfile = { 
               id: userId, 
               role: (isGleisonEmail ? 'ADMIN' : 'CORRETOR'), 
-              nome: meta.full_name || userEmail?.split('@')[0] || 'Usuário (Modo Seguro)', 
+              nome: (meta.full_name || userEmail?.split('@')[0] || 'Usuário') + ' (LOCAL)', 
               approved: (isGleisonEmail ? true : false), 
               plano: 'Pro',
               status_pagamento: 'PAGO',
@@ -933,6 +934,10 @@ export default function DashboardPage() {
               proprietario_id: null 
             };
             setUserProfile(fallbackProfile);
+            
+            if (insertError.code === '42P01') {
+              alert('AVISO: A tabela de perfis não existe no banco. Rodar SUPABASE_SCHEMA.sql no painel do Supabase.');
+            }
           } else {
             // Buscar o perfil inserido para pegar o trial_ends_at gerado pelo DB
             const { data: insertedData } = await supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle();
@@ -1241,7 +1246,14 @@ export default function DashboardPage() {
       }
 
       if (userProfile?.role === 'ADMIN' || session?.user?.email?.toLowerCase() === 'gleisonisaias@gmail.com') {
-        const { data: perfisData } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
+        const { data: perfisData, error: perfisError } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
+        if (perfisError) {
+          console.error('Erro ao buscar lista de perfis para admin:', perfisError);
+          // Se for erro de tabela inexistente, mostramos uma mensagem no console mais clara
+          if (perfisError.code === '42P01') {
+            console.warn('DICA: Para ver a lista de usuários, você precisa rodar o script SUPABASE_SCHEMA.sql.');
+          }
+        }
         setPerfis(perfisData || []);
       }
 
