@@ -807,6 +807,7 @@ export default function DashboardPage() {
   cpf: string;
   valor: number;
   competencia: string;
+  vencimento: string;
   endereco: string;
   numero: string;
   complemento: string;
@@ -825,6 +826,7 @@ export default function DashboardPage() {
     cpf: '123.456.789-00',
     valor: 1500,
     competencia: 'Abril/2026',
+    vencimento: '10/04/2026',
     endereco: 'Rua das Flores',
     numero: '123',
     complemento: '',
@@ -1838,6 +1840,12 @@ export default function DashboardPage() {
       doc.setFont("helvetica", "bold");
       doc.text(String(receiptData.competencia || ""), marginX + 22, currentY);
       
+      currentY += 6;
+      doc.setFont("helvetica", "normal");
+      doc.text("Vencimento:", marginX, currentY);
+      doc.setFont("helvetica", "bold");
+      doc.text(String(receiptData.vencimento || ""), marginX + 22, currentY);
+      
       // Rodapé e Assinatura
       currentY += 10;
       doc.setFont("helvetica", "normal");
@@ -2630,6 +2638,7 @@ export default function DashboardPage() {
         cpf: contrato?.inquilinos?.cpf_cnpj || 'N/A',
         valor: valorPago,
         competencia: `${parcela.competencia_mes}/${parcela.competencia_ano}`,
+        vencimento: parcela.data_vencimento ? new Date(parcela.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A',
         locador: locadorNome,
         locador_cpf: locadorCpf,
         endereco: contrato?.imoveis?.endereco || 'N/A',
@@ -3692,6 +3701,7 @@ export default function DashboardPage() {
                                 cpf: contrato?.inquilinos?.cpf_cnpj || 'N/A',
                                 valor: pa.valor_pago || 0,
                                 competencia: `${pa.competencia_mes}/${pa.competencia_ano}`,
+                                vencimento: pa.data_vencimento ? new Date(pa.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A',
                                 locador: locadorNome,
                                 locador_cpf: locadorCpf,
                                 endereco: contrato?.imoveis?.endereco || 'N/A',
@@ -5717,7 +5727,7 @@ export default function DashboardPage() {
                               <span className="font-medium">{receiptData.endereco}, {receiptData.numero} - {receiptData.bairro}, {receiptData.cidade} - {receiptData.estado}, CEP: {receiptData.cep}</span>
                             </p>
                             <p>
-                              Competência: <span className="font-bold">{receiptData.competencia}</span>.
+                              Competência: <span className="font-bold">{receiptData.competencia}</span>. Vencimento: <span className="font-bold">{receiptData.vencimento}</span>.
                             </p>
                           </>
                         )}
@@ -6245,6 +6255,7 @@ export default function DashboardPage() {
                                                   cpf: contrato?.inquilinos?.cpf_cnpj || 'N/A',
                                                   valor: p.valor_pago || 0,
                                                   competencia: `${p.competencia_mes}/${p.competencia_ano}`,
+                                                  vencimento: p.data_vencimento ? new Date(p.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A',
                                                   locador: locadorNome,
                                                   locador_cpf: locadorCpf,
                                                   endereco: contrato?.imoveis?.endereco || 'N/A',
