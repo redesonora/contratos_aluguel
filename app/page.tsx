@@ -747,9 +747,7 @@ export default function DashboardPage() {
         const validTemplates = contractTemplates.map(t => {
           if (!t.id) {
             changed = true;
-            const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-              ? crypto.randomUUID() 
-              : Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+            const newId = Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
             return { ...t, id: newId };
           }
           return t;
@@ -1161,7 +1159,8 @@ export default function DashboardPage() {
           // Isso evita perder o localStorage se o banco tiver apenas o padrão
           const dbHasReal = tpRes.data.length > 1 || (tpRes.data.length === 1 && tpRes.data[0].name !== 'Residencial Padrão');
           if (!dbHasReal) {
-             // Deixe o frontend usar o local, o effect vai sobrescrever o DB
+             // Use local templates
+             setContractTemplates(localTemplates);
           } else {
              // Ambos tem templates reais? Idealmente mesclamos, mas para evitar complexidade,
              // vamos carregar o banco.
@@ -1190,9 +1189,7 @@ export default function DashboardPage() {
         // Se estiver vazio no banco, tentar salvar do localStorage para o Supabase e na memória
         if (localTemplates.length > 0) {
           try {
-              const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-                ? crypto.randomUUID() 
-                : Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+              const newId = Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
               const toInsert = localTemplates.map(t => ({
                 id: t.id || newId,
                 name: t.name || 'Modelo Migrado',
@@ -3522,8 +3519,51 @@ export default function DashboardPage() {
         const availableYears = Array.from(new Set(pagamentos.map(pa => pa.competencia_ano))).sort((a, b) => b - a);
         if (availableYears.length === 0) availableYears.push(new Date().getFullYear());
 
+        const totalRecebido = filteredPagamentos
+          .filter(pa => pa.status === StatusPagamento.PAGO)
+          .reduce((acc, pa) => acc + (pa.valor_pago || pa.valor_esperado || 0), 0);
+
+        const totalPendente = filteredPagamentos
+          .filter(pa => pa.status !== StatusPagamento.PAGO)
+          .reduce((acc, pa) => acc + (pa.valor_esperado || 0), 0);
+
+        const totalGeral = totalRecebido + totalPendente;
+
         return (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto custom-scrollbar">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
+                <div>
+                  <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Filtrado</h3>
+                  <p className="text-2xl font-black text-slate-800 tracking-tight">{formatarMoeda(totalGeral)}</p>
+                </div>
+                <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                  <DollarSign size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
+                <div>
+                  <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Recebido</h3>
+                  <p className="text-2xl font-black text-green-600 tracking-tight">{formatarMoeda(totalRecebido)}</p>
+                </div>
+                <div className="p-3 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-all duration-300">
+                  <TrendingUp size={24} />
+                </div>
+              </div>
+
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
+                <div>
+                  <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Pendente</h3>
+                  <p className="text-2xl font-black text-red-600 tracking-tight">{formatarMoeda(totalPendente)}</p>
+                </div>
+                <div className="p-3 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-all duration-300">
+                  <AlertCircle size={24} />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto custom-scrollbar">
             <div className="p-6 border-b border-slate-50 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50/30 min-w-[1000px]">
               <div>
                 <h3 className="font-black text-slate-800 uppercase tracking-tight italic">Histórico de Recebimentos</h3>
@@ -3688,6 +3728,7 @@ export default function DashboardPage() {
                 Nenhum registro financeiro encontrado para os filtros selecionados.
               </div>
             )}
+            </div>
           </div>
         );
       }

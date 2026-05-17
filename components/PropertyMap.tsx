@@ -9,7 +9,7 @@ const TileLayer = dynamic(() => import('react-leaflet').then(mod => mod.TileLaye
 const Marker = dynamic(() => import('react-leaflet').then(mod => mod.Marker), { ssr: false });
 const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), { ssr: false });
 const ChangeViewWrapper = dynamic(() => Promise.resolve(({ center }: { center: [number, number] }) => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+   
   const { useMap } = require('react-leaflet');
   const map = useMap();
   useEffect(() => {
