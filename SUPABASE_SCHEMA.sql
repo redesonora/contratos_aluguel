@@ -1,5 +1,5 @@
 -- SUPABASE SQL SCHEMA
--- Execute este script no SQL Editor do Supabase
+-- Execute este script no SQL Editor do Supabase para configurar todo o banco de dados.
 
 -- 1. Tipos e Perfis
 DO $$ 
@@ -21,11 +21,11 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   data_inicio TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
   trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT (timezone('utc'::text, now()) + interval '7 days'),
   last_access TIMESTAMP WITH TIME ZONE,
-  proprietario_id UUID REFERENCES proprietarios(id), -- Vincula o usuário a um proprietário CRM
+  proprietario_id UUID, -- Referência manual para evitar erros de ordem de criação
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Funções auxiliares
+-- Funções auxiliares de Admin
 CREATE OR REPLACE FUNCTION is_admin() 
 RETURNS boolean 
 LANGUAGE plpgsql 
@@ -45,31 +45,15 @@ ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
 DO $$ 
 BEGIN
-    DROP POLICY IF EXISTS "user_view_own" ON user_profiles;
-    DROP POLICY IF EXISTS "user_create_own" ON user_profiles;
-    DROP POLICY IF EXISTS "user_update_own" ON user_profiles;
-    DROP POLICY IF EXISTS "admin_all_profiles" ON user_profiles;
     DROP POLICY IF EXISTS "profiles_select_all" ON user_profiles;
     DROP POLICY IF EXISTS "profiles_insert_own" ON user_profiles;
-    DROP POLICY IF EXISTS "profiles_update_admin" ON user_profiles;
     DROP POLICY IF EXISTS "profiles_update_policy" ON user_profiles;
     DROP POLICY IF EXISTS "profiles_delete_admin" ON user_profiles;
 
-    -- Permite que qualquer usuário autenticado veja os nomes e cargos (necessário para o app)
     CREATE POLICY "profiles_select_all" ON user_profiles FOR SELECT TO authenticated USING (true);
-    
-    -- Permite criação do próprio perfil (necessário no primeiro login)
     CREATE POLICY "profiles_insert_own" ON user_profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
-    
-    -- Permite atualização: usuários podem mudar o próprio nome, mas apenas admins podem mudar role/approved
-    -- Como RLS é por linha, facilitamos: Admin pode tudo, usuário só o dele.
-    -- Para segurança extra, no app filtramos campos. No DB:
-    CREATE POLICY "profiles_update_policy" ON user_profiles FOR UPDATE TO authenticated 
-    USING (auth.uid() = id OR is_admin());
-
-    -- Permite deleção apenas por administradores
-    CREATE POLICY "profiles_delete_admin" ON user_profiles FOR DELETE TO authenticated 
-    USING (is_admin());
+    CREATE POLICY "profiles_update_policy" ON user_profiles FOR UPDATE TO authenticated USING (auth.uid() = id OR is_admin());
+    CREATE POLICY "profiles_delete_admin" ON user_profiles FOR DELETE TO authenticated USING (is_admin());
 END $$;
 
 -- 2. Tabelas Principais
@@ -157,6 +141,20 @@ CREATE TABLE IF NOT EXISTS contratos (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Modelos de Contratos
+CREATE TABLE IF NOT EXISTS contract_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
+  name TEXT NOT NULL,
+  content TEXT,
+  font_size INTEGER DEFAULT 12,
+  font_color TEXT DEFAULT '#000000',
+  bold BOOLEAN DEFAULT false,
+  alignment TEXT DEFAULT 'justify',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- Pagamentos
 CREATE TABLE IF NOT EXISTS pagamentos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -172,7 +170,7 @@ CREATE TABLE IF NOT EXISTS pagamentos (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Recibos (Log)
+-- Recibos
 CREATE TABLE IF NOT EXISTS recibos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
@@ -186,53 +184,46 @@ CREATE TABLE IF NOT EXISTS recibos (
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
-  acao TEXT NOT NULL, -- 'CRIAR', 'EDITAR', 'EXCLUIR', 'ARQUIVAR', 'RESTAURAR'
-  tabela TEXT NOT NULL, -- 'imoveis', 'contratos', etc
+  acao TEXT NOT NULL,
+  tabela TEXT NOT NULL,
   registro_id UUID,
   detalhes JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 2. Configuração de RLS (Row Level Security)
-
+-- 3. Configuração de RLS
 ALTER TABLE proprietarios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE imoveis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inquilinos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contratos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contract_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pagamentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recibos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Políticas de Isolamento
 DO $$ 
 BEGIN
-    -- Tabelas: proprietarios, imoveis, inquilinos, contratos, pagamentos, recibos, audit_logs
-    
-    -- Proprietários
-    DROP POLICY IF EXISTS "Usuários veem apenas seus próprios proprietários" ON proprietarios;
+    DROP POLICY IF EXISTS "proprietarios_policy" ON proprietarios;
     CREATE POLICY "proprietarios_policy" ON proprietarios FOR ALL USING (auth.uid() = user_id OR is_admin());
 
-    -- Imóveis
-    DROP POLICY IF EXISTS "Usuários veem apenas seus próprios imóveis" ON imoveis;
+    DROP POLICY IF EXISTS "imoveis_policy" ON imoveis;
     CREATE POLICY "imoveis_policy" ON imoveis FOR ALL USING (auth.uid() = user_id OR is_admin());
 
-    -- Inquilinos
-    DROP POLICY IF EXISTS "Usuários veem apenas seus próprios inquilinos" ON inquilinos;
+    DROP POLICY IF EXISTS "inquilinos_policy" ON inquilinos;
     CREATE POLICY "inquilinos_policy" ON inquilinos FOR ALL USING (auth.uid() = user_id OR is_admin());
 
-    -- Contratos
-    DROP POLICY IF EXISTS "Usuários veem apenas seus próprios contratos" ON contratos;
+    DROP POLICY IF EXISTS "contratos_policy" ON contratos;
     CREATE POLICY "contratos_policy" ON contratos FOR ALL USING (auth.uid() = user_id OR is_admin());
 
-    -- Pagamentos
-    DROP POLICY IF EXISTS "Usuários veem apenas seus próprios pagamentos" ON pagamentos;
+    DROP POLICY IF EXISTS "contract_templates_policy" ON contract_templates;
+    CREATE POLICY "contract_templates_policy" ON contract_templates FOR ALL USING (auth.uid() = user_id OR is_admin());
+
+    DROP POLICY IF EXISTS "pagamentos_policy" ON pagamentos;
     CREATE POLICY "pagamentos_policy" ON pagamentos FOR ALL USING (auth.uid() = user_id OR is_admin());
 
-    -- Recibos
-    DROP POLICY IF EXISTS "Usuários veem apenas seus próprios recibos" ON recibos;
+    DROP POLICY IF EXISTS "recibos_policy" ON recibos;
     CREATE POLICY "recibos_policy" ON recibos FOR ALL USING (auth.uid() = user_id OR is_admin());
 
-    -- Logs
-    DROP POLICY IF EXISTS "Usuários veem apenas seus próprios logs" ON audit_logs;
+    DROP POLICY IF EXISTS "audit_logs_policy" ON audit_logs;
     CREATE POLICY "audit_logs_policy" ON audit_logs FOR ALL USING (auth.uid() = user_id OR is_admin());
 END $$;
