@@ -875,86 +875,87 @@ export default function DashboardPage() {
         .from('user_profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('DEBUG: Detalhes do erro Supabase (Code):', error.code);
         console.error('DEBUG: Detalhes do erro Supabase (Full):', JSON.stringify(error, null, 2));
         
-        if (error.code === 'PGRST116') { // Perfil não existe
-          // Criar perfil padrão para novos usuários (ADMIN se for o primeiro, senão CORRETOR)
-          try {
-            const { count, error: countError } = await supabase.from('user_profiles').select('*', { count: 'exact', head: true });
-            
-            if (countError) {
-              console.error('Erro ao contar perfis:', JSON.stringify(countError));
-            }
-
-            const role = (count === 0 && !countError) ? 'ADMIN' : 'CORRETOR';
-            const approved = role === 'ADMIN';
-            
-            // Buscar metadados do Auth User se estiver disponível
-            const { data: { user } } = await supabase.auth.getUser();
-            const meta = user?.user_metadata || {};
-            
-            const newProfile = { 
-              id: userId, 
-              role, 
-              nome: meta.full_name || userEmail?.split('@')[0] || 'Usuário',
-              cpf: meta.cpf || null,
-              approved,
-              plano: 'Nenhum',
-              status_pagamento: 'Sem Assinatura'
-            };
-            
-            const { error: insertError } = await supabase.from('user_profiles').insert(newProfile);
-            
-            if (insertError) {
-              console.error('Erro ao inserir novo perfil (Cache Schema?):', JSON.stringify(insertError));
-              // Se falhou ao inserir (ex: PGRST204), usamos o fallback completo
-              const fallbackProfile: UserProfile = { 
-                id: userId, 
-                role: 'ADMIN', 
-                nome: meta.full_name || userEmail?.split('@')[0] || 'Usuário (Modo Seguro)', 
-                approved: true, 
-                plano: 'Pro',
-                status_pagamento: 'PAGO',
-                data_inicio: new Date().toISOString(),
-                trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-                last_access: new Date().toISOString(),
-                proprietario_id: null 
-              };
-              setUserProfile(fallbackProfile);
-            } else {
-              // Buscar o perfil inserido para pegar o trial_ends_at gerado pelo DB
-              const { data: insertedData } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
-              setUserProfile(insertedData || (newProfile as UserProfile));
-            }
-          } catch (createErr) {
-            console.error('Exceção ao criar perfil:', createErr);
-            setUserProfile({ id: userId, role: 'ADMIN', nome: 'Admin (Fallback Exception)', approved: true, proprietario_id: null });
-          }
-        } else if (error.code === '42P01') {
+        if (error.code === '42P01') {
           console.error('ERRO CRÍTICO: A tabela "user_profiles" não existe no banco de dados.');
           console.info('DICA: Execute o conteúdo do arquivo SUPABASE_SCHEMA.sql no Editor SQL do seu painel Supabase.');
           // Fallback para permitir o uso básico do sistema se o admin ainda não rodou o script
           setUserProfile({ id: userId, role: 'ADMIN', nome: 'Admin (Pendente)', approved: true, proprietario_id: null });
-        } else if (data) {
-          // Atualizar o last_access para usuários existentes
-          try {
-            await supabase.from('user_profiles').update({ last_access: new Date().toISOString() }).eq('id', userId);
-          } catch (err) {
+        }
+      } else if (!data) {
+        // Perfil não existe
+        // Criar perfil padrão para novos usuários (ADMIN se for o primeiro ou for Gleison, senão CORRETOR)
+        try {
+          const { count, error: countError } = await supabase.from('user_profiles').select('*', { count: 'exact', head: true });
+          
+          if (countError) {
+            console.error('Erro ao contar perfis:', JSON.stringify(countError));
+          }
+
+          const isGleisonEmail = userEmail?.toLowerCase() === 'gleisonisaias@gmail.com';
+          const role = (isGleisonEmail || (count === 0 && !countError)) ? 'ADMIN' : 'CORRETOR';
+          const approved = role === 'ADMIN';
+          
+          // Buscar metadados do Auth User se estiver disponível
+          const { data: { user } } = await supabase.auth.getUser();
+          const meta = user?.user_metadata || {};
+          
+          const newProfile = { 
+            id: userId, 
+            role, 
+            nome: meta.full_name || userEmail?.split('@')[0] || 'Usuário',
+            cpf: meta.cpf || null,
+            approved,
+            plano: 'Nenhum',
+            status_pagamento: 'Sem Assinatura'
+          };
+          
+          const { error: insertError } = await supabase.from('user_profiles').insert(newProfile);
+          
+          if (insertError) {
+            console.error('Erro ao inserir novo perfil (Cache Schema?):', JSON.stringify(insertError));
+            // Se falhou ao inserir (ex: PGRST204), usamos o fallback completo
+            const fallbackProfile: UserProfile = { 
+              id: userId, 
+              role: (isGleisonEmail ? 'ADMIN' : 'CORRETOR'), 
+              nome: meta.full_name || userEmail?.split('@')[0] || 'Usuário (Modo Seguro)', 
+              approved: (isGleisonEmail ? true : false), 
+              plano: 'Pro',
+              status_pagamento: 'PAGO',
+              data_inicio: new Date().toISOString(),
+              trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              last_access: new Date().toISOString(),
+              proprietario_id: null 
+            };
+            setUserProfile(fallbackProfile);
+          } else {
+            // Buscar o perfil inserido para pegar o trial_ends_at gerado pelo DB
+            const { data: insertedData } = await supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle();
+            setUserProfile(insertedData || (newProfile as UserProfile));
+          }
+        } catch (createErr) {
+          console.error('Exceção ao criar perfil:', createErr);
+          setUserProfile({ id: userId, role: 'ADMIN', nome: 'Admin (Fallback Exception)', approved: true, proprietario_id: null });
+        }
+      } else {
+        // Atualizar o last_access para usuários existentes
+        try {
+          // Só tenta atualizar se a coluna existe (PGRST204 é o erro de coluna faltando)
+          await supabase.from('user_profiles').update({ last_access: new Date().toISOString() }).eq('id', userId);
+        } catch (err: any) {
+          if (err.code !== 'PGRST204') {
             console.warn('Falha ao atualizar last_access:', err);
           }
-          setUserProfile(data as UserProfile);
         }
-      } else if (data) {
-        setUserProfile(data);
+        setUserProfile(data as UserProfile);
       }
     } catch (err) {
-      console.error('Erro fetchProfile:', err);
-    } finally {
-      setAuthLoading(false);
+      console.error('Erro ao buscar perfil:', err);
     }
   };
 
@@ -1239,7 +1240,7 @@ export default function DashboardPage() {
         }
       }
 
-      if (userProfile.role === 'ADMIN') {
+      if (userProfile?.role === 'ADMIN' || session?.user?.email?.toLowerCase() === 'gleisonisaias@gmail.com') {
         const { data: perfisData } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
         setPerfis(perfisData || []);
       }
@@ -4152,11 +4153,18 @@ export default function DashboardPage() {
                   <tbody className="divide-y divide-slate-50">
                     {perfis.map((p) => {
                       const isGleison = p.nome?.toLowerCase().includes('gleison') || p.role === 'ADMIN';
+                      const isCurrentAppAdmin = session?.user?.email?.toLowerCase() === 'gleisonisaias@gmail.com';
+                      
                       return (
-                        <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group relative">
                           <td className="px-6 py-5">
                             <div className="flex flex-col">
-                              <span className="text-sm font-black text-slate-700">{p.nome?.split(' ')[0].toLowerCase() || '-'}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-black text-slate-700">{p.nome?.split(' ')[0].toLowerCase() || '-'}</span>
+                                {!p.approved && (
+                                  <span className="bg-amber-100 text-amber-600 text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase animate-pulse">Pendente</span>
+                                )}
+                              </div>
                               <span className={`text-[9px] font-bold uppercase tracking-tighter ${p.role === 'ADMIN' ? 'text-blue-500' : 'text-slate-400'}`}>{p.role}</span>
                             </div>
                           </td>
@@ -4206,7 +4214,7 @@ export default function DashboardPage() {
                             </div>
                           </td>
                           <td className="px-6 py-5 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className={`flex items-center justify-end gap-2 ${!p.approved ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                               {!p.approved && (
                                 <button 
                                   onClick={async () => {
@@ -4215,10 +4223,10 @@ export default function DashboardPage() {
                                       if (!error) fetchData();
                                     }
                                   }}
-                                  className="p-2 bg-emerald-50 text-emerald-500 hover:bg-emerald-100 rounded-lg transition-all relative group/btn"
+                                  className="p-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-all relative group/btn shadow-lg shadow-emerald-200"
                                 >
                                   <CheckCircle2 size={16} />
-                                  <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] uppercase font-black px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">Conceder Assinatura / Aprovar</span>
+                                  <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] uppercase font-black px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">Aprovar e Conceder Assinatura</span>
                                 </button>
                               )}
                               <button 
@@ -4227,12 +4235,17 @@ export default function DashboardPage() {
                               >
                                 <Edit3 size={16} />
                               </button>
-                              {userProfile?.id !== p.id && (
+                              {(userProfile?.id !== p.id || isCurrentAppAdmin) && (
                                 <button 
                                   onClick={async () => {
                                     if (confirm(`Remover acesso de ${p.nome}?`)) {
                                       const { error } = await supabase.from('user_profiles').delete().eq('id', p.id);
-                                      if (!error) fetchData();
+                                      if (error) {
+                                        console.error('Erro ao deletar:', error);
+                                        alert(`Erro ao excluir: ${error.message}`);
+                                      } else {
+                                        fetchData();
+                                      }
                                     }
                                   }}
                                   className="p-2 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
