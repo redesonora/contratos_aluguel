@@ -731,7 +731,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!templatesLoaded || !session?.user) return;
     
-    localStorage.setItem('contratos_templates', JSON.stringify(contractTemplates));
+    try {
+      localStorage.setItem('contratos_templates', JSON.stringify(contractTemplates));
+    } catch (e) {
+      console.warn("Storage error:", e);
+    }
     
     // Configura um timer para debouncing de 2 segundos antes de salvar no supabase
     const timer = setTimeout(() => {
@@ -743,7 +747,10 @@ export default function DashboardPage() {
         const validTemplates = contractTemplates.map(t => {
           if (!t.id) {
             changed = true;
-            return { ...t, id: crypto.randomUUID() };
+            const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+              ? crypto.randomUUID() 
+              : Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+            return { ...t, id: newId };
           }
           return t;
         });
@@ -1140,10 +1147,13 @@ export default function DashboardPage() {
       const localSaved = localStorage.getItem('contratos_templates');
       let localTemplates: any[] = [];
       try {
-        if (localSaved) localTemplates = JSON.parse(localSaved);
+        if (localSaved) {
+          const parsed = JSON.parse(localSaved);
+          localTemplates = Array.isArray(parsed) ? parsed : [];
+        }
       } catch(e) {}
       
-      const hasRealLocalTemplates = localTemplates.length > 1 || (localTemplates.length === 1 && localTemplates[0].name !== 'Residencial Padrão');
+      const hasRealLocalTemplates = localTemplates.length > 1 || (localTemplates.length === 1 && localTemplates[0]?.name !== 'Residencial Padrão');
 
       if (tpRes.data && tpRes.data.length > 0) {
         if (hasRealLocalTemplates) {
@@ -1180,16 +1190,19 @@ export default function DashboardPage() {
         // Se estiver vazio no banco, tentar salvar do localStorage para o Supabase e na memória
         if (localTemplates.length > 0) {
           try {
-            const toInsert = localTemplates.map(t => ({
-              id: t.id || crypto.randomUUID(),
-              name: t.name || 'Modelo Migrado',
-              content: t.content || '',
-              font_size: t.fontSize || 12,
-              font_color: t.fontColor || '#000000',
-              bold: t.bold || false,
-              alignment: t.alignment || 'justify',
-              user_id: session.user.id
-            }));
+              const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
+                ? crypto.randomUUID() 
+                : Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+              const toInsert = localTemplates.map(t => ({
+                id: t.id || newId,
+                name: t.name || 'Modelo Migrado',
+                content: t.content || '',
+                font_size: t.fontSize || 12,
+                font_color: t.fontColor || '#000000',
+                bold: t.bold || false,
+                alignment: t.alignment || 'justify',
+                user_id: session.user.id
+              }));
             const { data: insertedValues } = await supabase.from('contract_templates').insert(toInsert).select();
             if (insertedValues) {
               setContractTemplates(insertedValues.map((t: any) => ({
