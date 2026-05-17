@@ -469,6 +469,7 @@ export default function DashboardPage() {
   const [imovelCityFilter, setImovelCityFilter] = useState('todas');
   const [imovelStatusFilter, setImovelStatusFilter] = useState('todos');
   const [imovelTypeFilter, setImovelTypeFilter] = useState('todos');
+  const [inquilinoSearch, setInquilinoSearch] = useState('');
   const [selectedTemplateIdx, setSelectedTemplateIdx] = useState<number>(0);
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
   const [guarantorFilesToUpload, setGuarantorFilesToUpload] = useState<File[]>([]);
@@ -3165,13 +3166,42 @@ export default function DashboardPage() {
       }
 
       case 'inquilinos': {
-        const dataToUse = showArchived ? archivedInquilinos : inquilinos;
-        const { data: paginatedInquilinos, totalPages: inquilinosPages } = getPaginatedAndSortedData(dataToUse, 'inquilinos');
+        const rawDataToUse = showArchived ? archivedInquilinos : inquilinos;
+        
+        const filteredData = rawDataToUse.filter(inq => {
+          const searchLower = inquilinoSearch.toLowerCase();
+          const matchesSearch = 
+            inquilinoSearch === '' ||
+            (inq.nome || '').toLowerCase().includes(searchLower) ||
+            (inq.email || '').toLowerCase().includes(searchLower) ||
+            (inq.cpf_cnpj || '').toLowerCase().includes(searchLower) ||
+            (inq.telefone || '').toLowerCase().includes(searchLower);
+          
+          return matchesSearch;
+        });
+
+        const { data: paginatedInquilinos, totalPages: inquilinosPages } = getPaginatedAndSortedData(filteredData, 'inquilinos');
 
         return (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left min-w-[600px]">
+          <div className="flex flex-col gap-4">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Search size={14} />
+                </span>
+                <input 
+                  type="text"
+                  placeholder="Pesquisar por nome, e-mail, CPF/CNPJ ou telefone..."
+                  value={inquilinoSearch}
+                  onChange={(e) => setInquilinoSearch(e.target.value)}
+                  className="pl-8 pr-4 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all w-full bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left min-w-[600px]">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr className="text-slate-500 text-[10px] uppercase tracking-widest font-black">
                     <SortHeader label="Inquilino" sortKey="nome" activeTab="inquilinos" />
@@ -3241,6 +3271,7 @@ export default function DashboardPage() {
               </table>
             </div>
             <Pagination tab="inquilinos" totalPages={inquilinosPages} />
+          </div>
           </div>
         );
       }
@@ -4073,15 +4104,18 @@ export default function DashboardPage() {
 
         return (
           <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="bg-emerald-50 px-4 py-2 rounded-xl flex items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 font-sans">{assinantesCount} Assinantes</span>
-                </div>
-                <div className="bg-amber-50 px-4 py-2 rounded-xl flex items-center gap-2">
-                  <div className="w-2 h-2 bg-amber-500 rounded-full" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 font-sans">{trialCount} em Trial</span>
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-slate-400 uppercase tracking-widest mb-4">Usuários Ativos</h2>
+                <div className="flex items-center gap-4">
+                  <div className="bg-emerald-50 px-4 py-2 rounded-xl flex items-center gap-2">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 font-sans">{assinantesCount} Assinantes</span>
+                  </div>
+                  <div className="bg-amber-50 px-4 py-2 rounded-xl flex items-center gap-2">
+                    <div className="w-2 h-2 bg-amber-500 rounded-full" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 font-sans">{trialCount} em Trial</span>
+                  </div>
                 </div>
               </div>
               <div className="relative group">
@@ -4089,7 +4123,7 @@ export default function DashboardPage() {
                 <input 
                   type="text" 
                   placeholder="Buscar por nome, e-mail ou CPF..." 
-                  className="bg-slate-50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl px-12 py-3 text-sm font-bold w-full md:w-80 transition-all shadow-sm"
+                  className="bg-slate-50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-full px-12 py-3 text-sm font-bold w-full md:w-80 transition-all shadow-sm"
                 />
               </div>
             </div>
@@ -4101,8 +4135,11 @@ export default function DashboardPage() {
                     <tr className="bg-slate-50/50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                       <th className="px-6 py-5">Usuário</th>
                       <th className="px-6 py-5">Nome Completo</th>
+                      <th className="px-6 py-5">CPF</th>
+                      <th className="px-6 py-5">E-mail</th>
                       <th className="px-6 py-5 text-center">Status Pagto</th>
                       <th className="px-6 py-5 text-center">Plano</th>
+                      <th className="px-6 py-5">Início</th>
                       <th className="px-6 py-5">Expiração</th>
                       <th className="px-6 py-5">Último Acesso</th>
                       <th className="px-6 py-5 text-right">Ações</th>
@@ -4115,11 +4152,13 @@ export default function DashboardPage() {
                         <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
                           <td className="px-6 py-5">
                             <div className="flex flex-col">
-                              <span className="text-sm font-black text-slate-700">{p.nome?.split(' ')[0].toLowerCase()}</span>
+                              <span className="text-sm font-black text-slate-700">{p.nome?.split(' ')[0].toLowerCase() || '-'}</span>
                               <span className={`text-[9px] font-bold uppercase tracking-tighter ${p.role === 'ADMIN' ? 'text-blue-500' : 'text-slate-400'}`}>{p.role}</span>
                             </div>
                           </td>
                           <td className="px-6 py-5 text-sm font-bold text-slate-600">{p.nome || '-'}</td>
+                          <td className="px-6 py-5 text-xs text-slate-500">{p.cpf || '-'}</td>
+                          <td className="px-6 py-5 text-xs text-slate-500">-</td>
                           <td className="px-6 py-5">
                             <div className="flex justify-center">
                               <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
@@ -4141,12 +4180,15 @@ export default function DashboardPage() {
                             </div>
                           </td>
                           <td className="px-6 py-5">
+                            <span className="text-xs text-slate-500 font-bold">{p.data_inicio ? new Date(p.data_inicio).toLocaleDateString('pt-BR') : '-'}</span>
+                          </td>
+                          <td className="px-6 py-5">
                             <div className="flex flex-col">
                               <span className={`text-xs font-black ${
                                 isGleison ? 'text-emerald-500' :
                                 p.trial_ends_at && new Date(p.trial_ends_at) < new Date() ? 'text-red-500' : 'text-slate-600'
                               }`}>
-                                {isGleison ? '∞' : (p.trial_ends_at ? new Date(p.trial_ends_at).toLocaleDateString() : '-')}
+                                {isGleison ? '∞' : (p.trial_ends_at ? new Date(p.trial_ends_at).toLocaleDateString('pt-BR') : '-')}
                               </span>
                               <span className="text-[9px] font-bold uppercase text-slate-400">
                                 {isGleison ? 'VITALÍCIO' : (p.trial_ends_at && new Date(p.trial_ends_at) < new Date() ? 'EXPIRADO' : 'ATIVO')}
@@ -4156,11 +4198,25 @@ export default function DashboardPage() {
                           <td className="px-6 py-5">
                             <div className="text-xs font-bold text-slate-500 flex items-center gap-2">
                               <div className={`w-1.5 h-1.5 rounded-full ${p.last_access ? 'bg-emerald-400' : 'bg-slate-300'}`} />
-                              {p.last_access ? new Date(p.last_access).toLocaleDateString() : 'Nunca'}
+                              {p.last_access ? new Date(p.last_access).toLocaleDateString('pt-BR') : 'Nunca'}
                             </div>
                           </td>
                           <td className="px-6 py-5 text-right">
                             <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {!p.approved && (
+                                <button 
+                                  onClick={async () => {
+                                    if (confirm(`Aprovar entrada de ${p.nome}?`)) {
+                                      const { error } = await supabase.from('user_profiles').update({ approved: true, status_pagamento: 'PAGO', plano: 'Pro' }).eq('id', p.id);
+                                      if (!error) fetchData();
+                                    }
+                                  }}
+                                  className="p-2 bg-emerald-50 text-emerald-500 hover:bg-emerald-100 rounded-lg transition-all relative group/btn"
+                                >
+                                  <CheckCircle2 size={16} />
+                                  <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] uppercase font-black px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">Conceder Assinatura / Aprovar</span>
+                                </button>
+                              )}
                               <button 
                                 onClick={() => setEditingUser(p)}
                                 className="p-2 hover:bg-blue-50 text-slate-300 hover:text-blue-500 rounded-lg transition-all"
@@ -4524,7 +4580,7 @@ export default function DashboardPage() {
   const isTrialActive = userProfile?.trial_ends_at ? new Date(userProfile.trial_ends_at) > new Date() : false;
   const trialDaysLeft = userProfile?.trial_ends_at ? Math.max(0, Math.ceil((new Date(userProfile.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
 
-  if (userProfile && !userProfile.approved && !isTrialActive && userProfile.role !== 'ADMIN') {
+  if (userProfile && !userProfile.approved && userProfile.role !== 'ADMIN') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans">
         <motion.div 
@@ -4532,20 +4588,20 @@ export default function DashboardPage() {
           animate={{ opacity: 1, scale: 1 }}
           className="bg-white p-10 rounded-3xl shadow-xl w-full max-w-lg border border-slate-200 text-center flex flex-col items-center gap-6"
         >
-          <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-2">
-            <ShieldAlert size={40} />
+          <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mb-2">
+            <Clock size={40} />
           </div>
           <div className="space-y-2">
-            <h1 className="text-3xl font-black text-slate-800 tracking-tight uppercase italic leading-tight">Período de Teste Encerrado</h1>
+            <h1 className="text-3xl font-black text-slate-800 tracking-tight uppercase italic leading-tight">Acesso Pendente</h1>
             <p className="text-slate-500 font-medium leading-relaxed italic">
-              Olá, <span className="font-bold text-slate-800">{userProfile.nome}</span>. Seus 7 dias de trial terminaram e sua conta ainda não foi <span className="text-blue-600 font-black">APROVADA</span> definitivamente por um administrador.
+              Olá, <span className="font-bold text-slate-800">{userProfile.nome}</span>. Seu cadastro foi recebido e está <span className="text-amber-600 font-black">AGUARDANDO APROVAÇÃO</span> de um administrador.
             </p>
           </div>
           <div className="w-full h-px bg-slate-100" />
           <div className="space-y-4 w-full">
-            <div className="flex items-center gap-3 bg-blue-50 p-4 rounded-2xl text-blue-700 text-xs font-bold border border-blue-100 text-left">
+            <div className="flex items-center gap-3 bg-amber-50 p-4 rounded-2xl text-amber-700 text-xs font-bold border border-amber-100 text-left">
               <Info size={18} className="shrink-0" />
-              <p>Para continuar utilizando o sistema, entre em contato com o administrador responsável pela sua unidade.</p>
+              <p>Você receberá acesso aos módulos autorizados assim que o administrador liberar o seu perfil.</p>
             </div>
             <button 
               onClick={handleLogout}
@@ -4672,7 +4728,7 @@ export default function DashboardPage() {
           {userProfile?.role === 'ADMIN' && (
             <SidebarItem 
               icon={Users} 
-              label="Equipe" 
+              label="Usuários" 
               active={activeTab === 'usuarios'} 
               onClick={() => { setActiveTab('usuarios'); setIsSidebarOpen(false); setShowArchived(false); }} 
             />
