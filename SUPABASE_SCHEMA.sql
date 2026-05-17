@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   role user_role DEFAULT 'CORRETOR' NOT NULL,
   nome TEXT,
+  email TEXT,
   cpf VARCHAR(14),
   approved BOOLEAN DEFAULT false,
   plano TEXT DEFAULT 'Nenhum',
@@ -35,7 +36,7 @@ BEGIN
   RETURN EXISTS (
     SELECT 1 FROM user_profiles 
     WHERE id = auth.uid() AND role = 'ADMIN'
-  ) OR (auth.jwt() ->> 'email') = 'gleisonisaias@gmail.com';
+  ) OR LOWER(auth.jwt() ->> 'email') = 'gleisonisaias@gmail.com';
 END;
 $$;
 

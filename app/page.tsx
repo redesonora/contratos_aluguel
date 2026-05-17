@@ -34,6 +34,7 @@ import {
   ArchiveRestore,
   Mail,
   Send,
+  RefreshCw,
   Eye,
   TrendingUp,
   TrendingDown,
@@ -136,6 +137,7 @@ interface UserProfile {
   role: 'ADMIN' | 'CORRETOR' | 'PROPRIETARIO';
   nome: string | null;
   cpf?: string;
+  email?: string;
   approved: boolean;
   plano?: string;
   status_pagamento?: string;
@@ -457,6 +459,7 @@ export default function DashboardPage() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [pwdForm, setPwdForm] = useState({ current: '', new: '', confirm: '' });
   const [loading, setLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
@@ -909,6 +912,7 @@ export default function DashboardPage() {
             id: userId, 
             role, 
             nome: meta.full_name || userEmail?.split('@')[0] || 'Usuário',
+            email: userEmail,
             cpf: meta.cpf || null,
             approved,
             plano: 'Nenhum',
@@ -925,6 +929,7 @@ export default function DashboardPage() {
               id: userId, 
               role: (isGleisonEmail ? 'ADMIN' : 'CORRETOR'), 
               nome: (meta.full_name || userEmail?.split('@')[0] || 'Usuário') + ' (LOCAL)', 
+              email: userEmail,
               approved: (isGleisonEmail ? true : false), 
               plano: 'Pro',
               status_pagamento: 'PAGO',
@@ -1180,8 +1185,10 @@ export default function DashboardPage() {
       }
 
       // Buscar perfil de usuários para ADMIN ou Gleison
+      let perfisData: any[] | null = null;
       if (userProfile?.role === 'ADMIN' || session?.user?.email?.toLowerCase() === 'gleisonisaias@gmail.com') {
-        const { data: perfisData, error: perfisError } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
+        const { data, error: perfisError } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
+        perfisData = data;
         if (perfisError) {
           console.error('Erro ao buscar lista de perfis para admin:', perfisError);
         } else {
@@ -1230,6 +1237,12 @@ export default function DashboardPage() {
 
       setNotifications(combinedAlerts);
       setTemplatesLoaded(true);
+      console.log('Dados carregados com sucesso:', {
+        imoveis: imRes.data?.length,
+        inquilinos: inRes.data?.length,
+        contratos: coRes.data?.length,
+        perfis: perfisData?.length
+      });
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     } finally {
@@ -4106,7 +4119,7 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-6 py-5 text-sm font-bold text-slate-600">{p.nome || '-'}</td>
                           <td className="px-6 py-5 text-xs text-slate-500">{p.cpf || '-'}</td>
-                          <td className="px-6 py-5 text-xs text-slate-500">-</td>
+                          <td className="px-6 py-5 text-xs text-slate-500">{p.email || '-'}</td>
                           <td className="px-6 py-5">
                             <div className="flex justify-center">
                               <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
@@ -4163,6 +4176,23 @@ export default function DashboardPage() {
                                 >
                                   <CheckCircle2 size={16} />
                                   <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] uppercase font-black px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">Aprovar e Conceder Assinatura</span>
+                                </button>
+                              )}
+                              {!p.approved && (
+                                <button 
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`Aprovar acesso para ${p.nome}?`)) {
+                                      const { error } = await supabase.from('user_profiles').update({ approved: true, role: 'CORRETOR' }).eq('id', p.id);
+                                      if (!error) {
+                                        setPerfis(prev => prev.map(item => item.id === p.id ? { ...item, approved: true, role: 'CORRETOR' } : item));
+                                      }
+                                    }
+                                  }}
+                                  className="p-2 hover:bg-emerald-50 text-slate-300 hover:text-emerald-500 rounded-lg transition-all"
+                                  title="Aprovar Usuário"
+                                >
+                                  <CheckCircle2 size={16} />
                                 </button>
                               )}
                               <button 
@@ -4223,7 +4253,7 @@ export default function DashboardPage() {
                           </div>
                           <div>
                             <p className="text-sm font-black text-slate-700">{editingUser.nome}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{editingUser.plano || 'Nenhum'} • {editingUser.role}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{editingUser.email || editingUser.id} • {editingUser.role}</p>
                           </div>
                         </div>
                       </div>
@@ -4266,10 +4296,20 @@ export default function DashboardPage() {
                         </div>
                       </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-slate-400">Status Pagamento</label>
-                        <select 
-                          id="edit-status"
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-1.5 flex items-center gap-3 pt-6">
+                          <input 
+                            id="edit-approved"
+                            type="checkbox"
+                            defaultChecked={editingUser.approved}
+                            className="w-5 h-5 accent-blue-600 rounded bg-slate-100 border-slate-200"
+                          />
+                          <label htmlFor="edit-approved" className="text-xs font-bold text-slate-700">Aprovar Acesso ao Sistema</label>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-slate-400">Status Pagamento</label>
+                          <select 
+                            id="edit-status"
                           defaultValue={editingUser.status_pagamento || 'Sem Assinatura'}
                           className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl px-4 py-4 font-bold text-sm transition-all appearance-none"
                         >
@@ -4279,6 +4319,7 @@ export default function DashboardPage() {
                           <option value="PENDENTE">PENDENTE</option>
                         </select>
                       </div>
+                    </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-1.5">
