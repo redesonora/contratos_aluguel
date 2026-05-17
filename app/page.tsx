@@ -718,6 +718,7 @@ export default function DashboardPage() {
   };
   
   const [contractTemplates, setContractTemplates] = useState<{
+    id?: string,
     name: string, 
     content: string,
     fontSize?: number,
@@ -741,7 +742,68 @@ export default function DashboardPage() {
 
   useEffect(() => {
     localStorage.setItem('contratos_templates', JSON.stringify(contractTemplates));
-  }, [contractTemplates]);
+    
+    // Configura um timer para debouncing de 2 segundos antes de salvar no supabase
+    const timer = setTimeout(() => {
+      const syncWithSupabase = async () => {
+        if (!session?.user) return;
+        
+        // Garante que templates criados localmente tenham um id
+        let changed = false;
+        const validTemplates = contractTemplates.map(t => {
+          if (!t.id) {
+            changed = true;
+            return { ...t, id: crypto.randomUUID() };
+          }
+          return t;
+        });
+        
+        if (changed) {
+           setContractTemplates(validTemplates);
+           return; // the next effect execution will save
+        }
+        
+        try {
+          // Extrai os IDs atuais
+          const currentIds = validTemplates.map(t => t.id).filter(Boolean);
+          
+          if (currentIds.length > 0) {
+            // Remove templates que não estão mais no array local
+            await supabase.from('contract_templates')
+              .delete()
+              .eq('user_id', session.user.id)
+              .not('id', 'in', `(${currentIds.join(',')})`);
+          } else {
+             // Deleta todos se vazio
+             await supabase.from('contract_templates')
+              .delete()
+              .eq('user_id', session.user.id);
+          }
+
+          if (validTemplates.length > 0) {
+            const toUpsert = validTemplates.map(t => ({
+              id: t.id,
+              user_id: session.user.id,
+              name: t.name,
+              content: t.content,
+              font_size: t.fontSize || 12,
+              font_color: t.fontColor || '#000000',
+              bold: t.bold || false,
+              alignment: t.alignment || 'justify'
+            }));
+            
+            await supabase.from('contract_templates').upsert(toUpsert);
+          }
+        } catch(e) {
+          console.error("Erro ao sincronizar templates", e);
+        }
+      };
+      
+      syncWithSupabase();
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, [contractTemplates, session]);
 
   /* state already declared above */
   
@@ -1062,13 +1124,16 @@ export default function DashboardPage() {
         paQuery = paQuery.not('contratos', 'is', null).filter('contratos.proprietario_id', 'eq', userProfile.proprietario_id);
       }
 
-      const [imRes, inRes, prRes, coRes, paRes, logRes] = await Promise.all([
+      const tpQuery = supabase.from('contract_templates').select('*').order('created_at', { ascending: true });
+
+      const [imRes, inRes, prRes, coRes, paRes, logRes, tpRes] = await Promise.all([
         imQuery,
         inQuery,
         prQuery,
         coQuery,
         paQuery,
-        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50)
+        supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50),
+        tpQuery
       ]);
       
       setLogs(logRes.data || []);
@@ -1080,6 +1145,78 @@ export default function DashboardPage() {
       setProprietarios(prRes.data || []);
       setContratos(coRes.data || []);
       setPagamentos(paRes.data || []);
+
+      // Migração e carregamento de templates do banco
+      const localSaved = localStorage.getItem('contratos_templates');
+      let localTemplates: any[] = [];
+      try {
+        if (localSaved) localTemplates = JSON.parse(localSaved);
+      } catch(e) {}
+      
+      const hasRealLocalTemplates = localTemplates.length > 1 || (localTemplates.length === 1 && localTemplates[0].name !== 'Residencial Padrão');
+
+      if (tpRes.data && tpRes.data.length > 0) {
+        if (hasRealLocalTemplates) {
+          // Merge: Apenas mantém o local ativo para ser "synced" para cima pelo useEffect
+          // Isso evita perder o localStorage se o banco tiver apenas o padrão
+          const dbHasReal = tpRes.data.length > 1 || (tpRes.data.length === 1 && tpRes.data[0].name !== 'Residencial Padrão');
+          if (!dbHasReal) {
+             // Deixe o frontend usar o local, o effect vai sobrescrever o DB
+          } else {
+             // Ambos tem templates reais? Idealmente mesclamos, mas para evitar complexidade,
+             // vamos carregar o banco.
+             setContractTemplates(tpRes.data.map((t: any) => ({
+                id: t.id,
+                name: t.name,
+                content: t.content,
+                fontSize: t.font_size,
+                fontColor: t.font_color,
+                bold: t.bold,
+                alignment: t.alignment
+              })));
+          }
+        } else {
+          setContractTemplates(tpRes.data.map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            content: t.content,
+            fontSize: t.font_size,
+            fontColor: t.font_color,
+            bold: t.bold,
+            alignment: t.alignment
+          })));
+        }
+      } else {
+        // Se estiver vazio no banco, tentar salvar do localStorage para o Supabase e na memória
+        if (localTemplates.length > 0) {
+          try {
+            const toInsert = localTemplates.map(t => ({
+              id: t.id || crypto.randomUUID(),
+              name: t.name || 'Modelo Migrado',
+              content: t.content || '',
+              font_size: t.fontSize || 12,
+              font_color: t.fontColor || '#000000',
+              bold: t.bold || false,
+              alignment: t.alignment || 'justify',
+              user_id: session.user.id
+            }));
+            const { data: insertedValues } = await supabase.from('contract_templates').insert(toInsert).select();
+            if (insertedValues) {
+              setContractTemplates(insertedValues.map((t: any) => ({
+                id: t.id,
+                name: t.name,
+                content: t.content,
+                fontSize: t.font_size,
+                fontColor: t.font_color,
+                bold: t.bold,
+                alignment: t.alignment
+              })));
+            }
+          } catch(e) {
+            console.error("Erro ao migrar templates do localStorage", e);
+          }
+        }
+      }
 
       if (userProfile.role === 'ADMIN') {
         const { data: perfisData } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
