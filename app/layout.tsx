@@ -1,20 +1,22 @@
-import type {Metadata} from 'next';
-import { Inter } from 'next/font/google';
-import './globals.css';
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'ImobiSaaS - Gestão Imobiliária',
-  description: 'Gestão de contratos e recibos imobiliários',
+  title: "REALIZE - Gestão Imobiliária",
+  description: "Administração de aluguéis e contratos",
 };
 
-export default function RootLayout({children}: {children: React.ReactNode}) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="pt-BR">
-      <body className={`${inter.className} bg-slate-50 text-slate-900 min-h-screen`} suppressHydrationWarning>
-        {children}
-      </body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }

@@ -1,7 +1,7 @@
--- SUPABASE SQL SCHEMA
--- Execute este script no SQL Editor do Supabase para configurar todo o banco de dados.
+-- ==========================================
+-- PARTE 1: TIPOS E FUNÇÕES (RODE PRIMEIRO)
+-- ==========================================
 
--- 1. Tipos e Perfis
 DO $$ 
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
@@ -9,23 +9,6 @@ BEGIN
     END IF;
 END $$;
 
-CREATE TABLE IF NOT EXISTS user_profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  role user_role DEFAULT 'CORRETOR' NOT NULL,
-  nome TEXT,
-  email TEXT,
-  cpf VARCHAR(14),
-  approved BOOLEAN DEFAULT false,
-  plano TEXT DEFAULT 'Nenhum',
-  status_pagamento TEXT DEFAULT 'Sem Assinatura',
-  data_inicio TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
-  trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT (timezone('utc'::text, now()) + interval '7 days'),
-  last_access TIMESTAMP WITH TIME ZONE,
-  proprietario_id UUID, -- Referência manual para evitar erros de ordem de criação
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- Funções auxiliares de Admin
 CREATE OR REPLACE FUNCTION is_admin() 
 RETURNS boolean 
 LANGUAGE plpgsql 
@@ -40,64 +23,48 @@ BEGIN
 END;
 $$;
 
--- Políticas de user_profiles
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+-- ==========================================
+-- PARTE 2: TABELAS (RODE SEGUNDO)
+-- ==========================================
 
-DO $$ 
-BEGIN
-    DROP POLICY IF EXISTS "profiles_select_all" ON user_profiles;
-    DROP POLICY IF EXISTS "profiles_insert_own" ON user_profiles;
-    DROP POLICY IF EXISTS "profiles_update_policy" ON user_profiles;
-    DROP POLICY IF EXISTS "profiles_delete_admin" ON user_profiles;
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  role user_role DEFAULT 'CORRETOR' NOT NULL,
+  nome TEXT,
+  email TEXT,
+  cpf VARCHAR(14),
+  approved BOOLEAN DEFAULT false,
+  plano TEXT DEFAULT 'Nenhum',
+  status_pagamento TEXT DEFAULT 'Sem Assinatura',
+  data_inicio TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+  trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT (timezone('utc'::text, now()) + interval '7 days'),
+  last_access TIMESTAMP WITH TIME ZONE,
+  proprietario_id UUID,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
-    CREATE POLICY "profiles_select_all" ON user_profiles FOR SELECT TO authenticated USING (true);
-    CREATE POLICY "profiles_insert_own" ON user_profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
-    CREATE POLICY "profiles_update_policy" ON user_profiles FOR UPDATE TO authenticated USING (auth.uid() = id OR is_admin());
-    CREATE POLICY "profiles_delete_admin" ON user_profiles FOR DELETE TO authenticated USING (is_admin());
-END $$;
-
--- 2. Tabelas Principais
-
--- Proprietários
 CREATE TABLE IF NOT EXISTS proprietarios (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
   nome TEXT NOT NULL,
   cpf_cnpj VARCHAR(18) NOT NULL,
-  rg TEXT,
-  estado_civil TEXT,
-  endereco TEXT NOT NULL,
-  bairro TEXT,
-  cidade TEXT,
-  estado VARCHAR(2),
   email TEXT,
   telefone TEXT,
   arquivado BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Imóveis
 CREATE TABLE IF NOT EXISTS imoveis (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
-  apelido TEXT,
   endereco TEXT NOT NULL,
-  numero TEXT,
-  complemento TEXT,
-  bairro TEXT,
   cidade TEXT NOT NULL,
   estado VARCHAR(2) NOT NULL,
-  cep VARCHAR(9),
-  tipo_imovel TEXT DEFAULT 'RESIDENCIAL',
   status TEXT DEFAULT 'Disponível',
-  cemig TEXT,
-  copasa TEXT,
-  descricao TEXT,
   arquivado BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Inquilinos
 CREATE TABLE IF NOT EXISTS inquilinos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
@@ -105,22 +72,10 @@ CREATE TABLE IF NOT EXISTS inquilinos (
   cpf_cnpj VARCHAR(18) NOT NULL,
   email TEXT,
   telefone TEXT,
-  estado_civil TEXT,
-  rg TEXT,
-  profissao TEXT,
-  nacionalidade TEXT,
-  naturalidade TEXT,
-  uf_nascimento VARCHAR(2),
-  nome_fiador TEXT,
-  cpf_fiador VARCHAR(18),
-  rg_fiador TEXT,
-  endereco_fiador TEXT,
-  documentos_fiador TEXT[],
   arquivado BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Contratos
 CREATE TABLE IF NOT EXISTS contratos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
@@ -130,32 +85,11 @@ CREATE TABLE IF NOT EXISTS contratos (
   valor_aluguel DECIMAL(10,2) NOT NULL,
   data_inicio DATE NOT NULL,
   data_fim DATE NOT NULL,
-  dia_vencimento INTEGER CHECK (dia_vencimento >= 1 AND dia_vencimento <= 31),
-  status TEXT DEFAULT 'ativo' CHECK (status IN ('ativo', 'finalizado', 'cancelado')),
-  renovacoes_count INTEGER DEFAULT 0,
-  clausulas TEXT,
-  alinhamento_texto TEXT DEFAULT 'justify',
-  arquivo_url TEXT,
-  documentos TEXT[],
+  status TEXT DEFAULT 'ativo',
   arquivado BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Modelos de Contratos
-CREATE TABLE IF NOT EXISTS contract_templates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
-  name TEXT NOT NULL,
-  content TEXT,
-  font_size INTEGER DEFAULT 12,
-  font_color TEXT DEFAULT '#000000',
-  bold BOOLEAN DEFAULT false,
-  alignment TEXT DEFAULT 'justify',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- Pagamentos
 CREATE TABLE IF NOT EXISTS pagamentos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
@@ -163,67 +97,45 @@ CREATE TABLE IF NOT EXISTS pagamentos (
   valor_esperado DECIMAL(10,2),
   valor_pago DECIMAL(10,2),
   data_vencimento DATE,
-  data_pagamento TIMESTAMP WITH TIME ZONE,
-  competencia_mes INTEGER NOT NULL,
-  competencia_ano INTEGER NOT NULL,
   status TEXT DEFAULT 'Pendente',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Recibos
-CREATE TABLE IF NOT EXISTS recibos (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
-  pagamento_id UUID NOT NULL REFERENCES pagamentos(id),
-  numero_sequencial BIGSERIAL,
-  conteudo_customizado TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
+-- ==========================================
+-- PARTE 3: SEGURANÇA E POLÍTICAS (RODE POR ÚLTIMO)
+-- ==========================================
 
--- Auditoria (Logs)
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
-  acao TEXT NOT NULL,
-  tabela TEXT NOT NULL,
-  registro_id UUID,
-  detalhes JSONB,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 3. Configuração de RLS
+-- Habilita RLS em todas as tabelas
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE proprietarios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE imoveis ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inquilinos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contratos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE contract_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pagamentos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE recibos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+-- Limpeza de Políticas para evitar erro "já existe"
 DO $$ 
 BEGIN
+    DROP POLICY IF EXISTS "profiles_select_all" ON user_profiles;
+    DROP POLICY IF EXISTS "profiles_insert_own" ON user_profiles;
+    DROP POLICY IF EXISTS "profiles_update_policy" ON user_profiles;
+    DROP POLICY IF EXISTS "profiles_delete_admin" ON user_profiles;
+
     DROP POLICY IF EXISTS "proprietarios_policy" ON proprietarios;
-    CREATE POLICY "proprietarios_policy" ON proprietarios FOR ALL USING (auth.uid() = user_id OR is_admin());
-
     DROP POLICY IF EXISTS "imoveis_policy" ON imoveis;
-    CREATE POLICY "imoveis_policy" ON imoveis FOR ALL USING (auth.uid() = user_id OR is_admin());
-
     DROP POLICY IF EXISTS "inquilinos_policy" ON inquilinos;
-    CREATE POLICY "inquilinos_policy" ON inquilinos FOR ALL USING (auth.uid() = user_id OR is_admin());
-
     DROP POLICY IF EXISTS "contratos_policy" ON contratos;
-    CREATE POLICY "contratos_policy" ON contratos FOR ALL USING (auth.uid() = user_id OR is_admin());
-
-    DROP POLICY IF EXISTS "contract_templates_policy" ON contract_templates;
-    CREATE POLICY "contract_templates_policy" ON contract_templates FOR ALL USING (auth.uid() = user_id OR is_admin());
-
     DROP POLICY IF EXISTS "pagamentos_policy" ON pagamentos;
-    CREATE POLICY "pagamentos_policy" ON pagamentos FOR ALL USING (auth.uid() = user_id OR is_admin());
-
-    DROP POLICY IF EXISTS "recibos_policy" ON recibos;
-    CREATE POLICY "recibos_policy" ON recibos FOR ALL USING (auth.uid() = user_id OR is_admin());
-
-    DROP POLICY IF EXISTS "audit_logs_policy" ON audit_logs;
-    CREATE POLICY "audit_logs_policy" ON audit_logs FOR ALL USING (auth.uid() = user_id OR is_admin());
 END $$;
+
+-- Criação das Políticas
+CREATE POLICY "profiles_select_all" ON user_profiles FOR SELECT TO authenticated USING (true);
+CREATE POLICY "profiles_insert_own" ON user_profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
+CREATE POLICY "profiles_update_policy" ON user_profiles FOR UPDATE TO authenticated USING (auth.uid() = id OR is_admin());
+CREATE POLICY "profiles_delete_admin" ON user_profiles FOR DELETE TO authenticated USING (is_admin());
+
+CREATE POLICY "proprietarios_policy" ON proprietarios FOR ALL USING (auth.uid() = user_id OR is_admin());
+CREATE POLICY "imoveis_policy" ON imoveis FOR ALL USING (auth.uid() = user_id OR is_admin());
+CREATE POLICY "inquilinos_policy" ON inquilinos FOR ALL USING (auth.uid() = user_id OR is_admin());
+CREATE POLICY "contratos_policy" ON contratos FOR ALL USING (auth.uid() = user_id OR is_admin());
+CREATE POLICY "pagamentos_policy" ON pagamentos FOR ALL USING (auth.uid() = user_id OR is_admin());
