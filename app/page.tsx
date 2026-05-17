@@ -986,6 +986,7 @@ export default function DashboardPage() {
 
     const initAuth = async () => {
       try {
+        setAuthLoading(true);
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -993,26 +994,22 @@ export default function DashboardPage() {
           const msg = error.message?.toLowerCase() || '';
           if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
             await handleAuthError();
-          } else {
-            setAuthLoading(false);
+            return;
           }
-          return;
         }
 
         setSession(session);
         if (session) {
-          fetchProfile(session.user.id, session.user.email);
-        } else {
-          setAuthLoading(false);
+          await fetchProfile(session.user.id, session.user.email);
         }
       } catch (err: any) {
         console.error('Falha no carregamento da autenticação:', err);
         const msg = err?.message?.toLowerCase() || '';
         if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
           await handleAuthError();
-        } else {
-          setAuthLoading(false);
         }
+      } finally {
+        setAuthLoading(false);
       }
     };
 
@@ -1102,7 +1099,12 @@ export default function DashboardPage() {
   // Fetch Data
   const fetchData = useCallback(async () => {
     try {
-      if (!session?.user || !userProfile) return;
+      if (!session?.user || !userProfile) {
+        console.warn('fetchData: Sessão ou perfil não disponível');
+        return;
+      }
+
+      console.log('Iniciando carregamento de dados (fetchData)...');
 
       let imQuery = supabase.from('imoveis').select('*').or('arquivado.eq.false,arquivado.is.null').order('created_at', { ascending: false }).limit(200);
       let inQuery = supabase.from('inquilinos').select('*').or('arquivado.eq.false,arquivado.is.null').order('created_at', { ascending: false }).limit(200);
@@ -1126,13 +1128,10 @@ export default function DashboardPage() {
 
       // Filtro para Proprietário: Vê apenas o que lhe pertence
       if (userProfile.role === 'PROPRIETARIO' && userProfile.proprietario_id) {
-        // Obter ids de imóveis do proprietário para filtrar pagamentos indiretamente se necessário
         imQuery = imQuery.eq('proprietario_id', userProfile.proprietario_id);
         coQuery = coQuery.eq('proprietario_id', userProfile.proprietario_id);
         prQuery = prQuery.eq('id', userProfile.proprietario_id);
         inQuery = inQuery.eq('proprietario_id', userProfile.proprietario_id);
-        
-        // Pagamentos: Para filtrar por proprietário_id dentro do objeto relacionado 'contratos'
         paQuery = paQuery.not('contratos', 'is', null).filter('contratos.proprietario_id', 'eq', userProfile.proprietario_id);
       }
 
@@ -1149,16 +1148,13 @@ export default function DashboardPage() {
       ]);
       
       setLogs(logRes.data || []);
-
       setImoveis(imRes.data || []);
-      
       setInquilinos(inRes.data || []);
-      
       setProprietarios(prRes.data || []);
       setContratos(coRes.data || []);
       setPagamentos(paRes.data || []);
 
-      // Migração e carregamento de templates do banco
+      // Migração e carregamento de templates
       const localSaved = localStorage.getItem('contratos_templates');
       let localTemplates: any[] = [];
       try {
@@ -1167,139 +1163,56 @@ export default function DashboardPage() {
           localTemplates = Array.isArray(parsed) ? parsed : [];
         }
       } catch(e) {}
-      
-      const hasRealLocalTemplates = localTemplates.length > 1 || (localTemplates.length === 1 && localTemplates[0]?.name !== 'Residencial Padrão');
 
       if (tpRes.data && tpRes.data.length > 0) {
-        if (hasRealLocalTemplates) {
-          // Merge: Apenas mantém o local ativo para ser "synced" para cima pelo useEffect
-          // Isso evita perder o localStorage se o banco tiver apenas o padrão
-          const dbHasReal = tpRes.data.length > 1 || (tpRes.data.length === 1 && tpRes.data[0].name !== 'Residencial Padrão');
-          if (!dbHasReal) {
-             // Use local templates
-             setContractTemplates(localTemplates);
-          } else {
-             // Ambos tem templates reais? Idealmente mesclamos, mas para evitar complexidade,
-             // vamos carregar o banco.
-             setContractTemplates(tpRes.data.map((t: any) => ({
-                id: t.id,
-                name: t.name,
-                content: t.content,
-                fontSize: t.font_size,
-                fontColor: t.font_color,
-                bold: t.bold,
-                alignment: t.alignment
-              })));
-          }
-        } else {
-          setContractTemplates(tpRes.data.map((t: any) => ({
-            id: t.id,
-            name: t.name,
-            content: t.content,
-            fontSize: t.font_size,
-            fontColor: t.font_color,
-            bold: t.bold,
-            alignment: t.alignment
-          })));
-        }
-      } else {
-        // Se estiver vazio no banco, tentar salvar do localStorage para o Supabase e na memória
-        if (localTemplates.length > 0) {
-          try {
-              const newId = Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-              const toInsert = localTemplates.map(t => ({
-                id: t.id || newId,
-                name: t.name || 'Modelo Migrado',
-                content: t.content || '',
-                font_size: t.fontSize || 12,
-                font_color: t.fontColor || '#000000',
-                bold: t.bold || false,
-                alignment: t.alignment || 'justify',
-                user_id: session.user.id
-              }));
-            const { data: insertedValues } = await supabase.from('contract_templates').insert(toInsert).select();
-            if (insertedValues) {
-              setContractTemplates(insertedValues.map((t: any) => ({
-                id: t.id,
-                name: t.name,
-                content: t.content,
-                fontSize: t.font_size,
-                fontColor: t.font_color,
-                bold: t.bold,
-                alignment: t.alignment
-              })));
-            }
-          } catch(e) {
-            console.error("Erro ao migrar templates do localStorage", e);
-          }
-        } else {
-          // Caso final: Tudo vazio, usar o padrão
-          setContractTemplates([{ 
-            name: 'Residencial Padrão', 
-            content: `CONTRATO DE LOCAÇÃO RESIDENCIAL\n\nLOCADOR: [DADOS DO PROPRIETÁRIO]\nLOCATÁRIO: {{inquilino}}, CPF: {{cpf}}\n\nOBJETO: O imóvel localizado em {{imovel}}.\n\nCLÁUSULA PRIMEIRA - DO VALOR: O aluguel mensal é de R$ {{valor}}.\n\nCLÁUSULA SEGUNDA - DO PRAZO: O contrato tem início em {{data_inicio}} e término em {{data_fim}}.\n\n[RESTANTE DAS CLÁUSULAS PADRÃO...]`,
-            fontSize: 12,
-            fontColor: '#000000',
-            bold: false,
-            alignment: 'justify'
-          }]);
-        }
+        setContractTemplates(tpRes.data.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          content: t.content,
+          fontSize: t.font_size,
+          fontColor: t.font_color,
+          bold: t.bold,
+          alignment: t.alignment
+        })));
+      } else if (localTemplates.length > 0) {
+        // Fallback para local se banco vazio
+        setContractTemplates(localTemplates);
       }
 
+      // Buscar perfil de usuários para ADMIN ou Gleison
       if (userProfile?.role === 'ADMIN' || session?.user?.email?.toLowerCase() === 'gleisonisaias@gmail.com') {
         const { data: perfisData, error: perfisError } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
         if (perfisError) {
           console.error('Erro ao buscar lista de perfis para admin:', perfisError);
-          // Se for erro de tabela inexistente, mostramos uma mensagem no console mais clara
-          if (perfisError.code === '42P01') {
-            console.warn('DICA: Para ver a lista de usuários, você precisa rodar o script SUPABASE_SCHEMA.sql.');
-          }
+        } else {
+          setPerfis(perfisData || []);
         }
-        setPerfis(perfisData || []);
       }
 
-      // Se já carregamos arquivados antes, talvez devamos atualizar o cache se necessário, 
-      // mas por enquanto vamos apenas garantir que a lista principal esteja limpa de arquivados.
-      
-      // Filter notifications
+      // Notificações
       const threshold = new Date();
       threshold.setDate(threshold.getDate() + notificationDays);
-      
       const contracts = (coRes.data as Contrato[] || []).filter(c => !c.arquivado);
-      
-      // 1. Contract Expirations
       const expirations = contracts.filter(c => {
         const endDate = new Date(c.data_fim + 'T00:00:00');
         return endDate <= threshold && endDate >= new Date();
       });
 
-      // 2. Upcoming Rent Payments
-      // This logic will notify payments due in the next few days
       const currentYear = new Date().getFullYear();
-      const currentMonth = new Date().getMonth(); // 0-indexed
-      const today = new Date().getDate();
-
+      const currentMonth = new Date().getMonth();
       const rentAlerts = contracts.filter(c => {
         if (!c.dia_vencimento) return false;
-        
-        // Calculate due date for current month
         let dueDate = new Date(currentYear, currentMonth, c.dia_vencimento);
-        
-        // If due date has passed this month, check next month
         if (dueDate < new Date()) {
           dueDate = new Date(currentYear, currentMonth + 1, c.dia_vencimento);
         }
-
         const daysDiff = Math.ceil((dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-        return daysDiff >= 0 && daysDiff <= 7; // Notificar apenas se faltar 7 dias ou menos
+        return daysDiff >= 0 && daysDiff <= 7;
       });
 
-      // 3. Overdue Payments
       const overdues = contracts.filter(c => {
         if (!c.dia_vencimento) return false;
-        
         const dueDate = new Date(currentYear, currentMonth, c.dia_vencimento);
-        
-        // Se já passou da data de vencimento este mês
         if (new Date() > dueDate) {
           const hasPayment = (paRes.data || []).some((p: any) => 
             p.contrato_id === c.id && 
@@ -1311,25 +1224,17 @@ export default function DashboardPage() {
         return false;
       });
       
-      // Combine (avoiding duplicates if it matches both)
       const combinedAlerts = [...expirations];
-      
-      rentAlerts.forEach(r => {
-        if (!combinedAlerts.some(a => a.id === r.id)) {
-          combinedAlerts.push(r);
-        }
-      });
-
-      overdues.forEach(o => {
-        if (!combinedAlerts.some(a => a.id === o.id)) {
-          combinedAlerts.push(o);
-        }
-      });
+      rentAlerts.forEach(r => { if (!combinedAlerts.some(a => a.id === r.id)) combinedAlerts.push(r); });
+      overdues.forEach(o => { if (!combinedAlerts.some(a => a.id === o.id)) combinedAlerts.push(o); });
 
       setNotifications(combinedAlerts);
       setTemplatesLoaded(true);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
+    } finally {
+      setIsInitialLoading(false);
+      setLoading(false);
     }
   }, [session, userProfile, notificationDays, setImoveis, setInquilinos, setProprietarios, setContratos, setPagamentos, setLogs, setNotifications, setTemplatesLoaded]);
 
@@ -4135,13 +4040,22 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-              <div className="relative group">
-                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
-                <input 
-                  type="text" 
-                  placeholder="Buscar por nome, e-mail ou CPF..." 
-                  className="bg-slate-50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-full px-12 py-3 text-sm font-bold w-full md:w-80 transition-all shadow-sm"
-                />
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => fetchData()}
+                  className="bg-white border-2 border-slate-100 p-3 rounded-full text-slate-400 hover:text-blue-500 hover:border-blue-400 transition-all shadow-sm group/refresh"
+                  title="Atualizar Usuários"
+                >
+                  <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+                </button>
+                <div className="relative group flex-1 md:flex-none">
+                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar por nome, e-mail ou CPF..." 
+                    className="bg-slate-50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-full px-12 py-3 text-sm font-bold w-full md:w-80 transition-all shadow-sm"
+                  />
+                </div>
               </div>
             </div>
 
@@ -4163,7 +4077,17 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {perfis.map((p) => {
+                    {perfis.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="px-6 py-20 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <Users size={48} className="text-slate-200" />
+                            <p className="text-slate-400 font-bold text-sm">Nenhum usuário cadastrado no banco de dados.</p>
+                            <p className="text-slate-300 text-[10px] uppercase font-black tracking-widest">Verifique se o usuário de teste concluiu o cadastro.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : perfis.map((p) => {
                       const isGleison = p.nome?.toLowerCase().includes('gleison') || p.role === 'ADMIN';
                       const isCurrentAppAdmin = session?.user?.email?.toLowerCase() === 'gleisonisaias@gmail.com';
                       
