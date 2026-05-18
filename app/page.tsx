@@ -292,7 +292,6 @@ const RichEditor = ({ content, onChange, activeDropdown, setActiveDropdown }: {
           >
             <Underline size={14} />
           </button>
-        </div>
         <div className="w-px h-6 bg-slate-200 mx-1" />
         <div className="flex items-center gap-0.5">
           <button 
@@ -329,7 +328,6 @@ const RichEditor = ({ content, onChange, activeDropdown, setActiveDropdown }: {
           </button>
         </div>
         <div className="w-px h-6 bg-slate-200 mx-1" />
-        <div className="relative">
           <button 
             type="button"
             onMouseDown={(e) => e.preventDefault()}
@@ -1002,13 +1000,8 @@ export default function DashboardPage() {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
+          console.error('Erro ao buscar sessão inicial:', error);
           const msg = error.message?.toLowerCase() || '';
-          if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
-            console.warn('Sessão expirada ou inválida, limpando...');
-          } else {
-            console.error('Erro ao buscar sessão inicial:', error);
-          }
-          
           if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
             await handleAuthError();
           } else {
@@ -3945,7 +3938,9 @@ export default function DashboardPage() {
                     </div>
                     
                     <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Conteúdo das Cláusulas</label>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Conteúdo das Cláusulas</label>
+                      </div>
                           <RichEditor 
                             content={template.content} 
                             onChange={(newContent) => {
