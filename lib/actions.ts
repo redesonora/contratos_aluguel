@@ -15,7 +15,7 @@ export async function registrarPagamento(formData: {
     .from('pagamentos')
     .insert([{ ...formData, user_id: user.id }])
     .select()
-    .single();
+    .maybeSingle();
 
   if (payError) throw payError;
   return pagamento;
