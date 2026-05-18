@@ -1002,8 +1002,13 @@ export default function DashboardPage() {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Erro ao buscar sessão inicial:', error);
           const msg = error.message?.toLowerCase() || '';
+          if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
+            console.warn('Sessão expirada ou inválida, limpando...');
+          } else {
+            console.error('Erro ao buscar sessão inicial:', error);
+          }
+          
           if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
             await handleAuthError();
           } else {
@@ -3940,59 +3945,7 @@ export default function DashboardPage() {
                     </div>
                     
                     <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Conteúdo das Cláusulas</label>
-                        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg overflow-hidden p-0.5 shadow-sm">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newTemplates = [...contractTemplates];
-                              newTemplates[idx].alignment = 'left';
-                              setContractTemplates(newTemplates);
-                            }}
-                            className={`p-1 transition-all rounded ${template.alignment === 'left' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}
-                            title="Alinhar à Esquerda"
-                          >
-                            <AlignLeft size={12} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newTemplates = [...contractTemplates];
-                              newTemplates[idx].alignment = 'center';
-                              setContractTemplates(newTemplates);
-                            }}
-                            className={`p-1 transition-all rounded ${template.alignment === 'center' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}
-                            title="Centralizar"
-                          >
-                            <AlignCenter size={12} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newTemplates = [...contractTemplates];
-                              newTemplates[idx].alignment = 'right';
-                              setContractTemplates(newTemplates);
-                            }}
-                            className={`p-1 transition-all rounded ${template.alignment === 'right' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}
-                            title="Alinhar à Direita"
-                          >
-                            <AlignRight size={12} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newTemplates = [...contractTemplates];
-                              newTemplates[idx].alignment = 'justify';
-                              setContractTemplates(newTemplates);
-                            }}
-                            className={`p-1 transition-all rounded ${template.alignment === 'justify' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}
-                            title="Justificar"
-                          >
-                            <AlignJustify size={12} />
-                          </button>
-                        </div>
-                      </div>
+                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Conteúdo das Cláusulas</label>
                           <RichEditor 
                             content={template.content} 
                             onChange={(newContent) => {
