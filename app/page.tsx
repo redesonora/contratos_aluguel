@@ -72,363 +72,33 @@ import {
   Line,
   Legend
 } from 'recharts';
-import { formatarMoeda, numeroParaExtenso } from '@/lib/utils-format';
-import { supabase } from '@/lib/supabase';
-import PropertyMap from '@/components/PropertyMap';
+import { formatarMoeda, numeroParaExtenso } from '../lib/utils-format';
+import { supabase } from '../lib/supabase';
+import PropertyMap from '../components/PropertyMap';
 
-// Tipos
-interface Imovel {
-  id: string;
-  endereco: string;
-  numero: string;
-  complemento?: string;
-  cep: string;
-  tipo_imovel: string;
-  cemig: string;
-  copasa: string;
-  bairro: string;
-  cidade: string;
-  estado: string;
-  status: string;
-  proprietario_id?: string;
-  apelido?: string;
-  descricao?: string;
-  arquivado?: boolean;
-}
+import { 
+  Imovel, 
+  Inquilino, 
+  Proprietario, 
+  UserProfile, 
+  Contrato, 
+  StatusPagamento, 
+  Pagamento, 
+  ReceiptData 
+} from '../types';
 
-interface Inquilino {
-  id: string;
-  nome: string;
-  cpf_cnpj: string;
-  email: string;
-  telefone: string;
-  estado_civil?: string;
-  rg?: string;
-  profissao?: string;
-  nacionalidade?: string;
-  naturalidade?: string;
-  uf_nascimento?: string;
-  nome_fiador?: string;
-  cpf_fiador?: string;
-  rg_fiador?: string;
-  endereco_fiador?: string;
-  documentos_fiador?: string[];
-  arquivado?: boolean;
-}
-
-interface Proprietario {
-  id: string;
-  nome: string;
-  cpf_cnpj: string;
-  rg?: string;
-  estado_civil?: string;
-  endereco: string;
-  bairro: string;
-  cidade: string;
-  estado: string;
-  email?: string;
-  telefone?: string;
-  arquivado?: boolean;
-}
-
-interface UserProfile {
-  id: string;
-  role: 'ADMIN' | 'CORRETOR' | 'PROPRIETARIO';
-  nome: string | null;
-  cpf?: string;
-  approved: boolean;
-  plano?: string;
-  status_pagamento?: string;
-  data_inicio?: string;
-  trial_ends_at?: string;
-  last_access?: string;
-  proprietario_id: string | null;
-}
-
-interface Contrato {
-  id: string;
-  imovel_id: string;
-  inquilino_id: string;
-  proprietario_id?: string;
-  valor_aluguel: number;
-  data_inicio: string;
-  data_fim: string;
-  dia_vencimento?: number;
-  clausulas?: string;
-  alinhamento_texto?: 'left' | 'center' | 'right' | 'justify';
-  arquivo_url?: string;
-  documentos?: string[];
-  imoveis?: { 
-    endereco: string;
-    numero?: string;
-    complemento?: string;
-    bairro?: string;
-    cep?: string;
-    cidade: string;
-    estado: string;
-    apelido?: string;
-    proprietario_id?: string;
-    proprietarios?: { nome: string; cpf_cnpj: string };
-  };
-  inquilinos?: { nome: string; cpf_cnpj: string; email: string };
-  proprietarios?: { nome: string; cpf_cnpj: string };
-  arquivado?: boolean;
-  renovacoes_count?: number;
-}
-
-enum StatusPagamento {
-  PENDENTE = 'Pendente',
-  PAGO = 'Pago',
-  ATRASADO = 'Atrasado'
-}
-
-interface Pagamento {
-  id: string;
-  contrato_id: string;
-  valor_pago?: number;
-  valor_esperado: number;
-  data_vencimento: string;
-  data_pagamento?: string;
-  competencia_mes: number;
-  competencia_ano: number;
-  status: StatusPagamento;
-  multa?: number;
-  juros?: number;
-  observacoes?: string;
-  user_id: string;
-  contratos?: Contrato;
-}
-
-// Tipos Simples para a Demo
-interface SidebarItemProps {
-  icon: React.ElementType;
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}
-
-const SidebarItem = ({ icon: Icon, label, active, onClick }: SidebarItemProps) => (
-  <motion.button
-    whileHover={{ x: 4 }}
-    whileTap={{ scale: 0.98 }}
-    onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative group ${
-      active 
-        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
-        : 'text-slate-500 hover:bg-slate-100'
-    }`}
-  >
-    <Icon size={20} className={active ? 'text-white' : 'text-slate-400 group-hover:text-blue-500 transition-colors'} />
-    <span className={`font-semibold tracking-tight ${active ? 'text-white' : 'text-slate-600'}`}>{label}</span>
-    {active && (
-      <motion.div
-        layoutId="activeTab"
-        className="absolute left-0 w-1 h-6 bg-white rounded-r-full"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      />
-    )}
-  </motion.button>
-);
-
-// Components
-const RichEditor = ({ content, onChange, activeDropdown, setActiveDropdown }: { 
-  content: string, 
-  onChange: (html: string) => void,
-  activeDropdown: 'size' | 'color' | null,
-  setActiveDropdown: (val: 'size' | 'color' | null) => void
-}) => {
-  const editorRef = React.useRef<HTMLDivElement>(null);
-  const initialized = React.useRef(false);
-
-  useEffect(() => {
-    if (editorRef.current && !initialized.current) {
-      editorRef.current.innerHTML = content;
-      initialized.current = true;
-    }
-  }, [content]);
-
-  // Se o conteúdo mudar externamente (ex: trocar de template), atualizamos o HTML
-  useEffect(() => {
-    if (editorRef.current && initialized.current && editorRef.current.innerHTML !== content) {
-       // Apenas atualiza se não for o foco atual para evitar perder cursor
-       if (document.activeElement !== editorRef.current) {
-         editorRef.current.innerHTML = content;
-       }
-    }
-  }, [content]);
-
-  const exec = (command: string, value: string = '') => {
-    document.execCommand('styleWithCSS', false, 'true');
-    document.execCommand(command, false, value);
-    editorRef.current?.focus();
-  };
-
-  return (
-    <div className="flex flex-col border border-slate-200 rounded-xl overflow-hidden bg-white">
-      <div className="flex flex-wrap items-center gap-1 p-2 bg-slate-50 border-b border-slate-200">
-        <div className="flex items-center gap-0.5">
-          <button 
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); exec('bold'); }}
-            className="p-1.5 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-600 transition-all focus:ring-0 outline-none"
-            title="Negrito"
-          >
-            <Bold size={14} />
-          </button>
-          <button 
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); exec('italic'); }}
-            className="p-1.5 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-600 transition-all focus:ring-0 outline-none"
-            title="Itálico"
-          >
-            <Italic size={14} />
-          </button>
-          <button 
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); exec('underline'); }}
-            className="p-1.5 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-600 transition-all focus:ring-0 outline-none"
-            title="Sublinhado"
-          >
-            <Underline size={14} />
-          </button>
-        <div className="w-px h-6 bg-slate-200 mx-1" />
-        <div className="flex items-center gap-0.5">
-          <button 
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); exec('justifyLeft'); }}
-            className="p-1.5 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-600 transition-all focus:ring-0 outline-none"
-            title="Alinhar à Esquerda"
-          >
-            <AlignLeft size={14} />
-          </button>
-          <button 
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); exec('justifyCenter'); }}
-            className="p-1.5 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-600 transition-all focus:ring-0 outline-none"
-            title="Centralizar"
-          >
-            <AlignCenter size={14} />
-          </button>
-          <button 
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); exec('justifyRight'); }}
-            className="p-1.5 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-600 transition-all focus:ring-0 outline-none"
-            title="Alinhar à Direita"
-          >
-            <AlignRight size={14} />
-          </button>
-          <button 
-            type="button"
-            onMouseDown={(e) => { e.preventDefault(); exec('justifyFull'); }}
-            className="p-1.5 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-600 transition-all focus:ring-0 outline-none"
-            title="Justificar"
-          >
-            <AlignJustify size={14} />
-          </button>
-        </div>
-        <div className="w-px h-6 bg-slate-200 mx-1" />
-          <button 
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setActiveDropdown(activeDropdown === 'size' ? null : 'size')}
-            className={`p-1.5 rounded border border-transparent flex items-center gap-1 transition-all ${activeDropdown === 'size' ? 'bg-white border-slate-200 text-blue-600 shadow-sm' : 'hover:bg-white hover:border-slate-200 text-slate-600'}`}
-          >
-            <Type size={14} />
-            <ChevronDown size={10} className={`transition-transform duration-200 ${activeDropdown === 'size' ? 'rotate-180' : ''}`} />
-          </button>
-          {activeDropdown === 'size' && (
-            <div className="absolute top-full left-0 mt-1 flex flex-col bg-white border border-slate-200 rounded-lg shadow-xl z-[100] min-w-[140px] animate-in fade-in zoom-in-95 duration-200">
-              {[
-                { label: 'Muito Pequeno', size: '1' },
-                { label: 'Pequeno', size: '2' },
-                { label: 'Normal', size: '3' },
-                { label: 'Médio', size: '4' },
-                { label: 'Grande', size: '5' },
-                { label: 'Muito Grande', size: '6' },
-                { label: 'Gigante', size: '7' }
-              ].map(s => (
-                <button 
-                  key={s.size}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    exec('fontSize', s.size);
-                    setActiveDropdown(null);
-                  }}
-                  className="px-3 py-2 text-[10px] hover:bg-slate-50 text-left first:rounded-t-lg last:rounded-b-lg font-bold text-slate-700 hover:text-blue-600 border-b border-slate-50 last:border-0"
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="relative">
-          <button 
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setActiveDropdown(activeDropdown === 'color' ? null : 'color')}
-            className={`p-1.5 rounded border border-transparent flex items-center gap-1 transition-all ${activeDropdown === 'color' ? 'bg-white border-slate-200 text-blue-600 shadow-sm' : 'hover:bg-white hover:border-slate-200 text-slate-600'}`}
-          >
-            <Palette size={14} />
-            <ChevronDown size={10} className={`transition-transform duration-200 ${activeDropdown === 'color' ? 'rotate-180' : ''}`} />
-          </button>
-          {activeDropdown === 'color' && (
-            <div className="absolute top-full left-0 mt-1 grid grid-cols-4 gap-1.5 p-2.5 bg-white border border-slate-200 rounded-lg shadow-xl z-[100] animate-in fade-in zoom-in-95 duration-200">
-              {['#000000', '#3b82f6', '#10b981', '#ef4444', '#f59e0b', '#8b5cf6', '#64748b', '#0f172a', '#94a3b8', '#ec4899', '#14b8a6', '#f43f5e', '#ffffff'].map(color => (
-                <button 
-                  key={color}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    exec('foreColor', color);
-                    setActiveDropdown(null);
-                  }}
-                  className="w-6 h-6 rounded border border-slate-200 transition-all hover:scale-110 active:scale-95 shadow-sm"
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      <div 
-        ref={editorRef}
-        className="w-full h-80 text-sm font-sans bg-transparent p-4 focus:outline-none overflow-y-auto leading-relaxed rich-editor"
-        contentEditable
-        suppressContentEditableWarning={true}
-        onBlur={(e) => onChange(e.currentTarget.innerHTML)}
-      />
-    </div>
-  );
-};
-
-const TagItem = ({ tag, label }: { tag: string, label: string }) => (
-  <div className="flex items-center justify-between p-2 hover:bg-white rounded-lg group transition-all border border-transparent hover:border-slate-100 hover:shadow-sm">
-    <div className="flex flex-col">
-       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{label}</span>
-       <span 
-         className="text-[12px] font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded cursor-pointer hover:bg-blue-100 transition-colors" 
-         onClick={() => {
-           navigator.clipboard.writeText(tag);
-           alert(`Tag ${tag} copiada!`);
-         }}
-       >
-         {tag}
-       </span>
-    </div>
-    <button 
-      onClick={() => {
-        navigator.clipboard.writeText(tag);
-        alert(`Tag ${tag} copiada!`);
-      }}
-      className="p-1.5 text-slate-300 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all"
-    >
-      <Copy size={14} />
-    </button>
-  </div>
-);
+import { SidebarItem } from '../components/SidebarItem';
+import { RichEditor } from '../components/RichEditor';
+import { TagItem } from '../components/TagItem';
+import { DashboardTab } from '../components/tabs/DashboardTab';
+import { ImoveisTab } from '../components/tabs/ImoveisTab';
+import { ProprietariosTab } from '../components/tabs/ProprietariosTab';
+import { InquilinosTab } from '../components/tabs/InquilinosTab';
+import { ContratosTab } from '../components/tabs/ContratosTab';
+import { PagamentosTab } from '../components/tabs/PagamentosTab';
+import { LogsTab } from '../components/tabs/LogsTab';
+import { UsuariosTab } from '../components/tabs/UsuariosTab';
+import { ConfiguracoesTab } from '../components/tabs/ConfiguracoesTab';
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -469,7 +139,9 @@ export default function DashboardPage() {
   const [imovelStatusFilter, setImovelStatusFilter] = useState('todos');
   const [imovelTypeFilter, setImovelTypeFilter] = useState('todos');
   const [inquilinoSearch, setInquilinoSearch] = useState('');
-  const [contratoSearch, setContratoSearch] = useState('');
+  const [proprietarioSearch, setProprietarioSearch] = useState('');
+  const [contractProprietarioId, setContractProprietarioId] = useState<string>('');
+  const [contractSearch, setContractSearch] = useState('');
   const [selectedTemplateIdx, setSelectedTemplateIdx] = useState<number>(0);
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
   const [guarantorFilesToUpload, setGuarantorFilesToUpload] = useState<File[]>([]);
@@ -487,7 +159,8 @@ export default function DashboardPage() {
   const [sortConfig, setSortConfig] = useState<{[key: string]: {key: string, direction: 'asc' | 'desc'}}>({
     imoveis: { key: 'endereco', direction: 'asc' },
     proprietarios: { key: 'nome', direction: 'asc' },
-    inquilinos: { key: 'nome', direction: 'asc' }
+    inquilinos: { key: 'nome', direction: 'asc' },
+    usuarios: { key: 'nome', direction: 'asc' }
   });
   const [currentPage, setCurrentPage] = useState<{[key: string]: number}>({
     imoveis: 1,
@@ -574,13 +247,16 @@ export default function DashboardPage() {
   };
 
   const handleSort = (tab: string, key: string) => {
-    setSortConfig(prev => ({
-      ...prev,
-      [tab]: {
-        key,
-        direction: prev[tab].key === key && prev[tab].direction === 'asc' ? 'desc' : 'asc'
-      }
-    }));
+    setSortConfig(prev => {
+      const currentTabConfig = prev[tab] || { key: '', direction: 'asc' };
+      return {
+        ...prev,
+        [tab]: {
+          key,
+          direction: currentTabConfig.key === key && currentTabConfig.direction === 'asc' ? 'desc' : 'asc'
+        }
+      };
+    });
   };
 
   const monthlyCashFlowData = React.useMemo(() => {
@@ -704,8 +380,9 @@ export default function DashboardPage() {
   };
 
   const SortHeader = ({ label, sortKey, activeTab }: { label: string, sortKey: string, activeTab: string }) => {
-    const isSorted = sortConfig[activeTab].key === sortKey;
-    const direction = sortConfig[activeTab].direction;
+    const tabConfig = sortConfig[activeTab];
+    const isSorted = tabConfig ? tabConfig.key === sortKey : false;
+    const direction = tabConfig ? tabConfig.direction : 'asc';
     
     return (
       <th 
@@ -807,25 +484,7 @@ export default function DashboardPage() {
 
   /* state already declared above */
   
-  interface ReceiptData {
-  inquilino: string;
-  cpf: string;
-  valor: number;
-  competencia: string;
-  vencimento: string;
-  endereco: string;
-  numero: string;
-  complemento: string;
-  bairro: string;
-  cidade: string;
-  estado: string;
-  cep: string;
-  locador: string;
-  locador_cpf: string;
-  data: string;
-}
-
-// Receipt State
+  // Receipt State
   const [receiptData, setReceiptData] = useState<ReceiptData>({
     inquilino: 'João Silva',
     cpf: '123.456.789-00',
@@ -849,7 +508,11 @@ export default function DashboardPage() {
   // Percursor check permissions helper
   const can = (action: string, tab?: string) => {
     if (!userProfile) return false;
-    if (userProfile.role === 'ADMIN') return true;
+    if (userProfile.role === 'MASTER') return true;
+    if (userProfile.role === 'ADMIN') {
+      if (['logs', 'usuarios'].includes(tab || '')) return false; // Admin não gerencia usuários do sistema (só MASTER)
+      return true;
+    }
 
     if (userProfile.role === 'CORRETOR') {
       if (action === 'DELETE') return false; // Corretores não excluem nada
@@ -883,14 +546,14 @@ export default function DashboardPage() {
         if (error.code === '42P01') {
           console.error('ERRO CRÍTICO: A tabela "user_profiles" não existe no banco de dados.');
           console.info('DICA: Execute o conteúdo do arquivo SUPABASE_SCHEMA.sql no Editor SQL do seu painel Supabase.');
-          setUserProfile({ id: userId, role: 'ADMIN', nome: 'Admin (Pendente)', approved: true, proprietario_id: null });
+          setUserProfile({ id: userId, role: 'MASTER', nome: 'Master (Pendente)', approved: true, proprietario_id: null });
           return;
         }
       }
 
       if (!data) {
         // Perfil não existe
-        // Criar perfil padrão para novos usuários (ADMIN se for o primeiro, senão CORRETOR)
+        // Criar perfil padrão para novos usuários (MASTER se for o primeiro, senão CORRETOR)
         try {
           const { count, error: countError } = await supabase.from('user_profiles').select('*', { count: 'exact', head: true });
           
@@ -898,8 +561,8 @@ export default function DashboardPage() {
             console.error('Erro ao contar perfis:', JSON.stringify(countError));
           }
 
-          const role = (count === 0 && !countError) ? 'ADMIN' : 'CORRETOR';
-          const approved = role === 'ADMIN';
+          const role = (count === 0 && !countError) ? 'MASTER' : 'CORRETOR';
+          const approved = role === 'MASTER';
           
           // Buscar metadados do Auth User se estiver disponível
           const { data: { user } } = await supabase.auth.getUser();
@@ -937,7 +600,7 @@ export default function DashboardPage() {
               // Se for outro erro, usamos o fallback memória
               const fallbackProfile: UserProfile = { 
                 id: userId, 
-                role: 'ADMIN', 
+                role: 'MASTER', 
                 nome: meta.full_name || userEmail?.split('@')[0] || 'Usuário (Modo Seguro)', 
                 approved: true, 
                 plano: 'Pro',
@@ -956,18 +619,29 @@ export default function DashboardPage() {
           }
         } catch (createErr) {
           console.error('Exceção ao criar perfil:', createErr);
-          setUserProfile({ id: userId, role: 'ADMIN', nome: 'Admin (Fallback Exception)', approved: true, proprietario_id: null });
+          setUserProfile({ id: userId, role: 'MASTER', nome: 'Master (Fallback Exception)', approved: true, proprietario_id: null });
         }
       } else {
         // Usuário existe, atualizar last_access e setar estado
+        let finalData = { ...data };
         try {
-          // Usamos select('*') para garantir que pegamos as colunas novas se existirem
-          // O update em si pode falhar se last_access não existir, então silenciamos
           await supabase.from('user_profiles').update({ last_access: new Date().toISOString() }).eq('id', userId);
         } catch (err) {
           console.warn('Falha ao atualizar last_access:', err);
         }
-        setUserProfile(data as UserProfile);
+
+        // Auto-upgrade o pioneiro para MASTER
+        try {
+          if (finalData.role === 'ADMIN') {
+             const { data: firstUserData } = await supabase.from('user_profiles').select('id').order('created_at', { ascending: true }).limit(1).single();
+             if (firstUserData && firstUserData.id === userId) {
+                 await supabase.from('user_profiles').update({ role: 'MASTER' }).eq('id', userId);
+                 finalData.role = 'MASTER';
+             }
+          }
+        } catch(e) {}
+
+        setUserProfile(finalData as UserProfile);
       }
     } catch (err) {
       console.error('Erro fetchProfile:', err);
@@ -1134,21 +808,26 @@ export default function DashboardPage() {
           inquilinos(nome, cpf_cnpj, email),
           proprietarios(nome, cpf_cnpj)
         )
-      `).order('created_at', { ascending: false }).limit(500);
+      `).order('created_at', { ascending: false }).limit(1000);
 
-      // Filtro para Proprietário: Vê apenas o que lhe pertence
+      // Isolamento de dados
       if (userProfile.role === 'PROPRIETARIO' && userProfile.proprietario_id) {
-        // Obter ids de imóveis do proprietário para filtrar pagamentos indiretamente se necessário
+        // Filtro para Proprietário: Vê apenas o que lhe pertence
         imQuery = imQuery.eq('proprietario_id', userProfile.proprietario_id);
         coQuery = coQuery.eq('proprietario_id', userProfile.proprietario_id);
         prQuery = prQuery.eq('id', userProfile.proprietario_id);
         inQuery = inQuery.eq('proprietario_id', userProfile.proprietario_id);
-        
-        // Pagamentos: Para filtrar por proprietário_id dentro do objeto relacionado 'contratos'
         paQuery = paQuery.not('contratos', 'is', null).filter('contratos.proprietario_id', 'eq', userProfile.proprietario_id);
+      } else {
+        // Filtro para MASTER, ADMIN e CORRETOR: Vê apenas os cadastros feitos por si mesmo
+        imQuery = imQuery.eq('user_id', session.user.id);
+        coQuery = coQuery.eq('user_id', session.user.id);
+        prQuery = prQuery.eq('user_id', session.user.id);
+        inQuery = inQuery.eq('user_id', session.user.id);
+        paQuery = paQuery.not('contratos', 'is', null).filter('contratos.user_id', 'eq', session.user.id);
       }
 
-      const tpQuery = supabase.from('contract_templates').select('*').order('created_at', { ascending: true });
+      const tpQuery = supabase.from('contract_templates').select('*').eq('user_id', session.user.id).order('created_at', { ascending: true });
 
       const [imRes, inRes, prRes, coRes, paRes, logRes, tpRes] = await Promise.all([
         imQuery,
@@ -1257,7 +936,7 @@ export default function DashboardPage() {
         }
       }
 
-      if (userProfile.role === 'ADMIN') {
+      if (userProfile.role === 'MASTER') {
         const { data: perfisData } = await supabase.from('user_profiles').select('*').order('created_at', { ascending: false });
         setPerfis(perfisData || []);
       }
@@ -1355,10 +1034,17 @@ export default function DashboardPage() {
         proprietarios(nome, cpf_cnpj)
       `).eq('arquivado', true).order('created_at', { ascending: false });
 
+      // Isolamento de dados arquivados
       if (userProfile.role === 'PROPRIETARIO' && userProfile.proprietario_id) {
         imQuery = imQuery.eq('proprietario_id', userProfile.proprietario_id);
         coQuery = coQuery.eq('proprietario_id', userProfile.proprietario_id);
         prQuery = prQuery.eq('id', userProfile.proprietario_id);
+        inQuery = inQuery.eq('proprietario_id', userProfile.proprietario_id);
+      } else {
+        imQuery = imQuery.eq('user_id', session.user.id);
+        coQuery = coQuery.eq('user_id', session.user.id);
+        prQuery = prQuery.eq('user_id', session.user.id);
+        inQuery = inQuery.eq('user_id', session.user.id);
       }
 
       const [imRes, inRes, prRes, coRes] = await Promise.all([
@@ -1439,6 +1125,7 @@ export default function DashboardPage() {
     setExistingGuarantorDocs(item?.documentos_fiador || []);
     setClausulasHtml(item?.clausulas || '');
     setContractAlignment(item?.alinhamento_texto || 'justify');
+    setContractProprietarioId(item?.proprietario_id || '');
     setCreateModalOpen(true);
   };
 
@@ -1627,38 +1314,45 @@ export default function DashboardPage() {
     }
     
     try {
-      // Ajuste de fuso horário para garantir que a data seja interpretada corretamente
+      // Verificar se já existem parcelas para este contrato para evitar duplicidade
+      const { data: existingPagamentos } = await supabase
+        .from('pagamentos')
+        .select('competencia_mes, competencia_ano')
+        .eq('contrato_id', contract.id);
+      
+      const existingKeys = new Set((existingPagamentos || []).map(p => `${p.competencia_mes}_${p.competencia_ano}`));
+
+      // Ajuste de fuso horário
       const startDate = new Date(startDateStr + 'T12:00:00');
       const endDate = new Date(endDateStr + 'T12:00:00');
       
       const parcelas = [];
       let currentDate = new Date(startDate);
       
-      // Limitar a 120 parcelas (10 anos)
       let safetyCounter = 0;
       while (currentDate <= endDate && safetyCounter < 120) {
         safetyCounter++;
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth() + 1;
         
-        // Calcular dia de vencimento real para o mês
-        const lastDayOfMonth = new Date(year, month, 0).getDate();
-        const actualDueDay = Math.min(dueDay || 5, lastDayOfMonth);
-        const dueDate = new Date(year, month - 1, actualDueDay);
+        if (!existingKeys.has(`${month}_${year}`)) {
+          // Calcular dia de vencimento real
+          const lastDayOfMonth = new Date(year, month, 0).getDate();
+          const actualDueDay = Math.min(dueDay || 5, lastDayOfMonth);
+          const dueDate = new Date(year, month - 1, actualDueDay);
+          
+          parcelas.push({
+            contrato_id: contract.id,
+            valor_esperado: rentValue,
+            data_vencimento: dueDate.toISOString().split('T')[0],
+            competencia_mes: month,
+            competencia_ano: year,
+            status: StatusPagamento.PENDENTE,
+            user_id: session.user.id
+          });
+        }
         
-        parcelas.push({
-          contrato_id: contract.id,
-          valor_esperado: rentValue,
-          data_vencimento: dueDate.toISOString().split('T')[0],
-          competencia_mes: month,
-          competencia_ano: year,
-          status: 'Pendente',
-          user_id: session.user.id
-        });
-        
-        // Mover para o próximo mês
         currentDate.setMonth(currentDate.getMonth() + 1);
-        // Garantir que estamos no início/meio do mês para evitar saltos de data
         currentDate.setDate(1); 
       }
       
@@ -2608,6 +2302,7 @@ export default function DashboardPage() {
             valor_pago: parseFloat(rawData.valor_pago as string),
             competencia_mes: parseInt(rawData.competencia_mes as string),
             competencia_ano: parseInt(rawData.competencia_ano as string),
+            status: StatusPagamento.PENDENTE,
             user_id: session.user.id 
           }]);
           dbError = err;
@@ -2637,16 +2332,45 @@ export default function DashboardPage() {
     }
   }, [session, userProfile, existingDocs, existingGuarantorDocs, contractFileUrl, contractFileToUpload, filesToUpload, guarantorFilesToUpload, activeTab, editingItem, fetchData, recordLog]);
 
+  const openReceiptModal = (parcela: Pagamento) => {
+    const contrato = parcela.contratos || contratos.find(c => c.id === parcela.contrato_id);
+    const locadorNome = contrato?.proprietarios?.nome || contrato?.imoveis?.proprietarios?.nome || 'N/A';
+    const locadorCpf = contrato?.proprietarios?.cpf_cnpj || contrato?.imoveis?.proprietarios?.cpf_cnpj || 'N/A';
+
+    setReceiptData({
+      inquilino: contrato?.inquilinos?.nome || 'N/A',
+      cpf: contrato?.inquilinos?.cpf_cnpj || 'N/A',
+      valor: parcela.valor_pago || parcela.valor_esperado || contrato?.valor_aluguel || 0,
+      competencia: `${parcela.competencia_mes}/${parcela.competencia_ano}`,
+      vencimento: parcela.data_vencimento ? new Date(parcela.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A',
+      locador: locadorNome,
+      locador_cpf: locadorCpf,
+      endereco: contrato?.imoveis?.endereco || 'N/A',
+      numero: contrato?.imoveis?.numero || '',
+      complemento: contrato?.imoveis?.complemento || '',
+      bairro: contrato?.imoveis?.bairro || '',
+      cidade: contrato?.imoveis?.cidade || '',
+      estado: contrato?.imoveis?.estado || '',
+      cep: contrato?.imoveis?.cep || '',
+      data: new Date().toLocaleDateString('pt-BR')
+    });
+    setReceiptModalOpen(true);
+  };
+
   const handleMarkAsPaid = async (parcela: Pagamento, valorPago: number) => {
     try {
       setLoading(true);
+      setErrorMsg(null);
       const { error } = await supabase.from('pagamentos').update({
         status: StatusPagamento.PAGO,
         valor_pago: valorPago,
         data_pagamento: new Date().toISOString()
       }).eq('id', parcela.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro Supabase ao baixar:', error);
+        throw new Error(`Erro ao registrar pagamento: ${error.message}`);
+      }
 
       await recordLog('PAGAMENTO', 'pagamentos', parcela.id, {
         contrato_id: parcela.contrato_id,
@@ -2654,33 +2378,15 @@ export default function DashboardPage() {
       });
 
       await fetchData();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
       
       // Auto-open receipt
-      const contrato = parcela.contratos || contratos.find(c => c.id === parcela.contrato_id);
-      const locadorNome = contrato?.proprietarios?.nome || contrato?.imoveis?.proprietarios?.nome || 'N/A';
-      const locadorCpf = contrato?.proprietarios?.cpf_cnpj || contrato?.imoveis?.proprietarios?.cpf_cnpj || 'N/A';
-
-      setReceiptData({
-        inquilino: contrato?.inquilinos?.nome || 'N/A',
-        cpf: contrato?.inquilinos?.cpf_cnpj || 'N/A',
-        valor: valorPago,
-        competencia: `${parcela.competencia_mes}/${parcela.competencia_ano}`,
-        vencimento: parcela.data_vencimento ? new Date(parcela.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A',
-        locador: locadorNome,
-        locador_cpf: locadorCpf,
-        endereco: contrato?.imoveis?.endereco || 'N/A',
-        numero: contrato?.imoveis?.numero || '',
-        complemento: contrato?.imoveis?.complemento || '',
-        bairro: contrato?.imoveis?.bairro || '',
-        cidade: contrato?.imoveis?.cidade || '',
-        estado: contrato?.imoveis?.estado || '',
-        cep: contrato?.imoveis?.cep || '',
-        data: new Date().toLocaleDateString('pt-BR')
-      });
-      setReceiptModalOpen(true);
+      openReceiptModal(parcela);
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao marcar como pago:', err);
+      setErrorMsg(err.message || 'Erro ao processar a baixa do pagamento.');
     } finally {
       setLoading(false);
     }
@@ -2694,1687 +2400,188 @@ export default function DashboardPage() {
     switch (activeTab) {
       case 'dashboard': {
         return (
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="space-y-8"
-          >
-            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-              <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md group">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                    <DollarSign size={20} />
-                  </div>
-                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase tracking-wider">A Receber</span>
-                </div>
-                <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Previsão Mensal</h3>
-                <p className="text-2xl font-black text-slate-800 tracking-tight">{formatarMoeda(stats.aReceber)}</p>
-              </motion.div>
-
-              <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md group">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-all duration-300">
-                    <TrendingUp size={20} />
-                  </div>
-                  <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded uppercase tracking-wider">Recebido</span>
-                </div>
-                <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Realizado no Mês</h3>
-                <p className="text-2xl font-black text-slate-800 tracking-tight">{formatarMoeda(stats.recebido)}</p>
-              </motion.div>
-
-              <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md group">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-all duration-300">
-                    <AlertCircle size={20} />
-                  </div>
-                  <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-1 rounded uppercase tracking-wider">Inadimplência</span>
-                </div>
-                <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Vencidos / No Mês</h3>
-                <p className="text-2xl font-black text-slate-800 tracking-tight">{stats.inadimplenciaCount}</p>
-              </motion.div>
-
-              <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md group">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-                    <Building2 size={20} />
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-xl font-black text-indigo-600">{Math.round(stats.alugadosPercent)}%</span>
-                  </div>
-                </div>
-                <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Ocupação Total</h3>
-                <div className="flex items-end gap-1">
-                  <p className="text-2xl font-black text-slate-800 tracking-tight">{stats.alugadosCount}</p>
-                  <p className="text-[10px] font-bold text-slate-400 mb-1">/ {stats.totalImoveis} total</p>
-                </div>
-              </motion.div>
-            </section>
-            
-            {/* Fluxo de Caixa Chart */}
-            <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-                  <div>
-                    <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight italic">Fluxo de Caixa Mensal</h3>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Gestão inteligente de recebimentos ({new Date().getFullYear()})</p>
-                  </div>
-                  <div className="flex gap-6">
-                    <div className="flex items-center gap-2">
-                       <div className="w-3 h-3 bg-blue-600 rounded-sm"></div>
-                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Recebido</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                       <div className="w-3 h-3 bg-red-400 rounded-sm"></div>
-                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pendente</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="h-[300px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyCashFlowData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis 
-                        dataKey="name" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }}
-                        dy={10}
-                      />
-                      <YAxis 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }}
-                        tickFormatter={(value) => `R$ ${value >= 1000 ? (value / 1000) + 'k' : value}`}
-                      />
-                      <Tooltip 
-                        cursor={{ fill: '#f8fafc' }}
-                        contentStyle={{ 
-                          borderRadius: '16px', 
-                          border: '1px solid #f1f5f9', 
-                          boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
-                          fontSize: '12px',
-                          fontWeight: '800'
-                        }}
-                        formatter={(value: any) => formatarMoeda(value)}
-                      />
-                      <Bar dataKey="recebido" fill="#2563eb" radius={[6, 6, 0, 0]} barSize={32} />
-                      <Bar dataKey="pendente" fill="#f87171" radius={[6, 6, 0, 0]} barSize={32} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-            </motion.div>
-
-            <motion.div variants={itemVariants} className="space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                <div>
-                  <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight italic">Próximos Alertas</h2>
-                  <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1">Ações recomendadas para os próximos {notificationDays} dias</p>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-              <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                <Bell size={20} className="text-amber-500" />
-                Alertas Críticos ({notifications.length})
-              </h3>
-              <div className="flex flex-col gap-3">
-                 {notifications.map((co) => {
-                  const isContractExpiring = new Date(co.data_fim + 'T00:00:00') <= new Date(new Date().setDate(new Date().getDate() + notificationDays));
-                  
-                  let nextDueDate = co.dia_vencimento ? new Date(new Date().getFullYear(), new Date().getMonth(), co.dia_vencimento) : null;
-                  
-                  // Detecção de atraso real (venceu e não tem pagamento este mês)
-                  const isOverdue = co.dia_vencimento && 
-                    new Date() > new Date(new Date().getFullYear(), new Date().getMonth(), co.dia_vencimento) &&
-                    !pagamentos.some(p => 
-                      p.contrato_id === co.id && 
-                      p.competencia_mes === (new Date().getMonth() + 1) && 
-                      p.competencia_ano === new Date().getFullYear()
-                    );
-                  
-                  if (!isOverdue && nextDueDate && nextDueDate < new Date()) {
-                    nextDueDate = new Date(new Date().getFullYear(), new Date().getMonth() + 1, co.dia_vencimento!);
-                  }
-                  
-                  const isRentDue = !isOverdue && nextDueDate && nextDueDate <= new Date(new Date().setDate(new Date().getDate() + 31));
-
-                  return (
-                    <div key={co.id} className={`flex items-center justify-between p-4 rounded-xl border scale-in-center transition-all ${
-                      isOverdue ? 'bg-red-50 border-red-100 shadow-sm' : 'bg-orange-50/50 border-orange-100'
-                    }`}>
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className={`p-2 rounded-lg ${
-                          isOverdue ? 'bg-red-100 text-red-600' : 
-                          isRentDue ? 'bg-amber-100 text-amber-600' : 'bg-orange-100 text-orange-600'
-                        }`}>
-                          {isOverdue ? <BadgeDollarSign size={18} /> : isRentDue ? <CreditCard size={18} /> : <AlertCircle size={18} />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-slate-800 uppercase text-xs tracking-tight flex items-center gap-2">
-                            {co.inquilinos?.nome || 'Sem Nome'} 
-                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full ${
-                              isOverdue ? 'bg-red-200 text-red-800' :
-                              isRentDue ? 'bg-amber-200 text-amber-800' : 'bg-orange-200 text-orange-800'
-                            }`}>
-                              {isOverdue ? 'EM ATRASO' : isRentDue ? 'ALUGUEL' : 'CONTRATO'}
-                            </span>
-                          </p>
-                          <p className="text-[10px] text-slate-500 font-medium italic truncate max-w-[300px]">{co.imoveis?.endereco}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            {isOverdue ? 'Vencido em:' : isRentDue ? 'Próximo Venc.:' : 'Expira em:'}
-                          </p>
-                          <p className={`text-xs font-black ${isOverdue ? 'text-red-600' : 'text-slate-800'}`}>
-                            {isOverdue && nextDueDate ? new Date(new Date().getFullYear(), new Date().getMonth(), co.dia_vencimento!).toLocaleDateString('pt-BR') :
-                             isRentDue && nextDueDate ? nextDueDate.toLocaleDateString('pt-BR') : 
-                             new Date(co.data_fim + 'T00:00:00').toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
-                        
-                        <div className="flex gap-1">
-                          {can('EDIT', 'pagamentos') && (isOverdue || isRentDue) && (
-                            <button 
-                              onClick={() => {
-                                setActiveTab('pagamentos');
-                                setEditingItem(null);
-                                setFilesToUpload([]);
-                                setGuarantorFilesToUpload([]);
-                                setContractFileToUpload(null);
-                                setExistingDocs([]);
-                                setExistingGuarantorDocs([]);
-                                // Pre-fill flow: we will use a timeout to let the tab change and state settle
-                                setTimeout(() => {
-                                  setCreateModalOpen(true);
-                                }, 50);
-                              }}
-                              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                              title="Registrar Pagamento"
-                            >
-                              <DollarSign size={18} />
-                            </button>
-                          )}
-                          {can('EDIT', 'contratos') && (
-                            <button 
-                              onClick={() => handleSendEmailNotification(co, isOverdue ? 'ATRASO' : 'VENCIMENTO', nextDueDate || undefined)}
-                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                              title="Enviar Notificação por E-mail"
-                            >
-                              <Mail size={18} />
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => {
-                              setActiveTab('contratos');
-                            }}
-                            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                          >
-                            <ChevronRight size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {notifications.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-2">
-                    <CheckCircle2 size={32} className="text-green-200" />
-                    <p className="text-xs font-medium italic">Nenhum vencimento próximo nos próximos {notificationDays} dias.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      );
-    }
+          <DashboardTab
+            containerVariants={containerVariants}
+            itemVariants={itemVariants}
+            stats={stats}
+            formatarMoeda={formatarMoeda}
+            monthlyCashFlowData={monthlyCashFlowData}
+            notificationDays={notificationDays}
+            notifications={notifications}
+            pagamentos={pagamentos}
+            can={can}
+            setActiveTab={setActiveTab}
+            setEditingItem={setEditingItem}
+            setFilesToUpload={setFilesToUpload}
+            setGuarantorFilesToUpload={setGuarantorFilesToUpload}
+            setContractFileToUpload={setContractFileToUpload}
+            setExistingDocs={setExistingDocs}
+            setExistingGuarantorDocs={setExistingGuarantorDocs}
+            setCreateModalOpen={setCreateModalOpen}
+            handleSendEmailNotification={handleSendEmailNotification}
+          />
+        );
+      }
       
       case 'imoveis': {
-        const rawDataToUse = showArchived ? archivedImoveis : imoveis;
-        const availableCities = Array.from(new Set(rawDataToUse.map(im => im.cidade).filter(Boolean))).sort();
-        const availableTypes = Array.from(new Set(rawDataToUse.map(im => im.tipo_imovel).filter(Boolean))).sort();
-        const availableStatus = Array.from(new Set(rawDataToUse.map(im => im.status).filter(Boolean))).sort();
-
-        const filteredData = rawDataToUse.filter(im => {
-          const matchesCity = imovelCityFilter === 'todas' || im.cidade === imovelCityFilter;
-          const matchesStatus = imovelStatusFilter === 'todos' || im.status === imovelStatusFilter;
-          const matchesType = imovelTypeFilter === 'todos' || im.tipo_imovel === imovelTypeFilter;
-          const searchLower = imovelSearch.toLowerCase();
-          const matchesSearch = 
-            imovelSearch === '' ||
-            (im.endereco || '').toLowerCase().includes(searchLower) ||
-            (im.bairro || '').toLowerCase().includes(searchLower) ||
-            (im.apelido || '').toLowerCase().includes(searchLower) ||
-            (im.cep || '').toLowerCase().includes(searchLower);
-          
-          return matchesCity && matchesStatus && matchesType && matchesSearch;
-        });
-
-        const { data: paginatedImoveis, totalPages: imoveisPages } = getPaginatedAndSortedData(filteredData, 'imoveis');
-        
         return (
-          <div className="flex flex-col gap-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <Search size={14} />
-                </span>
-                <input 
-                  type="text"
-                  placeholder="Pesquisar endereço, bairro, cep ou apelido..."
-                  value={imovelSearch}
-                  onChange={(e) => setImovelSearch(e.target.value)}
-                  className="pl-8 pr-4 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all w-full bg-white"
-                />
-              </div>
-
-              <select 
-                value={imovelCityFilter}
-                onChange={(e) => setImovelCityFilter(e.target.value)}
-                className="px-3 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all bg-white"
-              >
-                <option value="todas">Todas as Cidades</option>
-                {availableCities.map(city => (
-                  <option key={city as string} value={city as string}>{city as string}</option>
-                ))}
-              </select>
-
-              <select 
-                value={imovelStatusFilter}
-                onChange={(e) => setImovelStatusFilter(e.target.value)}
-                className="px-3 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all bg-white"
-              >
-                <option value="todos">Todos os Status</option>
-                {availableStatus.map(st => (
-                  <option key={st as string} value={st as string}>{st as string}</option>
-                ))}
-              </select>
-
-              <select 
-                value={imovelTypeFilter}
-                onChange={(e) => setImovelTypeFilter(e.target.value)}
-                className="px-3 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all bg-white"
-              >
-                <option value="todos">Todos os Tipos</option>
-                {availableTypes.map(type => (
-                  <option key={type as string} value={type as string}>{type as string}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-              <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left min-w-[600px]">
-                  <thead className="bg-slate-50 border-b border-slate-200">
-                    <tr className="text-slate-500 text-[10px] uppercase tracking-widest font-black">
-                      <SortHeader label="Imóvel / Endereço" sortKey="endereco" activeTab="imoveis" />
-                      <SortHeader label="Bairro" sortKey="bairro" activeTab="imoveis" />
-                      <SortHeader label="Tipo" sortKey="tipo_imovel" activeTab="imoveis" />
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 transition-all text-sm font-medium">
-                  <AnimatePresence mode="popLayout">
-                    {paginatedImoveis.map((im, idx) => (
-                      <motion.tr 
-                        key={im.id}
-                        variants={itemVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="hidden"
-                        custom={idx}
-                        className="hover:bg-slate-50/80 transition-colors group"
-                      >
-                        <td className="px-6 py-5">
-                          <div className="flex flex-col">
-                            {im.apelido && (
-                              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-1 opacity-70 group-hover:opacity-100 transition-all">
-                                {im.apelido}
-                              </span>
-                            )}
-                            <p className="font-bold text-slate-800 tracking-tight">{im.endereco}, {im.numero}</p>
-                            <p className="text-[10px] text-slate-400 font-medium font-mono uppercase mt-0.5">CEP: {im.cep}</p>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5">
-                          <p className="text-slate-700 font-bold">{im.bairro}</p>
-                          <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">{im.cidade} / {im.estado}</p>
-                        </td>
-                        <td className="px-6 py-5">
-                          <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest inline-block w-fit border ${
-                            im.tipo_imovel === 'COMERCIAL' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-blue-50 text-blue-600 border-blue-100'
-                          }`}>
-                            {im.tipo_imovel || 'RESIDENCIAL'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-5">
-                          <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-tighter inline-block w-fit border ${
-                            im.status === 'Disponível' ? 'bg-green-50 text-green-600 border-green-100' : 
-                            im.status === 'Alugado' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-amber-50 text-amber-600 border-amber-100'
-                          }`}>
-                            {im.status || 'Disponível'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-5 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button 
-                                onClick={() => {
-                                  setViewingItem(im);
-                                  setViewModalOpen(true);
-                                }}
-                                className="text-slate-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-all"
-                                title="Visualizar Detalhes"
-                              >
-                                <Eye size={16} />
-                              </button>
-                             {can('ARCHIVE', 'imoveis') && (
-                               <button 
-                                onClick={() => handleToggleArchive(im, 'imoveis')}
-                                className="text-slate-400 hover:text-amber-500 p-2 rounded-lg hover:bg-amber-50 transition-all"
-                                title={im.arquivado ? "Restaurar" : "Arquivar"}
-                              >
-                                {im.arquivado ? <ArchiveRestore size={16} /> : <Archive size={16} />}
-                              </button>
-                             )}
-                            {can('EDIT', 'imoveis') && (
-                              <button 
-                                onClick={() => openCreateModal(im)}
-                                className="text-[10px] font-black text-slate-400 hover:text-blue-600 px-3 py-2 uppercase tracking-widest transition-all hover:bg-blue-50 rounded-lg"
-                              >
-                                Editar
-                              </button>
-                            )}
-                            {can('DELETE', 'imoveis') && (
-                              <button 
-                                onClick={() => setItemToDelete({ id: im.id, type: 'imoveis' })}
-                                className="text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-all"
-                              >
-                                <X size={16} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </AnimatePresence>
-                  {paginatedImoveis.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="text-center py-20 text-slate-400 font-medium italic">Nenhum imóvel {showArchived ? 'arquivado' : 'cadastrado'}.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <Pagination tab="imoveis" totalPages={imoveisPages} />
-          </div>
-          </div>
+          <ImoveisTab
+            showArchived={showArchived}
+            archivedImoveis={archivedImoveis}
+            imoveis={imoveis}
+            imovelCityFilter={imovelCityFilter}
+            imovelStatusFilter={imovelStatusFilter}
+            imovelTypeFilter={imovelTypeFilter}
+            imovelSearch={imovelSearch}
+            setImovelSearch={setImovelSearch}
+            setImovelCityFilter={setImovelCityFilter}
+            setImovelStatusFilter={setImovelStatusFilter}
+            setImovelTypeFilter={setImovelTypeFilter}
+            getPaginatedAndSortedData={getPaginatedAndSortedData}
+            SortHeader={SortHeader}
+            Pagination={Pagination}
+            itemVariants={itemVariants}
+            setViewingItem={setViewingItem}
+            setViewModalOpen={setViewModalOpen}
+            can={can}
+            handleToggleArchive={handleToggleArchive}
+            openCreateModal={openCreateModal}
+            setItemToDelete={setItemToDelete}
+          />
         );
       }
-
+      
       case 'proprietarios': {
-        const dataToUse = showArchived ? archivedProprietarios : proprietarios;
-        const { data: paginatedProprietarios, totalPages: proprietariosPages } = getPaginatedAndSortedData(dataToUse, 'proprietarios');
-        
         return (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left min-w-[600px]">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr className="text-slate-500 text-[10px] uppercase tracking-widest font-black">
-                    <SortHeader label="Proprietário" sortKey="nome" activeTab="proprietarios" />
-                    <SortHeader label="Cidade" sortKey="cidade" activeTab="proprietarios" />
-                    <th className="px-6 py-4">Contato</th>
-                    <th className="px-6 py-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 transition-all text-sm font-medium">
-                  {paginatedProprietarios.map(pr => (
-                  <tr key={pr.id} className="hover:bg-slate-50/50">
-                    <td className="px-6 py-4">
-                      <p className="font-bold text-slate-800 uppercase tracking-tight">{pr.nome}</p>
-                      <p className="text-[10px] text-slate-400 font-bold font-mono">CPF/CNPJ: {pr.cpf_cnpj}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-slate-700 font-bold">{pr.cidade} - {pr.estado}</p>
-                      <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest truncate max-w-[200px]">{pr.bairro}, {pr.endereco}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-xs text-blue-600 font-bold">{pr.email}</p>
-                      <p className="text-xs text-slate-500">{pr.telefone}</p>
-                    </td>
-                    <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
-                       {can('ARCHIVE', 'proprietarios') && (
-                         <button 
-                          onClick={() => handleToggleArchive(pr, 'proprietarios')}
-                          className="text-slate-400 hover:text-amber-500 p-2 transition-colors"
-                          title={pr.arquivado ? "Restaurar" : "Arquivar"}
-                        >
-                          {pr.arquivado ? <ArchiveRestore size={16} /> : <Archive size={16} />}
-                        </button>
-                       )}
-                      {can('EDIT', 'proprietarios') && (
-                        <button 
-                          onClick={() => openCreateModal(pr)}
-                          className="text-slate-400 hover:text-blue-600 font-bold p-2 transition-colors text-xs uppercase tracking-widest"
-                        >
-                          Editar
-                        </button>
-                      )}
-                      {can('DELETE', 'proprietarios') && (
-                        <button 
-                          onClick={() => setItemToDelete({ id: pr.id, type: 'proprietarios' })}
-                          className="text-slate-400 hover:text-red-500 p-2 transition-colors"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {paginatedProprietarios.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="text-center py-20 text-slate-400 font-medium italic">Nenhum proprietário {showArchived ? 'arquivado' : 'cadastrado'}.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <Pagination tab="proprietarios" totalPages={proprietariosPages} />
-        </div>
+          <ProprietariosTab
+            showArchived={showArchived}
+            archivedProprietarios={archivedProprietarios}
+            proprietarios={proprietarios}
+            getPaginatedAndSortedData={getPaginatedAndSortedData}
+            SortHeader={SortHeader}
+            Pagination={Pagination}
+            can={can}
+            handleToggleArchive={handleToggleArchive}
+            openCreateModal={openCreateModal}
+            setItemToDelete={setItemToDelete}
+            proprietarioSearch={proprietarioSearch}
+            setProprietarioSearch={setProprietarioSearch}
+          />
         );
       }
-
+      
       case 'inquilinos': {
-        const rawDataToUse = showArchived ? archivedInquilinos : inquilinos;
-        
-        const filteredData = rawDataToUse.filter(inq => {
-          const searchLower = inquilinoSearch.toLowerCase();
-          const matchesSearch = 
-            inquilinoSearch === '' ||
-            (inq.nome || '').toLowerCase().includes(searchLower) ||
-            (inq.email || '').toLowerCase().includes(searchLower) ||
-            (inq.cpf_cnpj || '').toLowerCase().includes(searchLower) ||
-            (inq.telefone || '').toLowerCase().includes(searchLower);
-          
-          return matchesSearch;
-        });
-
-        const { data: paginatedInquilinos, totalPages: inquilinosPages } = getPaginatedAndSortedData(filteredData, 'inquilinos');
-
         return (
-          <div className="flex flex-col gap-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <Search size={14} />
-                </span>
-                <input 
-                  type="text"
-                  placeholder="Pesquisar por nome, e-mail, CPF/CNPJ ou telefone..."
-                  value={inquilinoSearch}
-                  onChange={(e) => setInquilinoSearch(e.target.value)}
-                  className="pl-8 pr-4 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all w-full bg-white"
-                />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-              <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left min-w-[600px]">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr className="text-slate-500 text-[10px] uppercase tracking-widest font-black">
-                    <SortHeader label="Inquilino" sortKey="nome" activeTab="inquilinos" />
-                    <th className="px-6 py-4">Contato</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 transition-all text-sm font-medium">
-                  {paginatedInquilinos.map(inq => (
-                    <tr key={inq.id} className="hover:bg-slate-50/50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-700 font-black text-xs border border-slate-200">
-                            {inq.nome.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-800 uppercase tracking-tight">{inq.nome}</p>
-                            <p className="text-[10px] text-slate-400 font-bold font-mono uppercase tracking-tighter">DOC: {inq.cpf_cnpj}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-xs text-blue-600 font-bold">{inq.email}</p>
-                        <p className="text-xs text-slate-500">{inq.telefone}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                          {inq.arquivado ? 'Arquivado' : 'Ativo'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right flex items-center justify-end gap-2">
-                        {can('ARCHIVE', 'inquilinos') && (
-                          <button 
-                            onClick={() => handleToggleArchive(inq, 'inquilinos')}
-                            className="text-slate-400 hover:text-amber-500 p-2 transition-colors"
-                            title={inq.arquivado ? "Restaurar" : "Arquivar"}
-                          >
-                            {inq.arquivado ? <ArchiveRestore size={16} /> : <Archive size={16} />}
-                          </button>
-                        )}
-                        {can('EDIT', 'inquilinos') && (
-                          <button 
-                            onClick={() => openCreateModal(inq)}
-                            className="text-slate-400 hover:text-blue-600 font-bold p-2 transition-colors text-xs uppercase tracking-widest"
-                          >
-                            Editar
-                          </button>
-                        )}
-                        {can('DELETE', 'inquilinos') && (
-                          <button 
-                            onClick={() => setItemToDelete({ id: inq.id, type: 'inquilinos' })}
-                            className="text-slate-400 hover:text-red-500 p-2 transition-colors"
-                          >
-                            <X size={16} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {paginatedInquilinos.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="text-center py-20 text-slate-400 font-medium italic">Nenhum inquilino {showArchived ? 'arquivado' : 'cadastrado'}.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <Pagination tab="inquilinos" totalPages={inquilinosPages} />
-          </div>
-          </div>
+          <InquilinosTab
+            showArchived={showArchived}
+            archivedInquilinos={archivedInquilinos}
+            inquilinos={inquilinos}
+            inquilinoSearch={inquilinoSearch}
+            setInquilinoSearch={setInquilinoSearch}
+            getPaginatedAndSortedData={getPaginatedAndSortedData}
+            SortHeader={SortHeader}
+            Pagination={Pagination}
+            can={can}
+            handleToggleArchive={handleToggleArchive}
+            openCreateModal={openCreateModal}
+            setItemToDelete={setItemToDelete}
+          />
         );
       }
       
       case 'logs': {
-        return (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-slate-50 bg-slate-50/30">
-              <h3 className="font-black text-slate-800 uppercase tracking-tight">Audit Log System</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Last 100 system events</p>
-            </div>
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left min-w-[800px]">
-                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-black tracking-widest border-b border-slate-200">
-                  <tr>
-                    <th className="px-6 py-4">Data/Hora</th>
-                    <th className="px-6 py-4">Ação</th>
-                    <th className="px-6 py-4">Módulo</th>
-                    <th className="px-6 py-4">Detalhes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs font-medium">
-                  {logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 text-slate-400 font-mono">
-                        {new Date(log.created_at).toLocaleString('pt-BR')}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter ${
-                          log.acao === 'CRIAR' ? 'bg-green-50 text-green-600' :
-                          log.acao === 'EDITAR' ? 'bg-blue-50 text-blue-600' :
-                          log.acao === 'EXCLUIR' ? 'bg-red-50 text-red-600' :
-                          'bg-amber-50 text-amber-600'
-                        }`}>
-                          {log.acao}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 uppercase tracking-widest font-bold">
-                        {log.tabela}
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-slate-800 font-bold">{log.detalhes?.identificador || log.registro_id || '-'}</p>
-                        <p className="text-[10px] text-slate-400">ID: {log.registro_id || 'N/A'}</p>
-                      </td>
-                    </tr>
-                  ))}
-                  {logs.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="text-center py-20 text-slate-400 italic">No logs found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
+        return <LogsTab logs={logs} />;
       }
 
       case 'contratos': {
-        const searchLower = contratoSearch.toLowerCase();
-        const dataToFilter = showArchived ? archivedContratos : contratos;
-        const filteredData = dataToFilter.filter(co =>
-          (co.inquilinos?.nome?.toLowerCase() || '').includes(searchLower) ||
-          (co.proprietarios?.nome?.toLowerCase() || '').includes(searchLower) ||
-          (co.imoveis?.endereco?.toLowerCase() || '').includes(searchLower) ||
-          (co.imoveis?.apelido?.toLowerCase() || '').includes(searchLower)
-        );
-
-        const { data: paginatedContratos, totalPages: contratosPages } = getPaginatedAndSortedData(filteredData, 'contratos');
-
         return (
-          <div className="flex flex-col gap-4">
-            <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <input
-                type="text"
-                placeholder="Buscar por inquilino, imóvel ou proprietário..."
-                className="w-full p-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
-                value={contratoSearch}
-                onChange={(e) => setContratoSearch(e.target.value)}
-              />
-            </div>
-            {paginatedContratos.map(co => (
-              <div key={co.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-200 transition-all relative overflow-hidden">
-                {co.arquivado && <div className="absolute top-0 right-0 w-24 h-6 bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center rotate-45 translate-x-8 -translate-y-1">Arquivado</div>}
-                <div className="flex items-center gap-8">
-                  <div className="p-4 bg-slate-50 rounded-2xl text-slate-300 border border-slate-100 shrink-0">
-                    <FileText size={32} strokeWidth={2.5} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-black text-slate-800 text-lg uppercase tracking-tight italic mb-1 truncate">
-                      {co.imoveis?.apelido ? (
-                        <>
-                          <span className="text-blue-600">{co.imoveis.apelido}</span>
-                          <span className="mx-2 text-slate-300">-</span>
-                          <span className="text-slate-700">{co.imoveis.endereco}</span>
-                        </>
-                      ) : (
-                        co.imoveis?.endereco || 'Imóvel s/ endereço'
-                      )}
-                    </h4>
-                    <div className="space-y-0.5">
-                      <p className="text-slate-500 font-bold text-sm">Locatário: <span className="text-slate-700">{co.inquilinos?.nome || 'Inquilino s/ nome'}</span></p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Proprietário: {co.proprietarios?.nome || 'Não informado'}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-4 mt-2 items-center">
-                      <div className="flex items-center gap-4">
-                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Início: <span className="text-slate-600">{new Date(co.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR')}</span></p>
-                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Fim: <span className="text-slate-600">{new Date(co.data_fim + 'T00:00:00').toLocaleDateString('pt-BR')}</span></p>
-                      </div>
-                      <div className="flex gap-2">
-                        {co.renovacoes_count && co.renovacoes_count > 0 && (
-                          <p className="text-[10px] bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg font-black uppercase tracking-widest flex items-center gap-1 shadow-sm">
-                            <CheckCircle2 size={10} />
-                            {co.renovacoes_count === 1 ? '1 Renovação' : `${co.renovacoes_count} Renovações`}
-                          </p>
-                        )}
-                        <p className={`text-[10px] px-2.5 py-1 rounded-lg font-black uppercase tracking-widest flex items-center gap-1 shadow-sm ${
-                          co.status === 'ativo' || !co.status ? 'bg-green-50 text-green-600' : 
-                          co.status === 'finalizado' ? 'bg-slate-100 text-slate-500' : 
-                          'bg-red-50 text-red-600'
-                        }`}>
-                          {co.status === 'ativo' || !co.status ? 'Contrato Ativo' : co.status === 'finalizado' ? 'Finalizado' : 'Cancelado'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {(co.arquivo_url || (co.documentos && co.documentos.length > 0)) && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {/* Botão Principal do Contrato */}
-                        <a 
-                          href={co.arquivo_url || (co.documentos && co.documentos[0])} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="bg-blue-600 border border-blue-700 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight flex items-center gap-2 hover:bg-blue-700 transition-all shadow-md shadow-blue-100"
-                        >
-                          <FileText size={12} />
-                          Visualizar Contrato PDF
-                          <ExternalLink size={10} />
-                        </a>
-                        
-                        {/* Outros Anexos */}
-                        {co.documentos?.map((doc: string, idx: number) => {
-                          if (!co.arquivo_url && idx === 0) return null;
-                          return (
-                            <a 
-                              key={idx} 
-                              href={doc} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="bg-slate-50 border border-slate-200 text-slate-600 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter flex items-center gap-1.5 hover:bg-white hover:border-blue-300 hover:text-blue-600 transition-all shadow-sm"
-                            >
-                              <FileText size={10} />
-                              Anexo {co.arquivo_url ? idx + 1 : idx}
-                            </a>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-2 text-right">
-                    <div className="flex gap-2">
-                       <button 
-                         onClick={() => handleSendEmailNotification(co, 'VENCIMENTO')}
-                         className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                         title="Enviar Lembrete por E-mail"
-                       >
-                         <Mail size={16} />
-                       </button>
-                       {(co.status === 'ativo' || !co.status) && (
-                         <button 
-                           onClick={() => handleFinishContract(co)}
-                           className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                           title="Finalizar Contrato (Locatário saiu)"
-                         >
-                           <Ban size={16} />
-                         </button>
-                       )}
-                       {(co.status === 'finalizado' || co.status === 'cancelado') && can('ARCHIVE', 'contratos') && (
-                         <button 
-                          onClick={() => handleToggleArchive(co, 'contratos')}
-                          className="text-slate-400 hover:text-amber-500 p-2 hover:bg-amber-50 rounded-lg transition-all"
-                          title={co.arquivado ? "Restaurar" : "Arquivar"}
-                        >
-                          {co.arquivado ? <ArchiveRestore size={16} /> : <Archive size={16} />}
-                        </button>
-                       )}
-                      <button 
-                         onClick={() => {
-                           setSelectedContractForFinance(co);
-                           setFinanceModalOpen(true);
-                         }}
-                         className="bg-indigo-50 border border-indigo-100 text-indigo-600 px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-900 hover:text-white hover:border-slate-800 transition-all shadow-sm"
-                       >
-                         <CreditCard size={12} strokeWidth={3} />
-                         Financeiro
-                       </button>
-                      <button 
-                        onClick={() => {
-                          const inquilino = co.inquilinos?.nome || 'Locatário';
-                          const clausulas = co.clausulas || 'Este documento não possui cláusulas registradas. Utilize a função Editar para gerar o contrato completo.';
-                          
-                          // Obter estilos do modelo selecionado atualmente
-                          const currentTemplate = contractTemplates[selectedTemplateIdx];
-                          const fontSize = currentTemplate?.fontSize || 12;
-                          const fontColor = currentTemplate?.fontColor || '#000000';
-                          const fontWeight = currentTemplate?.bold ? 'bold' : 'normal';
-
-                          const win = window.open('', '_blank');
-                          if (win) {
-                            win.document.title = `Contrato - ${inquilino}`;
-                            win.document.write(`
-                              <html>
-                                <head>
-                                  <title>Contrato - ${inquilino}</title>
-                                  <style>
-                                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
-                                    * { box-sizing: border-box; }
-                                    body { 
-                                      font-family: 'Inter', sans-serif; 
-                                      font-weight: 400;
-                                      padding: 40px; 
-                                      line-height: 1.6; 
-                                      color: ${fontColor}; 
-                                      background: #f1f5f9;
-                                      margin: 0;
-                                      -webkit-print-color-adjust: exact;
-                                      print-color-adjust: exact;
-                                    }
-                                    .paper {
-                                      background: white;
-                                      padding: 80px;
-                                      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-                                      max-width: 800px;
-                                      margin: 40px auto;
-                                      min-height: 1000px;
-                                      border-radius: 4px;
-                                    }
-                                    .contract-content { 
-                                      font-size: ${fontSize}px;
-                                      color: #000000;
-                                      font-weight: 400 !important;
-                                      text-align: ${co.alinhamento_texto || 'justify'};
-                                      white-space: pre-wrap;
-                                    }
-                                    .contract-content * {
-                                      font-family: inherit;
-                                    }
-                                    .contract-content p, .contract-content span, .contract-content div { 
-                                      font-weight: inherit; 
-                                    }
-                                    .contract-content b, .contract-content strong { font-weight: 700 !important; }
-                                    .contract-content h1, .contract-content h2, .contract-content h3, .contract-content h4, .contract-content h5, .contract-content h6 {
-                                      font-size: inherit;
-                                      font-weight: inherit;
-                                      margin: 0;
-                                    }
-                                    .contract-content u { text-decoration: underline; }
-                                    .contract-content i { font-style: italic; }
-                                    @media print {
-                                      body { padding: 0 !important; background: white !important; margin: 0 !important; }
-                                      .paper { box-shadow: none !important; padding: 0 !important; max-width: none !important; margin: 0 !important; }
-                                      .no-print { display: none !important; opacity: 0 !important; visibility: hidden !important; height: 0 !important; overflow: hidden !important; }
-                                    }
-                                    .controls { 
-                                      position: fixed; 
-                                      top: 20px; 
-                                      left: 50%; 
-                                      transform: translateX(-50%); 
-                                      background: rgba(15, 23, 42, 0.9); 
-                                      backdrop-filter: blur(8px);
-                                      padding: 8px 16px; 
-                                      border-radius: 99px; 
-                                      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-                                      display: flex;
-                                      gap: 12px;
-                                      align-items: center;
-                                      z-index: 100;
-                                    }
-                                    .btn-print {
-                                      background: #2563eb; 
-                                      color: white; 
-                                      border: none; 
-                                      padding: 8px 16px; 
-                                      border-radius: 99px; 
-                                      font-weight: 800; 
-                                      cursor: pointer;
-                                      text-transform: uppercase;
-                                      font-size: 11px;
-                                      letter-spacing: 0.1em;
-                                      transition: all 0.2s;
-                                    }
-                                    .btn-print:hover { background: #1d4ed8; transform: translateY(-1px); }
-                                    .info-badge { color: white; font-size: 10px; font-weight: bold; opacity: 0.7; }
-                                  </style>
-                                </head>
-                                <body>
-                                  <div class="controls no-print">
-                                    <span class="info-badge no-print">MODO DE IMPRESSÃO</span>
-                                    <button onclick="window.print()" class="btn-print no-print">Imprimir Contrato</button>
-                                  </div>
-                                  <div class="paper">
-                                    <div class="contract-content">${clausulas}</div>
-                                  </div>
-                                </body>
-                              </html>
-                            `);
-                            win.document.close();
-                          }
-                        }}
-                        className="text-[10px] font-black text-blue-600 hover:bg-blue-50 px-2 py-1 rounded uppercase tracking-widest transition-all"
-                      >
-                        Visualizar
-                      </button>
-                      <button 
-                         onClick={() => {
-                           setContractToRenew(co);
-                           setIsRenewModalOpen(true);
-                         }}
-                         className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest transition-colors flex items-center gap-1"
-                         title="Renovar este contrato"
-                       >
-                         <ArchiveRestore size={12} />
-                         Renovar
-                       </button>
-                      {can('EDIT', 'contratos') && (
-                        <button 
-                          onClick={() => openCreateModal(co)}
-                          className="text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors"
-                        >
-                          Editar
-                        </button>
-                      )}
-                      {can('DELETE', 'contratos') && (
-                        <button 
-                          onClick={() => setItemToDelete({ id: co.id, type: 'contratos' })}
-                          className="text-[10px] font-black text-red-500 hover:text-red-700 uppercase tracking-widest transition-colors"
-                        >
-                          Excluir
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-2xl font-black text-slate-900 tracking-tighter">{formatarMoeda(co.valor_aluguel)}</p>
-                    <span className={`text-[10px] font-black ${co.arquivado ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'} px-2.5 py-1 rounded-full uppercase tracking-tighter inline-block font-mono`}>
-                      {co.arquivado ? 'Contrato Arquivado' : 'Contrato Ativo'}
-                    </span>
-                  </div>
-              </div>
-            ))}
-            {paginatedContratos.length === 0 && (
-              <div className="text-center py-20 text-slate-400 font-medium italic">
-                Nenhum contrato {showArchived ? 'arquivado' : 'ativo'}.
-              </div>
-            )}
-            <Pagination tab="contratos" totalPages={contratosPages} />
-          </div>
+          <ContratosTab
+            contratos={contratos}
+            pagamentos={pagamentos}
+            can={can}
+            contractSearch={contractSearch}
+            setContractSearch={setContractSearch}
+            handleSendEmailNotification={handleSendEmailNotification}
+            handleFinishContract={handleFinishContract}
+            handleToggleArchive={handleToggleArchive}
+            setSelectedContractForFinance={setSelectedContractForFinance}
+            setFinanceModalOpen={setFinanceModalOpen}
+            selectedTemplateIdx={selectedTemplateIdx}
+            contractTemplates={contractTemplates}
+            openCreateModal={openCreateModal}
+            setItemToDelete={setItemToDelete}
+            setIsRenewModalOpen={setIsRenewModalOpen}
+            setContractToRenew={setContractToRenew}
+          />
         );
       }
-
+      
       case 'pagamentos': {
-        const filteredPagamentos = pagamentos.filter(pa => {
-          const matchesYear = pa.competencia_ano === selectedYear;
-          const matchesMonth = paymentMonthFilter === 0 || pa.competencia_mes === paymentMonthFilter;
-          const matchesStatus = paymentStatusFilter === 'todos' || pa.status === paymentStatusFilter;
-          const searchLower = paymentSearch.toLowerCase();
-          const matchesSearch = 
-            paymentSearch === '' ||
-            (pa.contratos?.inquilinos?.nome || '').toLowerCase().includes(searchLower) ||
-            (pa.contratos?.imoveis?.endereco || '').toLowerCase().includes(searchLower) ||
-            (pa.valor_pago?.toString() || '').includes(paymentSearch);
-          
-          return matchesYear && matchesMonth && matchesStatus && matchesSearch;
-        });
-        const availableYears = Array.from(new Set(pagamentos.map(pa => pa.competencia_ano))).sort((a, b) => b - a);
-        if (availableYears.length === 0) availableYears.push(new Date().getFullYear());
-
-        const totalRecebido = filteredPagamentos
-          .filter(pa => pa.status === StatusPagamento.PAGO)
-          .reduce((acc, pa) => acc + (pa.valor_pago || pa.valor_esperado || 0), 0);
-
-        const totalPendente = filteredPagamentos
-          .filter(pa => pa.status !== StatusPagamento.PAGO)
-          .reduce((acc, pa) => acc + (pa.valor_esperado || 0), 0);
-
-        const totalGeral = totalRecebido + totalPendente;
-
         return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
-                <div>
-                  <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Filtrado</h3>
-                  <p className="text-2xl font-black text-slate-800 tracking-tight">{formatarMoeda(totalGeral)}</p>
-                </div>
-                <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                  <DollarSign size={24} />
-                </div>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
-                <div>
-                  <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Recebido</h3>
-                  <p className="text-2xl font-black text-green-600 tracking-tight">{formatarMoeda(totalRecebido)}</p>
-                </div>
-                <div className="p-3 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-all duration-300">
-                  <TrendingUp size={24} />
-                </div>
-              </div>
-
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
-                <div>
-                  <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Pendente</h3>
-                  <p className="text-2xl font-black text-red-600 tracking-tight">{formatarMoeda(totalPendente)}</p>
-                </div>
-                <div className="p-3 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-all duration-300">
-                  <AlertCircle size={24} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto custom-scrollbar">
-            <div className="p-6 border-b border-slate-50 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-slate-50/30 min-w-[1000px]">
-              <div>
-                <h3 className="font-black text-slate-800 uppercase tracking-tight italic">Histórico de Recebimentos</h3>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Exibindo registros de {selectedYear}</p>
-              </div>
-              
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    <Search size={14} />
-                  </span>
-                  <input 
-                    type="text"
-                    placeholder="Pesquisar..."
-                    value={paymentSearch}
-                    onChange={(e) => setPaymentSearch(e.target.value)}
-                    className="pl-8 pr-4 py-1.5 border-2 border-slate-100 rounded-lg text-[11px] font-bold text-slate-700 outline-none focus:border-blue-400 transition-all w-48 sm:w-64 bg-white"
-                  />
-                </div>
-
-                <select 
-                  value={paymentStatusFilter}
-                  onChange={(e) => setPaymentStatusFilter(e.target.value)}
-                  className="bg-white border-2 border-slate-100 rounded-lg px-3 py-1 text-xs font-bold text-slate-700 outline-none focus:border-blue-400 transition-all"
-                >
-                   <option value="todos">Todos Status</option>
-                   <option value={StatusPagamento.PAGO}>Pagos</option>
-                   <option value={StatusPagamento.PENDENTE}>Pendentes</option>
-                </select>
-
-                <select 
-                  value={paymentMonthFilter}
-                  onChange={(e) => setPaymentMonthFilter(parseInt(e.target.value))}
-                  className="bg-white border-2 border-slate-100 rounded-lg px-3 py-1 text-xs font-bold text-slate-700 outline-none focus:border-blue-400 transition-all"
-                >
-                   <option value={0}>Todos Meses</option>
-                   {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
-                     <option key={m} value={m}>{m.toString().padStart(2, '0')}</option>
-                   ))}
-                </select>
-
-                <div className="flex items-center gap-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ano:</label>
-                  <select 
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                    className="bg-white border-2 border-slate-100 rounded-lg px-3 py-1 text-xs font-bold text-slate-700 outline-none focus:border-blue-400 transition-all"
-                  >
-                    {availableYears.map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-                <button 
-                  className="text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 px-3 py-1 border border-slate-200 rounded-lg hover:bg-white transition-all"
-                >
-                  Exportar
-                </button>
-              </div>
-            </div>
-            <table className="w-full text-left min-w-[1000px]">
-              <thead className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
-                <tr>
-                  <th className="px-6 py-4">Beneficiário</th>
-                  <th className="px-6 py-4">Período</th>
-                  <th className="px-6 py-4 text-center">Vencimento</th>
-                  <th className="px-6 py-4 text-center">Data Pagto</th>
-                  <th className="px-6 py-4">Valor</th>
-                  <th className="px-6 py-4 text-center">Status</th>
-                  <th className="px-6 py-4 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm font-medium">
-                {filteredPagamentos.map(pa => {
-                  const dueDate = new Date(pa.data_vencimento + 'T00:00:00');
-                  const paymentDate = pa.data_pagamento ? new Date(pa.data_pagamento) : null;
-                  const isOverdue = !pa.data_pagamento && dueDate < new Date();
-
-                  return (
-                    <tr key={pa.id} className={`hover:bg-slate-50 transition-colors ${isOverdue ? 'bg-red-50/20' : ''}`}>
-                      <td className="px-6 py-4">
-                        <p className="font-bold text-slate-800">{pa.contratos?.inquilinos?.nome}</p>
-                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate max-w-[200px]">{pa.contratos?.imoveis?.endereco}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="bg-slate-100 px-2 py-1 rounded text-xs font-bold text-slate-600">
-                          {pa.competencia_mes.toString().padStart(2, '0')}/{pa.competencia_ano}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center text-slate-400 font-mono italic">
-                        {dueDate.toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="px-6 py-4 text-center text-slate-600 font-mono">
-                        {paymentDate ? paymentDate.toLocaleDateString('pt-BR') : '---'}
-                      </td>
-                      <td className="px-6 py-4 font-black">
-                        <span className={pa.status === StatusPagamento.PAGO ? "text-green-600" : "text-slate-800"}>
-                          {formatarMoeda(pa.status === StatusPagamento.PAGO ? (pa.valor_pago || 0) : (pa.valor_esperado || 0))}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {pa.status === StatusPagamento.PAGO ? (
-                          <span className="text-[9px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center justify-center gap-1 mx-auto w-fit">
-                            <CheckCircle2 size={10} /> Pago
-                          </span>
-                        ) : isOverdue ? (
-                          <span className="text-[9px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center justify-center gap-1 mx-auto w-fit animate-pulse">
-                            <AlertCircle size={10} /> Atrasado
-                          </span>
-                        ) : (
-                          <span className="text-[9px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center justify-center gap-1 mx-auto w-fit">
-                             Pendente
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {pa.status === StatusPagamento.PAGO ? (
-                          <button 
-                            onClick={() => {
-                              const contrato = pa.contratos;
-                              const locadorNome = contrato?.proprietarios?.nome || contrato?.imoveis?.proprietarios?.nome || 'N/A';
-                              const locadorCpf = contrato?.proprietarios?.cpf_cnpj || contrato?.imoveis?.proprietarios?.cpf_cnpj || 'N/A';
-                              
-                              setReceiptData({
-                                inquilino: contrato?.inquilinos?.nome || 'N/A',
-                                cpf: contrato?.inquilinos?.cpf_cnpj || 'N/A',
-                                valor: pa.valor_pago || 0,
-                                competencia: `${pa.competencia_mes}/${pa.competencia_ano}`,
-                                vencimento: pa.data_vencimento ? new Date(pa.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A',
-                                locador: locadorNome,
-                                locador_cpf: locadorCpf,
-                                endereco: contrato?.imoveis?.endereco || 'N/A',
-                                numero: contrato?.imoveis?.numero || '',
-                                complemento: contrato?.imoveis?.complemento || '',
-                                bairro: contrato?.imoveis?.bairro || '',
-                                cidade: contrato?.imoveis?.cidade || '',
-                                estado: contrato?.imoveis?.estado || '',
-                                cep: contrato?.imoveis?.cep || '',
-                                data: pa.data_pagamento ? new Date(pa.data_pagamento).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')
-                              });
-                              setReceiptModalOpen(true);
-                            }}
-                            className="text-blue-600 hover:bg-blue-50 px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest transition-all"
-                          >
-                            Recibo
-                          </button>
-                        ) : (
-                          <button 
-                             onClick={() => handleMarkAsPaid(pa, pa.valor_esperado || 0)}
-                             className="bg-green-600 text-white px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest hover:bg-green-700 transition-all shadow-md shadow-green-100"
-                          >
-                             Baixar
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            {filteredPagamentos.length === 0 && (
-              <div className="text-center py-20 text-slate-400 font-medium italic">
-                Nenhum registro financeiro encontrado para os filtros selecionados.
-              </div>
-            )}
-            </div>
-          </div>
+          <PagamentosTab
+            pagamentos={pagamentos}
+            paymentSearch={paymentSearch}
+            setPaymentSearch={setPaymentSearch}
+            paymentStatusFilter={paymentStatusFilter}
+            setPaymentStatusFilter={setPaymentStatusFilter}
+            paymentMonthFilter={paymentMonthFilter}
+            setPaymentMonthFilter={setPaymentMonthFilter}
+            selectedYear={selectedYear}
+            setSelectedYear={setSelectedYear}
+            formatarMoeda={formatarMoeda}
+            StatusPagamento={StatusPagamento}
+            handleSendEmailNotification={handleSendEmailNotification}
+            openReceiptModal={openReceiptModal}
+            handleMarkAsPaid={handleMarkAsPaid}
+            openCreateModal={openCreateModal}
+            showArchived={showArchived}
+            setShowArchived={setShowArchived}
+            loading={loading}
+          />
         );
       }
-
+      
+      case 'usuarios': {
+        return (
+          <UsuariosTab
+            perfis={perfis}
+            SortHeader={SortHeader}
+            loading={loading}
+            handleApproveUser={async (id) => {
+               if (confirm(`Aprovar entrada?`)) {
+                 const { error } = await supabase.from('user_profiles').update({ approved: true, status_pagamento: 'PAGO', plano: 'Pro' }).eq('id', id);
+                 if (!error) fetchData();
+               }
+            }}
+            handleChangeRole={async (id, newRole) => {
+               if (confirm(`Alterar nível para ${newRole}?`)) {
+                 const { error } = await supabase.from('user_profiles').update({ role: newRole }).eq('id', id);
+                 if (error) {
+                   console.error("Erro ao alterar nível", error);
+                   alert("Erro ao alterar nível: " + error.message);
+                 }
+                 if (!error) fetchData();
+               }
+            }}
+            handleDeleteUser={async (id, role) => {
+               if (userProfile?.id !== id && confirm(`Remover acesso?`)) {
+                 const { error } = await supabase.from('user_profiles').delete().eq('id', id);
+                 if (!error) fetchData();
+               }
+            }}
+            onEditUser={(user) => setEditingUser(user)}
+          />
+        );
+      }
+      
       case 'configuracoes': {
         return (
-          <div className="flex flex-col gap-8">
-            {/* Modelos de Contratos - Priorizado */}
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-                <div>
-                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                    <FileText size={24} className="text-blue-600" />
-                    Modelos de Contratos Personalizados
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium italic mt-1">Configure modelos que podem ser selecionados na criação de novos contratos.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => setIsTagGuideOpen(true)}
-                    className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all border border-slate-200"
-                  >
-                    <Hash size={16} />
-                    Guia de Tags
-                  </button>
-                  <button 
-                    onClick={() => {
-                      const newTemplates = [...contractTemplates, { name: 'Novo Modelo', content: 'Escreva seu contrato aqui...' }];
-                      setContractTemplates(newTemplates);
-                    }}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
-                  >
-                    <PlusCircle size={16} />
-                    Novo Modelo
-                  </button>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                {contractTemplates.map((template, idx) => (
-                  <div key={idx} className="p-5 bg-slate-50 rounded-2xl border border-slate-200 group flex flex-col gap-3">
-                    <div className="flex justify-between items-center">
-                      <div className="flex-1">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nome do Modelo</label>
-                        <input 
-                          className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-                          value={template.name}
-                          onChange={(e) => {
-                            const newTemplates = [...contractTemplates];
-                            newTemplates[idx].name = e.target.value;
-                            setContractTemplates(newTemplates);
-                          }}
-                        />
-                      </div>
-                      <button 
-                        onClick={() => {
-                          if (contractTemplates.length <= 1) {
-                            alert('Você deve ter pelo menos um modelo de contrato.');
-                            return;
-                          }
-                          if (confirm('Deseja realmente excluir este modelo de contrato?')) {
-                            const newTemplates = contractTemplates.filter((_, i) => i !== idx);
-                            setContractTemplates(newTemplates);
-                          }
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all border border-transparent hover:border-red-100"
-                        title="Excluir este modelo"
-                      >
-                        <X size={14} />
-                        Excluir Modelo
-                      </button>
-                    </div>
-                    
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Conteúdo das Cláusulas</label>
-                      </div>
-                          <RichEditor 
-                            content={template.content} 
-                            onChange={(newContent) => {
-                              const newTemplates = [...contractTemplates];
-                              if (newTemplates[idx].content !== newContent) {
-                                newTemplates[idx].content = newContent;
-                                setContractTemplates(newTemplates);
-                              }
-                            }}
-                            activeDropdown={activeEditorDropdown}
-                            setActiveDropdown={setActiveEditorDropdown}
-                          />
-                    </div>
-                    
-                    <div className="flex justify-between items-center mt-2 px-1">
-                      <p className="text-[9px] text-slate-400 font-medium italic">Edite o texto e as tags livremente.</p>
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          setSuccess(true);
-                          setTimeout(() => setSuccess(false), 3000);
-                        }}
-                        className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
-                      >
-                        <CheckCircle2 size={14} />
-                        Salvar Alterações
-                      </button>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block w-full mb-1">Tags Disponíveis (Clique para Inserir):</span>
-                      {[
-                        { label: "Locatário: Nome", tag: "{{inquilino_nome}}" },
-                        { label: "Locatário: CPF/CNPJ", tag: "{{inquilino_cpf}}" },
-                        { label: "Locatário: RG", tag: "{{inquilino_rg}}" },
-                        { label: "Locatário: Tel", tag: "{{inquilino_telefone}}" },
-                        { label: "Locatário: Email", tag: "{{inquilino_email}}" },
-                        { label: "Locatário: Est. Civil", tag: "{{inquilino_estado_civil}}" },
-                        { label: "Locatário: Profissão", tag: "{{inquilino_profissao}}" },
-                        { label: "Imóvel: Endereço", tag: "{{imovel_endereco}}" },
-                        { label: "Imóvel: Bairro", tag: "{{imovel_bairro}}" },
-                        { label: "Imóvel: Cidade", tag: "{{imovel_cidade}}" },
-                        { label: "Imóvel: Estado", tag: "{{imovel_estado}}" },
-                        { label: "Imóvel: CEP", tag: "{{imovel_cep}}" },
-                        { label: "Proprietário: Nome", tag: "{{proprietario_nome}}" },
-                        { label: "Proprietário: CPF/CNPJ", tag: "{{proprietario_cpf}}" },
-                        { label: "Proprietário: Endereço", tag: "{{proprietario_endereco}}" },
-                        { label: "Proprietário: Cidade", tag: "{{proprietario_cidade}}" },
-                        { label: "Valor Total", tag: "{{valor_total}}" },
-                        { label: "Valor Extenso", tag: "{{valor_extenso}}" },
-                        { label: "Vencimento", tag: "{{data_vencimento}}" },
-                        { label: "Data Início", tag: "{{data_inicio}}" },
-                        { label: "Data Fim", tag: "{{data_fim}}" },
-                        { label: "Data Hoje", tag: "{{data_hoje}}" },
-                        { label: "Foro", tag: "{{foro}}" },
-                        { label: "Condições Pag.", tag: "{{condicoes_pagamento}}" },
-                        { label: "Testemunha 1", tag: "{{testemunha_1}}" },
-                        { label: "Testemunha 2", tag: "{{testemunha_2}}" }
-                      ].map(item => (
-                        <button 
-                          key={item.tag} 
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            document.execCommand('insertText', false, item.tag);
-                          }}
-                          className="px-2 py-1 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 rounded text-[9px] font-mono font-bold text-blue-600 transition-all"
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                      <button 
-                        type="button"
-                        onClick={() => setIsTagGuideOpen(true)}
-                        className="px-2 py-1 bg-blue-600 border border-blue-700 hover:bg-blue-700 rounded text-[9px] font-bold text-white transition-all flex items-center gap-1 shadow-sm"
-                      >
-                        <Hash size={10} />
-                        GUIA DE TAGS
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Notificações - Reduzido */}
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm max-w-2xl">
-              <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight mb-6 flex items-center gap-2">
-                <Bell size={20} className="text-slate-400" />
-                Alertas e Notificações
-              </h3>
-              
-              <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between items-end mb-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Antecedência de Alerta</label>
-                    <span className="text-2xl font-black text-blue-600">{notificationDays} dias</span>
-                  </div>
-                  <input 
-                    type="range" 
-                    min="15" 
-                    max="180" 
-                    step="15"
-                    value={notificationDays}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value);
-                      setNotificationDays(val);
-                      fetchData();
-                    }}
-                    className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-
-                <div className="pt-4 border-t border-slate-50 flex items-center justify-between opacity-50 grayscale cursor-not-allowed">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-100 text-slate-400 rounded-lg">
-                      <Bell size={18} />
-                    </div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Notificações via E-mail</p>
-                  </div>
-                  <span className="text-[9px] font-bold bg-slate-100 text-slate-500 px-2 py-1 rounded uppercase">Upgrade Pro</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      case 'usuarios': {
-        const assinantesCount = perfis.filter(p => p.status_pagamento === 'PAGO').length;
-        const trialCount = perfis.filter(p => p.trial_ends_at && new Date(p.trial_ends_at) > new Date() && p.status_pagamento !== 'PAGO').length;
-
-        return (
-          <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-black text-slate-400 uppercase tracking-widest mb-4">Usuários Ativos</h2>
-                <div className="flex items-center gap-4">
-                  <div className="bg-emerald-50 px-4 py-2 rounded-xl flex items-center gap-2">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 font-sans">{assinantesCount} Assinantes</span>
-                  </div>
-                  <div className="bg-amber-50 px-4 py-2 rounded-xl flex items-center gap-2">
-                    <div className="w-2 h-2 bg-amber-500 rounded-full" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-600 font-sans">{trialCount} em Trial</span>
-                  </div>
-                </div>
-              </div>
-              <div className="relative group">
-                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
-                <input 
-                  type="text" 
-                  placeholder="Buscar por nome, e-mail ou CPF..." 
-                  className="bg-slate-50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-full px-12 py-3 text-sm font-bold w-full md:w-80 transition-all shadow-sm"
-                />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden text-slate-700">
-              <div className="overflow-x-auto overflow-y-hidden">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50/50 border-b border-slate-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <th className="px-6 py-5">Usuário</th>
-                      <th className="px-6 py-5">Nome Completo</th>
-                      <th className="px-6 py-5">CPF</th>
-                      <th className="px-6 py-5">E-mail</th>
-                      <th className="px-6 py-5 text-center">Status Pagto</th>
-                      <th className="px-6 py-5 text-center">Plano</th>
-                      <th className="px-6 py-5">Início</th>
-                      <th className="px-6 py-5">Expiração</th>
-                      <th className="px-6 py-5">Último Acesso</th>
-                      <th className="px-6 py-5 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {perfis.map((p) => {
-                      const isGleison = p.nome?.toLowerCase().includes('gleison') || p.role === 'ADMIN';
-                      return (
-                        <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="px-6 py-5">
-                            <div className="flex flex-col">
-                              <span className="text-sm font-black text-slate-700">{p.nome?.split(' ')[0].toLowerCase() || '-'}</span>
-                              <span className={`text-[9px] font-bold uppercase tracking-tighter ${p.role === 'ADMIN' ? 'text-blue-500' : 'text-slate-400'}`}>{p.role}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-5 text-sm font-bold text-slate-600">{p.nome || '-'}</td>
-                          <td className="px-6 py-5 text-xs text-slate-500">{p.cpf || '-'}</td>
-                          <td className="px-6 py-5 text-xs text-slate-500">-</td>
-                          <td className="px-6 py-5">
-                            <div className="flex justify-center">
-                              <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-                                p.status_pagamento === 'PAGO' ? 'bg-emerald-50 text-emerald-600' : 
-                                p.status_pagamento === 'ATRASADO' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-400'
-                              }`}>
-                                {p.status_pagamento || 'SEM ASSINATURA'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-5">
-                            <div className="flex justify-center">
-                              <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-                                p.plano === 'Pro' ? 'bg-blue-50 text-blue-600' : 
-                                p.plano === 'Platinum' ? 'bg-purple-50 text-purple-600' : 'bg-slate-100 text-slate-400'
-                              }`}>
-                                {p.plano || 'NENHUM'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-5">
-                            <span className="text-xs text-slate-500 font-bold">{p.data_inicio ? new Date(p.data_inicio).toLocaleDateString('pt-BR') : '-'}</span>
-                          </td>
-                          <td className="px-6 py-5">
-                            <div className="flex flex-col">
-                              <span className={`text-xs font-black ${
-                                isGleison ? 'text-emerald-500' :
-                                p.trial_ends_at && new Date(p.trial_ends_at) < new Date() ? 'text-red-500' : 'text-slate-600'
-                              }`}>
-                                {isGleison ? '∞' : (p.trial_ends_at ? new Date(p.trial_ends_at).toLocaleDateString('pt-BR') : '-')}
-                              </span>
-                              <span className="text-[9px] font-bold uppercase text-slate-400">
-                                {isGleison ? 'VITALÍCIO' : (p.trial_ends_at && new Date(p.trial_ends_at) < new Date() ? 'EXPIRADO' : 'ATIVO')}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-5">
-                            <div className="text-xs font-bold text-slate-500 flex items-center gap-2">
-                              <div className={`w-1.5 h-1.5 rounded-full ${p.last_access ? 'bg-emerald-400' : 'bg-slate-300'}`} />
-                              {p.last_access ? new Date(p.last_access).toLocaleDateString('pt-BR') : 'Nunca'}
-                            </div>
-                          </td>
-                          <td className="px-6 py-5 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {!p.approved && (
-                                <button 
-                                  onClick={async () => {
-                                    if (confirm(`Aprovar entrada de ${p.nome}?`)) {
-                                      const { error } = await supabase.from('user_profiles').update({ approved: true, status_pagamento: 'PAGO', plano: 'Pro' }).eq('id', p.id);
-                                      if (!error) fetchData();
-                                    }
-                                  }}
-                                  className="p-2 bg-emerald-50 text-emerald-500 hover:bg-emerald-100 rounded-lg transition-all relative group/btn"
-                                >
-                                  <CheckCircle2 size={16} />
-                                  <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] uppercase font-black px-2 py-1 rounded opacity-0 group-hover/btn:opacity-100 pointer-events-none transition-opacity whitespace-nowrap">Conceder Assinatura / Aprovar</span>
-                                </button>
-                              )}
-                              <button 
-                                onClick={() => setEditingUser(p)}
-                                className="p-2 hover:bg-blue-50 text-slate-300 hover:text-blue-500 rounded-lg transition-all"
-                              >
-                                <Edit3 size={16} />
-                              </button>
-                              {userProfile?.id !== p.id && (
-                                <button 
-                                  onClick={async () => {
-                                    if (confirm(`Remover acesso de ${p.nome}?`)) {
-                                      const { error } = await supabase.from('user_profiles').delete().eq('id', p.id);
-                                      if (!error) fetchData();
-                                    }
-                                  }}
-                                  className="p-2 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-lg transition-all"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Modal de Edição */}
-            <AnimatePresence>
-              {editingUser && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl relative overflow-hidden flex flex-col"
-                  >
-                    <div className="px-10 pt-10 pb-6 border-b border-slate-50 flex items-center justify-between">
-                      <h3 className="text-2xl font-black text-slate-800 tracking-tight italic uppercase">Editar Usuário</h3>
-                      <button onClick={() => setEditingUser(null)} className="text-slate-300 hover:text-slate-500"><X size={24} /></button>
-                    </div>
-
-                    <div className="p-10 space-y-6 overflow-y-auto max-h-[70vh] custom-scrollbar text-slate-700">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-slate-400">Perfil do Colaborador</label>
-                        <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex items-center gap-4">
-                          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-xl font-black text-slate-400 border border-slate-100 shadow-sm">
-                            {editingUser.nome?.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="text-sm font-black text-slate-700">{editingUser.nome}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{editingUser.plano || 'Nenhum'} • {editingUser.role}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-slate-400">Nome Completo</label>
-                        <input 
-                          id="edit-nome"
-                          defaultValue={editingUser.nome || ''}
-                          className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl px-4 py-4 font-bold text-sm transition-all"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-slate-400">Função (Role)</label>
-                          <select 
-                            id="edit-role"
-                            defaultValue={editingUser.role}
-                            className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl px-4 py-4 font-bold text-sm transition-all appearance-none"
-                          >
-                            <option value="CORRETOR">Usuário Comum</option>
-                            <option value="ADMIN">Administrador</option>
-                            <option value="PROPRIETARIO">Proprietário</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-slate-400">Plano</label>
-                          <select 
-                            id="edit-plano"
-                            defaultValue={editingUser.plano || 'Nenhum'}
-                            className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl px-4 py-4 font-bold text-sm transition-all appearance-none"
-                          >
-                            <option value="Nenhum">Nenhum</option>
-                            <option value="Basic">Basic</option>
-                            <option value="Pro">Pro</option>
-                            <option value="Platinum">Platinum</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-slate-400">Status Pagamento</label>
-                        <select 
-                          id="edit-status"
-                          defaultValue={editingUser.status_pagamento || 'Sem Assinatura'}
-                          className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl px-4 py-4 font-bold text-sm transition-all appearance-none"
-                        >
-                          <option value="Sem Assinatura">Sem Assinatura</option>
-                          <option value="PAGO">PAGO</option>
-                          <option value="ATRASADO">ATRASADO</option>
-                          <option value="PENDENTE">PENDENTE</option>
-                        </select>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-slate-400">Data de Início</label>
-                          <input 
-                            id="edit-data-inicio"
-                            type="date"
-                            defaultValue={editingUser.data_inicio ? new Date(editingUser.data_inicio).toISOString().split('T')[0] : ''}
-                            className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl px-4 py-4 font-bold text-sm transition-all"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-slate-400">Data de Expiração</label>
-                          <input 
-                            id="edit-data-fim"
-                            type="date"
-                            defaultValue={editingUser.trial_ends_at ? new Date(editingUser.trial_ends_at).toISOString().split('T')[0] : ''}
-                            className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl px-4 py-4 font-bold text-sm transition-all"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-10 bg-slate-50 flex items-center justify-end gap-4 rounded-b-[2.5rem]">
-                      <button 
-                        onClick={() => setEditingUser(null)}
-                        className="px-8 py-4 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all font-sans"
-                      >
-                        Cancelar
-                      </button>
-                      <button 
-                        onClick={() => {
-                          const nome = (document.getElementById('edit-nome') as HTMLInputElement).value;
-                          const role = (document.getElementById('edit-role') as HTMLSelectElement).value;
-                          const plano = (document.getElementById('edit-plano') as HTMLSelectElement).value;
-                          const status_pagamento = (document.getElementById('edit-status') as HTMLSelectElement).value;
-                          const data_inicio = (document.getElementById('edit-data-inicio') as HTMLInputElement).value;
-                          const trial_ends_at = (document.getElementById('edit-data-fim') as HTMLInputElement).value;
-
-                          handleUpdateUser({
-                            nome,
-                            role: role as any,
-                            plano,
-                            status_pagamento,
-                            data_inicio: data_inicio ? new Date(data_inicio).toISOString() : undefined,
-                            trial_ends_at: trial_ends_at ? new Date(trial_ends_at).toISOString() : undefined,
-                            approved: true
-                          });
-                        }}
-                        disabled={loading}
-                        className="bg-blue-600 text-white px-12 py-4 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
-                      >
-                        {loading ? 'Salvando...' : 'Salvar Alterações'}
-                      </button>
-                    </div>
-                  </motion.div>
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
+          <ConfiguracoesTab 
+            contractTemplates={contractTemplates} 
+            setContractTemplates={setContractTemplates}
+            notificationDays={notificationDays}
+            setNotificationDays={setNotificationDays}
+          />
         );
       }
 
@@ -4569,7 +2776,7 @@ export default function DashboardPage() {
   const isTrialActive = userProfile?.trial_ends_at ? new Date(userProfile.trial_ends_at) > new Date() : false;
   const trialDaysLeft = userProfile?.trial_ends_at ? Math.max(0, Math.ceil((new Date(userProfile.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
 
-  if (userProfile && !userProfile.approved && userProfile.role !== 'ADMIN') {
+  if (userProfile && !userProfile.approved && userProfile.role !== 'MASTER') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans">
         <motion.div 
@@ -4714,7 +2921,7 @@ export default function DashboardPage() {
               onClick={() => { setActiveTab('logs'); setIsSidebarOpen(false); setShowArchived(false); }} 
             />
           )}
-          {userProfile?.role === 'ADMIN' && (
+          {userProfile?.role === 'MASTER' && (
             <SidebarItem 
               icon={Users} 
               label="Usuários" 
@@ -4729,6 +2936,7 @@ export default function DashboardPage() {
             <div className="flex justify-between items-start mb-1">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Usuário</p>
               <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${
+                userProfile?.role === 'MASTER' ? 'bg-purple-100 text-purple-600' : 
                 userProfile?.role === 'ADMIN' ? 'bg-red-100 text-red-600' : 
                 userProfile?.role === 'PROPRIETARIO' ? 'bg-amber-100 text-amber-600' : 
                 'bg-blue-100 text-blue-600'
@@ -4790,7 +2998,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
               <span>Workspace</span>
               <ChevronRight size={10} className="text-slate-300" />
-              <span className="text-blue-500">{activeTab}</span>
+              <span className="text-blue-500">{activeTab === 'configuracoes' ? 'Definições' : activeTab === 'dashboard' ? 'Início' : activeTab}</span>
               {userProfile && !userProfile.approved && isTrialActive && (
                 <div className="ml-4 flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1 text-amber-600 shadow-sm animate-pulse">
                   <BadgeDollarSign size={12} className="text-amber-500" />
@@ -4803,7 +3011,7 @@ export default function DashboardPage() {
                activeTab === 'logs' ? 'Auditoria' :
                activeTab === 'configuracoes' ? 'Configurações' :
                activeTab.toUpperCase()}
-              {userProfile?.role === 'ADMIN' && activeTab === 'contratos' && (
+              {userProfile?.role === 'MASTER' && activeTab === 'contratos' && (
                 <span className="text-[10px] bg-blue-100 text-blue-600 px-3 py-1.5 rounded-2xl not-italic font-black flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse" />
                   SISTEMA: {contratos.length} CARREGADOS
@@ -4955,6 +3163,16 @@ export default function DashboardPage() {
                         </select>
                       </div>
 
+                      <div>
+                        <label className="text-[10px] font-black text-slate-500 uppercase mb-1 block tracking-tight">Proprietário (Opcional)</label>
+                        <select name="proprietario_id" defaultValue={editingItem?.proprietario_id || ""} className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all appearance-none bg-white">
+                          <option value="">Selecione um proprietário...</option>
+                          {proprietarios.map(p => (
+                            <option key={p.id} value={p.id}>{p.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-8 gap-3">
                         <div className="md:col-span-4">
                           <label className="text-[10px] font-black text-slate-500 uppercase mb-1 block flex justify-between">
@@ -5002,11 +3220,11 @@ export default function DashboardPage() {
 
                       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-50">
                         <div>
-                          <label className="text-[10px] font-black text-orange-500 uppercase mb-1 block">Instalação CEMIG</label>
+                          <label className="text-[10px] font-black text-orange-500 uppercase mb-1 block">Concessionária de Luz (Instalação)</label>
                           <input name="cemig" defaultValue={editingItem?.cemig} className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all" />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-blue-500 uppercase mb-1 block">Matrícula COPASA</label>
+                          <label className="text-[10px] font-black text-blue-500 uppercase mb-1 block">Concessionária de Água (Matrícula)</label>
                           <input name="copasa" defaultValue={editingItem?.copasa} className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all" />
                         </div>
                       </div>
@@ -5318,13 +3536,13 @@ export default function DashboardPage() {
 
                   {activeTab === 'contratos' && (
                     <div className="space-y-3">
-                      {userProfile?.role === 'ADMIN' ? (
+                      {userProfile?.role !== 'PROPRIETARIO' ? (
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block tracking-tight flex justify-between">
                             <span>Proprietário / Locador</span>
                             {formErrors.proprietario_id && <span className="text-red-500 normal-case font-bold">{formErrors.proprietario_id}</span>}
                           </label>
-                          <select name="proprietario_id" defaultValue={editingItem?.proprietario_id || ""} required onBlur={handleFieldBlur} className={`w-full border-2 ${formErrors.proprietario_id ? 'border-red-200 bg-red-50' : 'border-slate-100'} focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all appearance-none bg-white`}>
+                          <select name="proprietario_id" defaultValue={editingItem?.proprietario_id || ""} required onBlur={handleFieldBlur} onChange={(e) => setContractProprietarioId(e.target.value)} className={`w-full border-2 ${formErrors.proprietario_id ? 'border-red-200 bg-red-50' : 'border-slate-100'} focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all appearance-none bg-white`}>
                             <option value="">Selecione o Proprietário...</option>
                             {proprietarios.map(pr => <option key={pr.id} value={pr.id}>{pr.nome}</option>)}
                           </select>
@@ -5343,25 +3561,29 @@ export default function DashboardPage() {
                             {formErrors.imovel_id && <span className="text-red-500 normal-case font-bold">{formErrors.imovel_id}</span>}
                           </label>
                           {imoveis.length > 0 ? (
-                            <select name="imovel_id" defaultValue={editingItem?.imovel_id || ""} required onBlur={handleFieldBlur} className={`w-full border-2 ${formErrors.imovel_id ? 'border-red-200 bg-red-50' : 'border-slate-100'} focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all appearance-none bg-white`}>
+                            <select name="imovel_id" defaultValue={editingItem?.imovel_id || ""} required onBlur={handleFieldBlur} onChange={(e) => {
+                              // Se alterar imóvel, atualizar proprietário se necessário? Não, o fluxo é Proprietário -> Imóvel
+                            }} className={`w-full border-2 ${formErrors.imovel_id ? 'border-red-200 bg-red-50' : 'border-slate-100'} focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all appearance-none bg-white`}>
                               <option value="">Selecione o Imóvel...</option>
-                              {imoveis.map(im => {
-                                const isRented = im.status === 'Alugado' && editingItem?.imovel_id !== im.id;
-                                return (
-                                  <option 
-                                    key={im.id} 
-                                    value={im.id} 
-                                    disabled={isRented}
-                                    className={isRented ? 'text-slate-300' : ''}
-                                  >
-                                    {im.apelido ? `[${im.apelido}] ${im.endereco}` : im.endereco}, {im.numero} 
-                                    {isRented ? ' (INDISPONÍVEL - JÁ ALUGADO)' : ` (${im.status || 'Disponível'})`}
-                                  </option>
-                                );
-                              })}
+                              {imoveis
+                                .filter(im => !contractProprietarioId || im.proprietario_id === contractProprietarioId)
+                                .map(im => {
+                                  const isRented = im.status === 'Alugado' && editingItem?.imovel_id !== im.id;
+                                  return (
+                                    <option 
+                                      key={im.id} 
+                                      value={im.id} 
+                                      disabled={isRented}
+                                      className={isRented ? 'text-slate-300' : ''}
+                                    >
+                                      {im.apelido ? `[${im.apelido}] ${im.endereco}` : im.endereco}, {im.numero} 
+                                      {isRented ? ' (INDISPONÍVEL - JÁ ALUGADO)' : ` (${im.status || 'Disponível'})`}
+                                    </option>
+                                  );
+                                })}
                             </select>
                           ) : (
-                            <p className="text-[10px] text-red-500 font-bold bg-red-50 p-2 rounded-lg border border-red-100 italic">Nenhum imóvel disponível. Cadastre um primeiro.</p>
+                            <p className="text-[10px] text-red-500 font-bold bg-red-50 p-2 rounded-lg border border-red-100 italic">Nenhum imóvel disponível para este proprietário.</p>
                           )}
                         </div>
                         <div>
@@ -5672,7 +3894,7 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
-      {/* Basic Receipt Modal */}
+      {/* Professional Receipt Modal */}
       <AnimatePresence>
         {isReceiptModalOpen && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -5680,212 +3902,171 @@ export default function DashboardPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[95vh]"
             >
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h2 className="text-xl font-bold text-slate-800">Visualização do Recibo</h2>
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                <h2 className="text-xl font-black text-slate-800 tracking-tight italic uppercase">Visualização do Recibo</h2>
                 <button 
                   onClick={() => setReceiptModalOpen(false)}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-all"
                 >
-                  <PlusCircle size={24} className="rotate-45" />
+                  <X size={20} />
                 </button>
               </div>
               
-              <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar" id="printable-area">
-                {[1, 2].map((via) => (
-                  <div key={via} className={`${via === 2 ? 'print:mt-16 pt-8 border-t-2 border-dashed border-slate-200' : ''}`}>
-                    <div className="relative border-4 border-slate-200 p-8 rounded-lg space-y-8 print:border-none print:p-0">
-                      <div className="absolute top-4 right-4 text-[10px] font-black text-slate-300 uppercase tracking-widest hidden print:block">
-                        {via === 1 ? '1ª VIA - LOCADOR' : '2ª VIA - INQUILINO'}
-                      </div>
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                          <h1 className="text-3xl font-black text-slate-900 uppercase">Recibo</h1>
-                          <p className="text-slate-500 font-medium">Nº 0001/2026</p>
+              <div className="p-8 space-y-12 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/30" id="printable-area">
+                <div className="bg-white border border-slate-200 p-12 rounded-lg shadow-sm space-y-10 relative overflow-hidden">
+                  {/* Decorative Border like in the image */}
+                  <div className="absolute inset-0 border-8 border-slate-50 pointer-events-none opacity-50" />
+                  
+                  <div className="flex justify-between items-start relative z-10">
+                    <div className="space-y-1">
+                      <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase italic">Recibo</h1>
+                      <p className="text-xs font-black text-slate-400 tracking-widest uppercase">{`Nº 0001/${new Date().getFullYear()}`}</p>
+                    </div>
+                    <div className="text-right">
+                      {isEditing ? (
+                        <div className="flex flex-col gap-1 items-end">
+                           <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Valor R$</span>
+                           <input 
+                             type="number" 
+                             value={receiptData.valor} 
+                             onChange={(e) => handleReceiptChange('valor', parseFloat(e.target.value))}
+                             className="text-3xl font-black text-blue-600 border-2 border-blue-100 rounded-xl px-4 py-1 w-40 outline-none focus:border-blue-400 transition-all text-right"
+                           />
                         </div>
-                        <div className="text-right">
-                          {isEditing ? (
-                            via === 1 && (
-                              <div className="flex flex-col gap-1 items-end">
-                                 <span className="text-xs text-slate-400 font-bold uppercase">Valor R$</span>
-                                 <input 
-                                   type="number" 
-                                   value={receiptData.valor} 
-                                   onChange={(e) => handleReceiptChange('valor', parseFloat(e.target.value))}
-                                   className="text-2xl font-black text-blue-600 border rounded px-2 w-32 border-blue-200"
-                                 />
-                              </div>
-                            )
-                          ) : (
-                            <p className="text-2xl font-black text-blue-600">{formatarMoeda(receiptData.valor)}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="space-y-4 text-slate-800 leading-relaxed text-lg">
-                        {isEditing ? (
-                          via === 1 ? (
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                  <label className="text-xs font-bold text-slate-400 uppercase">Nome Inquilino</label>
-                                  <input 
-                                    className="w-full border rounded px-3 py-2 text-sm" 
-                                    value={receiptData.inquilino} 
-                                    onChange={(e) => handleReceiptChange('inquilino', e.target.value)}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-xs font-bold text-slate-400 uppercase">CPF/CNPJ</label>
-                                  <input 
-                                    className="w-full border rounded px-3 py-2 text-sm" 
-                                    value={receiptData.cpf} 
-                                    onChange={(e) => handleReceiptChange('cpf', e.target.value)}
-                                  />
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="grid grid-cols-3 gap-2">
-                                  <div className="col-span-2 space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Endereço</label>
-                                    <input 
-                                      className="w-full border rounded px-3 py-2 text-sm" 
-                                      value={receiptData.endereco} 
-                                      onChange={(e) => handleReceiptChange('endereco', e.target.value)}
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Nº</label>
-                                    <input 
-                                      className="w-full border rounded px-3 py-2 text-sm" 
-                                      value={receiptData.numero} 
-                                      onChange={(e) => handleReceiptChange('numero', e.target.value)}
-                                    />
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Bairro</label>
-                                    <input 
-                                      className="w-full border rounded px-3 py-2 text-sm" 
-                                      value={receiptData.bairro} 
-                                      onChange={(e) => handleReceiptChange('bairro', e.target.value)}
-                                    />
-                                  </div>
-                                  <div className="space-y-1">
-                                    <label className="text-xs font-bold text-slate-400 uppercase">CEP</label>
-                                    <input 
-                                      className="w-full border rounded px-3 py-2 text-sm" 
-                                      value={receiptData.cep} 
-                                      onChange={(e) => handleReceiptChange('cep', e.target.value)}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                  <label className="text-xs font-bold text-slate-400 uppercase">Cidade</label>
-                                  <input 
-                                    className="w-full border rounded px-3 py-2 text-sm" 
-                                    value={receiptData.cidade} 
-                                    onChange={(e) => handleReceiptChange('cidade', e.target.value)}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-xs font-bold text-slate-400 uppercase">UF</label>
-                                  <input 
-                                    className="w-full border rounded px-3 py-2 text-sm" 
-                                    value={receiptData.estado} 
-                                    onChange={(e) => handleReceiptChange('estado', e.target.value)}
-                                  />
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-400 uppercase">Competência</label>
-                                <input 
-                                  className="w-full border rounded px-3 py-2 text-sm" 
-                                  value={receiptData.competencia} 
-                                  onChange={(e) => handleReceiptChange('competencia', e.target.value)}
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                  <label className="text-xs font-bold text-slate-400 uppercase">Nome Locador</label>
-                                  <input 
-                                    className="w-full border rounded px-3 py-2 text-sm" 
-                                    value={receiptData.locador} 
-                                    onChange={(e) => handleReceiptChange('locador', e.target.value)}
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <label className="text-xs font-bold text-slate-400 uppercase">CPF/CNPJ Locador</label>
-                                  <input 
-                                    className="w-full border rounded px-3 py-2 text-sm" 
-                                    value={receiptData.locador_cpf} 
-                                    onChange={(e) => handleReceiptChange('locador_cpf', e.target.value)}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="bg-slate-50 p-8 rounded-xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 italic">
-                                <p>A segunda via será gerada automaticamente na impressão.</p>
-                            </div>
-                          )
-                        ) : (
-                          <>
-                            <p>
-                              Recebemos de <span className="font-bold border-b border-slate-300 pb-0.5">{receiptData.inquilino}</span>, 
-                              inscrito sob o CPF/CNPJ <span className="font-bold">{receiptData.cpf}</span>, 
-                              a importância supra de <span className="font-bold">{numeroParaExtenso(receiptData.valor)}</span>.
-                            </p>
-                            <p>
-                              Referente ao pagamento do aluguel do imóvel situado em: <br/>
-                              <span className="font-medium">{receiptData.endereco}, {receiptData.numero} - {receiptData.bairro}, {receiptData.cidade} - {receiptData.estado}, CEP: {receiptData.cep}</span>
-                            </p>
-                            <p>
-                              Competência: <span className="font-bold">{receiptData.competencia}</span>. Vencimento: <span className="font-bold">{receiptData.vencimento}</span>.
-                            </p>
-                          </>
-                        )}
-                      </div>
-
-                      <div className="pt-12 flex flex-col items-center gap-12">
-                        <p className="text-slate-400 font-medium italic underline decoration-dotted underline-offset-4">Local/Data: ____________________, ____ de ____________ de 20____</p>
-                        <div className="flex flex-col items-center gap-1 text-center">
-                          <div className="w-64 border-t-2 border-slate-900 pt-2 text-sm font-bold uppercase tracking-widest text-slate-900">
-                            {receiptData.locador}
-                          </div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Locador - {receiptData.locador_cpf}</span>
-                        </div>
-                      </div>
+                      ) : (
+                        <p className="text-4xl font-black text-blue-600 tracking-tight">{formatarMoeda(receiptData.valor)}</p>
+                      )}
                     </div>
                   </div>
-                ))}
+
+                  <div className="space-y-6 text-slate-800 leading-relaxed text-lg relative z-10">
+                    {isEditing ? (
+                      <div className="space-y-6 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome Inquilino</label>
+                            <input 
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" 
+                              value={receiptData.inquilino} 
+                              onChange={(e) => handleReceiptChange('inquilino', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CPF/CNPJ</label>
+                            <input 
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" 
+                              value={receiptData.cpf} 
+                              onChange={(e) => handleReceiptChange('cpf', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Endereço Completo</label>
+                            <input 
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" 
+                              value={receiptData.endereco} 
+                              onChange={(e) => handleReceiptChange('endereco', e.target.value)}
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                             <div className="col-span-1 space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nº</label>
+                                <input 
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" 
+                                  value={receiptData.numero} 
+                                  onChange={(e) => handleReceiptChange('numero', e.target.value)}
+                                />
+                             </div>
+                             <div className="col-span-2 space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bairro</label>
+                                <input 
+                                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" 
+                                  value={receiptData.bairro} 
+                                  onChange={(e) => handleReceiptChange('bairro', e.target.value)}
+                                />
+                             </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome Locador</label>
+                            <input 
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" 
+                              value={receiptData.locador} 
+                              onChange={(e) => handleReceiptChange('locador', e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CPF/CNPJ Locador</label>
+                            <input 
+                              className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold" 
+                              value={receiptData.locador_cpf} 
+                              onChange={(e) => handleReceiptChange('locador_cpf', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-8 font-medium text-slate-700 leading-relaxed md:text-xl">
+                        <p>
+                          Recebemos de <span className="font-black text-slate-900 border-b-2 border-slate-900 px-1">{receiptData.inquilino}</span>, 
+                          inscrito sob o CPF/CNPJ <span className="font-black text-slate-900">{receiptData.cpf}</span>, 
+                          a importância supra de <span className="font-black text-slate-900">{numeroParaExtenso(receiptData.valor)}</span>.
+                        </p>
+                        
+                        <div className="space-y-2">
+                          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Referente ao pagamento do aluguel do imóvel situado em:</p>
+                          <p className="font-black text-slate-800">
+                             {receiptData.endereco}, {receiptData.numero} {receiptData.complemento ? `- ${receiptData.complemento}` : ''} - {receiptData.bairro}, {receiptData.cidade} - {receiptData.estado}, CEP: {receiptData.cep}
+                          </p>
+                        </div>
+                        
+                        <p className="flex gap-4 items-center flex-wrap">
+                          <span>Competência: <span className="font-black text-slate-900">{receiptData.competencia}</span></span>
+                          <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                          <span>Vencimento: <span className="font-black text-slate-900">{receiptData.vencimento}</span></span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-20 flex flex-col items-center gap-12 relative z-10">
+                    <p className="text-slate-300 font-bold italic border-b border-dashed border-slate-200 pb-2 text-sm w-full text-center">
+                       Local/Data: ____________________________________, ______ de ______________________ de 20______
+                    </p>
+                    <div className="flex flex-col items-center gap-1 text-center mt-6">
+                      <div className="w-80 h-px bg-slate-900 mb-2" />
+                      <p className="text-lg font-black text-slate-900 uppercase tracking-tight">{receiptData.locador}</p>
+                      <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">Locador - {receiptData.locador_cpf}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+              <div className="p-8 border-t border-slate-100 flex justify-center flex-wrap gap-4 bg-white/80 backdrop-blur-md">
                 <button 
                   onClick={() => setIsEditing(!isEditing)}
-                  className={`px-6 py-2.5 font-medium rounded-lg transition-all border ${
-                    isEditing ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-white border-slate-200 text-slate-600'
+                  className={`px-8 py-3.5 font-black uppercase tracking-widest text-[10px] rounded-xl transition-all border shadow-sm ${
+                    isEditing ? 'bg-amber-100 border-amber-300 text-amber-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  {isEditing ? 'Salvar Edição' : 'Editar Recibo'}
+                  {isEditing ? 'Confirmar Edição' : 'Editar Recibo'}
                 </button>
                 <button 
                   onClick={generateReceiptPDF}
-                  className="px-6 py-2.5 bg-slate-800 text-white font-bold rounded-lg hover:bg-slate-900 shadow-md shadow-slate-200 flex items-center gap-2"
+                  className="px-8 py-3.5 bg-slate-800 text-white font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-slate-900 shadow-xl shadow-slate-200 flex items-center gap-3 transition-all transform hover:-translate-y-1 active:scale-95"
                 >
-                  <FileDown size={18} />
+                  <FileDown size={14} />
                   Baixar PDF
                 </button>
                 <button 
                   onClick={() => window.print()}
-                  className="px-6 py-2.5 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md shadow-blue-200 flex items-center gap-2"
+                  className="px-8 py-3.5 bg-blue-600 text-white font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-200 flex items-center gap-3 transition-all transform hover:-translate-y-1 active:scale-95"
                 >
-                  <Printer size={18} />
+                  <Printer size={14} />
                   Imprimir Recibo
                 </button>
               </div>
@@ -6325,7 +4506,11 @@ export default function DashboardPage() {
                                 .filter(p => p.contrato_id === selectedContractForFinance.id)
                                 .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
                                 .map(p => {
-                                  const isAtrasado = p.status !== StatusPagamento.PAGO && new Date(p.data_vencimento) < new Date();
+                                  const today = new Date();
+                                  today.setHours(0, 0, 0, 0);
+                                  const vencimentoDate = new Date(p.data_vencimento + 'T00:00:00');
+                                  const isAtrasado = p.status !== StatusPagamento.PAGO && vencimentoDate < today;
+
                                   return (
                                     <tr key={p.id} className="text-sm hover:bg-slate-50/80 transition-colors">
                                        <td className="py-3 font-bold text-slate-600">
@@ -6358,8 +4543,10 @@ export default function DashboardPage() {
                                           {p.status !== StatusPagamento.PAGO ? (
                                             <button 
                                               onClick={() => handleMarkAsPaid(p, p.valor_esperado || selectedContractForFinance.valor_aluguel)}
-                                              className="bg-green-600 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-green-700 transition-all shadow-md shadow-green-100"
+                                              disabled={loading}
+                                              className={`bg-green-600 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-green-700 transition-all shadow-md shadow-green-100 flex items-center justify-center gap-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             >
+                                              {loading && <Loader2 size={10} className="animate-spin" />}
                                               Baixar
                                             </button>
                                           ) : (
@@ -6622,6 +4809,136 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Edit User Modal */}
+      <AnimatePresence>
+        {editingUser && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col"
+            >
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight italic">Editar Usuário</h2>
+                <button 
+                  onClick={() => setEditingUser(null)}
+                  className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Perfil do Colaborador</label>
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-white border-2 border-slate-200 shadow-sm flex items-center justify-center text-slate-700 font-black text-lg">
+                      {editingUser.nome ? editingUser.nome.charAt(0).toUpperCase() : '?'}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800">{editingUser.nome}</p>
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{editingUser.plano || 'Sem Plano'} • {editingUser.role}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Nome Completo</label>
+                    <input 
+                      type="text" 
+                      value={editingUser.nome || ''}
+                      onChange={(e) => setEditingUser({...editingUser, nome: e.target.value})}
+                      className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 transition-all"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Função (Role)</label>
+                      <select 
+                        value={editingUser.role || 'CORRETOR'}
+                        onChange={(e) => setEditingUser({...editingUser, role: e.target.value as any})}
+                        className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 transition-all appearance-none bg-white"
+                      >
+                        <option value="MASTER">Master</option>
+                        <option value="ADMIN">Administrador</option>
+                        <option value="CORRETOR">Corretor</option>
+                        <option value="PROPRIETARIO">Proprietário</option>
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Plano</label>
+                      <input 
+                        type="text" 
+                        value={editingUser.plano || ''}
+                        onChange={(e) => setEditingUser({...editingUser, plano: e.target.value})}
+                        className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 transition-all bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Status Pagamento</label>
+                    <select 
+                        value={editingUser.status_pagamento || ''}
+                        onChange={(e) => setEditingUser({...editingUser, status_pagamento: e.target.value})}
+                        className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 transition-all appearance-none bg-white"
+                      >
+                        <option value="">Nenhum</option>
+                        <option value="PAGO">PAGO</option>
+                        <option value="ATRASADO">ATRASADO</option>
+                        <option value="CANCELADO">CANCELADO</option>
+                        <option value="TRIAL">TRIAL</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Data de Início</label>
+                      <input 
+                        type="date" 
+                        value={editingUser.created_at ? editingUser.created_at.split('T')[0] : ''}
+                        readOnly // Geralmente não se edita a data de início (created_at), mas coloquei como visualização. Pode-se alterar se o backend permitir
+                        className="w-full border-2 border-slate-100 bg-slate-50 outline-none rounded-xl px-4 py-3 text-sm font-bold text-slate-400 transition-all"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Data de Expiração</label>
+                      <input 
+                        type="date" 
+                        value={editingUser.trial_ends_at ? editingUser.trial_ends_at.split('T')[0] : ''}
+                        onChange={(e) => setEditingUser({...editingUser, trial_ends_at: e.target.value ? new Date(e.target.value).toISOString() : null})}
+                        className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+                <button 
+                  onClick={() => setEditingUser(null)}
+                  className="px-6 py-3 text-slate-400 hover:text-slate-600 font-black uppercase text-xs tracking-widest transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => handleUpdateUser(editingUser)}
+                  disabled={loading}
+                  className="px-8 py-3 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 disabled:opacity-50 flex justify-center items-center gap-2"
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : 'Salvar Alterações'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <style jsx global>{`
         @media print {
           body * {
@@ -6637,7 +4954,7 @@ export default function DashboardPage() {
             width: 100%;
             height: 100%;
             overflow: visible;
-            padding: 20px;
+            padding: 20px; 
           }
         }
       `}</style>

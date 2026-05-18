@@ -1,22 +1,102 @@
 @import "tailwindcss";
-@import "leaflet/dist/leaflet.css";
 
-@layer base {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #cbd5e1 transparent;
-  }
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
 
-  *::-webkit-scrollbar {
+body {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}
 
-  *::-webkit-scrollbar-track {
-    background: transparent;
-  }
+/* Base styles for RichEditor and Print */
+font[size="1"] { font-size: 10px !important; }
+font[size="2"] { font-size: 13px !important; }
+font[size="3"] { font-size: 16px !important; }
+font[size="4"] { font-size: 18px !important; }
+font[size="5"] { font-size: 24px !important; }
+font[size="6"] { font-size: 32px !important; }
+font[size="7"] { font-size: 48px !important; }
 
-  *::-webkit-scrollbar-thumb {
-    background-color: #cbd5e1;
-    border-radius: 20px;
+/* Ensure b/strong always render bold even inside elements */
+b, strong { font-weight: bold !important; }
+
+/* Base styles for Contract Content (Editor and Print) */
+.contract-content {
+  font-family: inherit;
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+}
+.contract-content h1, 
+.contract-content h2, 
+.contract-content h3, 
+.contract-content h4, 
+.contract-content h5, 
+.contract-content h6 {
+  font-weight: bold;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+  line-height: 1.2;
+}
+.contract-content h1 { font-size: 2em; }
+.contract-content h2 { font-size: 1.5em; }
+.contract-content h3 { font-size: 1.17em; }
+.contract-content h4 { font-size: 1em; }
+.contract-content h5 { font-size: 0.83em; }
+.contract-content h6 { font-size: 0.67em; }
+
+.contract-content p {
+  margin-bottom: 0.5em;
+  font-weight: normal;
+}
+.contract-content ul, 
+.contract-content ol {
+  padding-left: 2em;
+  margin-bottom: 1em;
+}
+.contract-content ul { list-style-type: disc; }
+.contract-content ol { list-style-type: decimal; }
+
+.contract-content *[style*="text-align: center"],
+.contract-content center {
+  text-align: center !important;
+  display: block;
+}
+.contract-content *[style*="text-align: right"] { text-align: right !important; }
+.contract-content *[style*="text-align: justify"] { text-align: justify !important; }
+.contract-content *[style*="text-align: left"] { text-align: left !important; }
+
+@keyframes scale-in-center {
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
   }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.scale-in-center {
+  animation: scale-in-center 0.3s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
 }
