@@ -469,6 +469,7 @@ export default function DashboardPage() {
   const [imovelStatusFilter, setImovelStatusFilter] = useState('todos');
   const [imovelTypeFilter, setImovelTypeFilter] = useState('todos');
   const [inquilinoSearch, setInquilinoSearch] = useState('');
+  const [contratoSearch, setContratoSearch] = useState('');
   const [selectedTemplateIdx, setSelectedTemplateIdx] = useState<number>(0);
   const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
   const [guarantorFilesToUpload, setGuarantorFilesToUpload] = useState<File[]>([]);
@@ -3352,11 +3353,28 @@ export default function DashboardPage() {
       }
 
       case 'contratos': {
-        const dataToUse = showArchived ? archivedContratos : contratos;
-        const { data: paginatedContratos, totalPages: contratosPages } = getPaginatedAndSortedData(dataToUse, 'contratos');
+        const searchLower = contratoSearch.toLowerCase();
+        const dataToFilter = showArchived ? archivedContratos : contratos;
+        const filteredData = dataToFilter.filter(co =>
+          (co.inquilinos?.nome?.toLowerCase() || '').includes(searchLower) ||
+          (co.proprietarios?.nome?.toLowerCase() || '').includes(searchLower) ||
+          (co.imoveis?.endereco?.toLowerCase() || '').includes(searchLower) ||
+          (co.imoveis?.apelido?.toLowerCase() || '').includes(searchLower)
+        );
+
+        const { data: paginatedContratos, totalPages: contratosPages } = getPaginatedAndSortedData(filteredData, 'contratos');
 
         return (
           <div className="flex flex-col gap-4">
+            <div className="bg-white p-4 rounded-xl border border-slate-200">
+              <input
+                type="text"
+                placeholder="Buscar por inquilino, imóvel ou proprietário..."
+                className="w-full p-3 rounded-lg border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                value={contratoSearch}
+                onChange={(e) => setContratoSearch(e.target.value)}
+              />
+            </div>
             {paginatedContratos.map(co => (
               <div key={co.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between hover:border-blue-200 transition-all relative overflow-hidden">
                 {co.arquivado && <div className="absolute top-0 right-0 w-24 h-6 bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center rotate-45 translate-x-8 -translate-y-1">Arquivado</div>}
