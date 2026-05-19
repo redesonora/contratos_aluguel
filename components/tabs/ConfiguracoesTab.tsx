@@ -258,9 +258,9 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                     <div className="flex-1 space-y-3">
                       <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Atalhos (Insert Tags):</label>
                       <div className="flex flex-wrap gap-2">
-                        {tagGroups.slice(0, 4).flatMap(g => g.tags.slice(0, 3)).map((tag, tIdx) => (
+                        {tagGroups.slice(0, 4).flatMap(g => g.tags.slice(0, 3)).map((tag, index) => (
                           <button 
-                            key={tIdx}
+                            key={`shortcut-${tag.tag}-${index}`}
                             onMouseDown={(e) => { e.preventDefault(); handleInsertTag(tag.tag); }}
                             className="px-2.5 py-1.5 bg-slate-50 text-slate-500 rounded-lg text-[9px] font-bold border border-slate-100 hover:border-blue-200 hover:text-blue-600 transition-all"
                           >
@@ -384,8 +384,8 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
             
             <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                  {tagGroups.map((group, gIdx) => (
-                    <div key={gIdx} className={`${group.fullWidth ? 'md:col-span-2 lg:col-span-4 bg-blue-50/50 p-8 rounded-[2rem] border border-blue-100' : 'space-y-4'}`}>
+                  {tagGroups.map((group) => (
+                    <div key={group.title} className={`${group.fullWidth ? 'md:col-span-2 lg:col-span-4 bg-blue-50/50 p-8 rounded-[2rem] border border-blue-100' : 'space-y-4'}`}>
                        <h3 className={`text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-2 mb-4 ${
                          group.color === 'blue' ? 'text-blue-600' : 
                          group.color === 'purple' ? 'text-purple-600' :
@@ -401,9 +401,9 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                        </h3>
                        
                        <div className={`${group.fullWidth ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4' : 'grid grid-cols-1 gap-3'}`}>
-                          {group.tags.map((tag, tIdx) => (
+                          {group.tags.map((tag) => (
                             <TagItem 
-                              key={tIdx} 
+                              key={`${group.title}-${tag.tag}`} 
                               label={tag.label} 
                               tag={tag.tag} 
                               onClick={handleInsertTag} 

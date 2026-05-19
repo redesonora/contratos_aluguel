@@ -474,7 +474,9 @@ export default function DashboardPage() {
             await supabase.from('contract_templates').upsert(toUpsert);
           }
         } catch(e) {
-          console.error("Erro ao sincronizar templates", e);
+          console.error("Erro ao sincronizar templates com Supabase:", e);
+          // Opcional: mostrar um toast ou notificação ao usuário se possível, 
+          // mas por enquanto apenas logar com mais detalhes.
         }
       };
       
