@@ -19,6 +19,30 @@ export const getSupabase = () => {
 // Mantemos o padrão para compatibilidade se possível, 
 // mas recomendado usar getSupabase() onde possível.
 export const supabase = getSupabase() || {
-  from: () => { throw new Error("Supabase não configurado"); },
-  auth: { getSession: () => ({ data: { session: null } }) }
+  from: () => ({
+    select: () => ({
+      or: () => ({ order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }) }),
+      order: () => ({ limit: () => Promise.resolve({ data: [], error: null }), eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }),
+      eq: () => ({ order: () => Promise.resolve({ data: [], error: null }), maybeSingle: () => Promise.resolve({ data: null, error: null }) })
+    }),
+    insert: () => Promise.resolve({ data: null, error: null }),
+    update: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }),
+    upsert: () => Promise.resolve({ data: null, error: null }),
+    delete: () => ({ eq: () => Promise.resolve({ data: null, error: null }) })
+  }),
+  auth: {
+    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+    getUser: () => Promise.resolve({ data: { user: null }, error: null }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    signOut: () => Promise.resolve({ error: null }),
+    signInWithPassword: () => Promise.resolve({ data: { user: null }, error: null }),
+    signUp: () => Promise.resolve({ data: { user: null }, error: null }),
+    updateUser: () => Promise.resolve({ data: { user: null }, error: null })
+  },
+  storage: {
+    from: () => ({
+      upload: () => Promise.resolve({ data: null, error: null }),
+      getPublicUrl: () => ({ data: { publicUrl: '' } })
+    })
+  }
 };
