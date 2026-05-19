@@ -862,6 +862,8 @@ export default function DashboardPage() {
   const fetchData = useCallback(async () => {
     try {
       if (!session?.user || !userProfile) return;
+      
+      console.log(`fetchData: Buscando dados para o usuário ${session.user.id} (${userProfile.role})`);
 
       let imQuery = supabase.from('imoveis').select('*').or('arquivado.eq.false,arquivado.is.null').order('created_at', { ascending: false }).limit(200);
       let inQuery = supabase.from('inquilinos').select('*').or('arquivado.eq.false,arquivado.is.null').order('created_at', { ascending: false }).limit(200);
@@ -1362,17 +1364,22 @@ export default function DashboardPage() {
         if (contract) {
           imovelIdToRelease = contract.imovel_id;
           
-          // First, delete all payments associated with this contract
+          console.log(`Limpando parcelas do contrato ${itemToDelete.id} para o usuário ${session.user.id}`);
+          // Recomenda-se que a tabela pagamentos tenha user_id para facilitar o RLS, 
+          // ou que o RLS seja baseado no contrato.
           const { error: prepayError } = await supabase
             .from('pagamentos')
             .delete()
             .eq('contrato_id', itemToDelete.id);
             
-          if (prepayError) throw prepayError;
+          if (prepayError) {
+            console.error('Erro ao limpar pagamentos:', prepayError);
+            throw prepayError;
+          }
         }
       }
 
-      const { error } = await supabase.from(itemToDelete.type).delete().eq('id', itemToDelete.id);
+      const { error, count } = await supabase.from(itemToDelete.type).delete({ count: 'exact' }).eq('id', itemToDelete.id);
       
       if (error) {
         if (error.code === '23503') {
@@ -1387,6 +1394,8 @@ export default function DashboardPage() {
         throw error;
       }
 
+      console.log(`Deleção concluída: ${itemToDelete.type} ${itemToDelete.id}. Registros afetados: ${count}`);
+
       await recordLog('EXCLUIR', itemToDelete.type, itemToDelete.id);
       
       if (imovelIdToRelease) {
@@ -1396,7 +1405,7 @@ export default function DashboardPage() {
       setSuccess(true);
       setItemToDelete(null);
       setDeleteConfirmationInput('');
-      fetchData();
+      await fetchData();
     } catch (err: any) {
       setErrorMsg(err.message || 'Erro ao excluir registro. Verifique vínculos ativos.');
       console.error(err);
