@@ -451,7 +451,7 @@ export default function DashboardPage() {
             await supabase.from('contract_templates')
               .delete()
               .eq('user_id', session.user.id)
-              .not('id', 'in', '(' + currentIds.map(id => `'${id}'`).join(',') + ')');
+              .not('id', 'in', currentIds);
           } else {
              // Deleta todos se vazio
              await supabase.from('contract_templates')
@@ -647,8 +647,15 @@ export default function DashboardPage() {
 
         setUserProfile(finalData as UserProfile);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro fetchProfile:', err);
+      const msg = err.message?.toLowerCase() || '';
+      if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
+         // Se erro crítico de auth, tenta limpar
+         try { await supabase.auth.signOut(); } catch(e) {}
+         setSession(null);
+         setUserProfile(null);
+      }
     } finally {
       setAuthLoading(false);
     }
@@ -675,15 +682,19 @@ export default function DashboardPage() {
     };
 
     const initAuth = async () => {
+      console.log('initAuth: começando');
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('initAuth: getSession result', { session, error });
         
         if (error) {
           console.error('Erro ao buscar sessão inicial:', error);
           const msg = error.message?.toLowerCase() || '';
           if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
+            console.log('initAuth: erro de auth, tratando');
             await handleAuthError();
           } else {
+            console.log('initAuth: erro desconhecido, setAuthLoading(false)');
             setAuthLoading(false);
           }
           return;
@@ -691,16 +702,20 @@ export default function DashboardPage() {
 
         setSession(session);
         if (session) {
+          console.log('initAuth: tem sessão, fetchProfile');
           fetchProfile(session.user.id, session.user.email);
         } else {
+          console.log('initAuth: não tem sessão, setAuthLoading(false)');
           setAuthLoading(false);
         }
       } catch (err: any) {
         console.error('Falha no carregamento da autenticação:', err);
         const msg = err?.message?.toLowerCase() || '';
         if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
+          console.log('initAuth: exceção de auth, tratando');
           await handleAuthError();
         } else {
+          console.log('initAuth: exceção, setAuthLoading(false)');
           setAuthLoading(false);
         }
       }
