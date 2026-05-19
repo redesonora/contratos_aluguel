@@ -431,7 +431,7 @@ export default function DashboardPage() {
         const validTemplates = contractTemplates.map(t => {
           if (!t.id) {
             changed = true;
-            const newId = Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+            const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
             return { ...t, id: newId };
           }
           return t;
@@ -451,7 +451,7 @@ export default function DashboardPage() {
             await supabase.from('contract_templates')
               .delete()
               .eq('user_id', session.user.id)
-              .not('id', 'in', `(${currentIds.join(',')})`);
+              .not('id', 'in', '(' + currentIds.map(id => `"${id}"`).join(',') + ')');
           } else {
              // Deleta todos se vazio
              await supabase.from('contract_templates')

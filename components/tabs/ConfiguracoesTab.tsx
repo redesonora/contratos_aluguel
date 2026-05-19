@@ -49,7 +49,7 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
   };
 
   const handleAddTemplate = () => {
-    const newId = Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
     const newTemplate = {
       id: newId,
       name: 'Novo Modelo ' + (contractTemplates.length + 1),
