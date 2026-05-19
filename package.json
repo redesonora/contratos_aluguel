@@ -16,7 +16,7 @@
     "jspdf": "^2.5.2",
     "lucide-react": "^0.446.0",
     "motion": "^12.0.0-alpha.10",
-    "next": "15.0.0-canary.168",
+    "next": "15.1.0",
     "react": "^19.0.0-rc",
     "react-dom": "^19.0.0-rc",
     "recharts": "^2.12.7",
