@@ -706,7 +706,7 @@ export default function DashboardPage() {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       setSession(session);
       if (session) {
         fetchProfile(session.user.id, session.user.email);
@@ -1322,7 +1322,7 @@ export default function DashboardPage() {
         .select('competencia_mes, competencia_ano')
         .eq('contrato_id', contract.id);
       
-      const existingKeys = new Set((existingPagamentos || []).map(p => `${p.competencia_mes}_${p.competencia_ano}`));
+      const existingKeys = new Set((existingPagamentos || []).map((p: any) => `${p.competencia_mes}_${p.competencia_ano}`));
 
       // Ajuste de fuso horário
       const startDate = new Date(startDateStr + 'T12:00:00');
