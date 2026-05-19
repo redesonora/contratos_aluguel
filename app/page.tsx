@@ -1770,6 +1770,435 @@ export default function DashboardPage() {
     doc.save(`Recibo_${(receiptData.inquilino || "inquilino").replace(/\s+/g, '_')}_${(receiptData.competencia || "competencia").replace('/', '-')}.pdf`);
   };
 
+  const handlePrintReceipt = () => {
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert("Por favor, permita pop-ups para imprimir o recibo.");
+      return;
+    }
+
+    const valorFormatado = formatarMoeda(receiptData.valor);
+    const extenso = numeroParaExtenso(receiptData.valor);
+    const anoAtual = new Date().getFullYear();
+
+    win.document.title = `Recibo_No_0001_${anoAtual}`;
+    win.document.write(`
+      <html>
+        <head>
+          <title>Recibo Nº 0001/${anoAtual}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,700;0,900;1,900&display=swap');
+            
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            
+            body {
+              font-family: 'Inter', sans-serif;
+              background-color: #ffffff;
+              color: #1e293b;
+              padding: 10mm;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              height: 100vh;
+              min-height: 100vh;
+              max-height: 100vh;
+              overflow: hidden;
+            }
+
+            @page {
+              size: A4;
+              margin: 0;
+            }
+
+            .print-container {
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              height: 100%;
+              width: 100%;
+            }
+
+            .receipt-card {
+              border: 1px solid #cbd5e1;
+              border-radius: 12px;
+              padding: 24px;
+              position: relative;
+              background-color: #ffffff;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              height: 47%; /* Fits perfectly two copies on A4 */
+              box-shadow: none;
+            }
+
+            .header-flex {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              border-bottom: 2px solid #f1f5f9;
+              padding-bottom: 12px;
+            }
+
+            .title-area {
+              display: flex;
+              flex-direction: column;
+              gap: 2px;
+            }
+
+            .flex-row-title {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+            }
+
+            .title {
+              font-size: 26px;
+              font-weight: 900;
+              text-transform: uppercase;
+              font-style: italic;
+              color: #0f172a;
+              letter-spacing: -0.025em;
+            }
+
+            .via-badge {
+              font-size: 8px;
+              font-weight: 900;
+              color: #475569;
+              background-color: #f1f5f9;
+              padding: 3px 8px;
+              border-radius: 999px;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            }
+
+            .doc-no {
+              font-size: 10px;
+              font-weight: 900;
+              color: #94a3b8;
+              text-transform: uppercase;
+              letter-spacing: 0.1em;
+            }
+
+            .value-box {
+              background-color: #eff6ff;
+              border: 1px solid #bfdbfe;
+              font-size: 24px;
+              font-weight: 900;
+              color: #2563eb;
+              padding: 10px 20px;
+              border-radius: 8px;
+              line-height: 1;
+              text-align: right;
+            }
+
+            .body-content {
+              font-size: 13px;
+              line-height: 1.6;
+              color: #334155;
+              margin-top: 14px;
+              flex-grow: 1;
+            }
+
+            .bold-text {
+              font-weight: 900;
+              color: #0f172a;
+            }
+
+            .reference-area {
+              margin-top: 12px;
+              border-left: 2px solid #e2e8f0;
+              padding-left: 10px;
+            }
+
+            .reference-label {
+              font-size: 9px;
+              font-weight: 900;
+              color: #94a3b8;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              margin-bottom: 2px;
+            }
+
+            .reference-text {
+              font-size: 12px;
+              font-weight: 700;
+              color: #1e293b;
+            }
+
+            .meta-line {
+              display: flex;
+              align-items: center;
+              gap: 16px;
+              margin-top: 12px;
+              font-size: 12px;
+            }
+
+            .meta-item {
+              display: flex;
+              gap: 4px;
+            }
+
+            .meta-label {
+              color: #64748b;
+            }
+
+            .meta-value {
+              font-weight: 900;
+              color: #0f172a;
+            }
+
+            .footer-area {
+              margin-top: auto;
+              padding-top: 12px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 12px;
+            }
+
+            .date-placeholder {
+              color: #cbd5e1;
+              font-size: 11px;
+              font-weight: 700;
+              font-style: italic;
+              text-align: center;
+              border-bottom: 1px dashed #e2e8f0;
+              padding-bottom: 4px;
+              width: 100%;
+            }
+
+            .signature-box {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              text-align: center;
+              margin-top: 35px;
+            }
+
+            .signature-line {
+              width: 280px;
+              border-top: 1.5px solid #0f172a;
+              height: 0;
+              margin-bottom: 6px;
+            }
+
+            .locador-name {
+              font-size: 13px;
+              font-weight: 900;
+              color: #0f172a;
+              text-transform: uppercase;
+            }
+
+            .locador-doc {
+              font-size: 8px;
+              font-weight: 900;
+              color: #94a3b8;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            }
+
+            .divider {
+              border-top: 1px dashed #cbd5e1;
+              margin: 10px 0;
+              position: relative;
+              text-align: center;
+            }
+
+            .divider-text {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              background: #ffffff;
+              padding: 0 10px;
+              font-size: 8px;
+              font-weight: 900;
+              color: #94a3b8;
+              text-transform: uppercase;
+              letter-spacing: 0.1em;
+            }
+
+            /* Custom print controls */
+            .print-controls {
+              position: fixed;
+              bottom: 20px;
+              right: 20px;
+              z-index: 9999;
+              display: flex;
+              gap: 10px;
+            }
+
+            .btn {
+              padding: 10px 20px;
+              font-size: 10px;
+              font-weight: 900;
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+              border-radius: 999px;
+              cursor: pointer;
+              border: none;
+              transition: all 0.2s;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            }
+
+            .btn-blue {
+              background-color: #2563eb;
+              color: #ffffff;
+            }
+
+            .btn-blue:hover {
+              background-color: #1d4ed8;
+            }
+
+            .btn-gray {
+              background-color: #f1f5f9;
+              color: #475569;
+              border: 1px solid #cbd5e1;
+            }
+
+            .btn-gray:hover {
+              background-color: #e2e8f0;
+            }
+
+            @media print {
+              .print-controls {
+                display: none !important;
+              }
+              body {
+                padding: 10mm !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-controls">
+            <button class="btn btn-gray" onclick="window.close()">Fechar</button>
+            <button class="btn btn-blue" onclick="window.print()">Imprimir</button>
+          </div>
+
+          <div class="print-container">
+            <!-- 1ª Via -->
+            <div class="receipt-card">
+              <div class="header-flex">
+                <div class="title-area">
+                  <div class="flex-row-title">
+                    <span class="title">Recibo</span>
+                    <span class="via-badge">1ª Via - Locador</span>
+                  </div>
+                  <span class="doc-no">Nº 0001/${anoAtual}</span>
+                </div>
+                <div class="value-box">${valorFormatado}</div>
+              </div>
+
+              <div class="body-content">
+                Recebemos de <span class="bold-text">${receiptData.inquilino}</span>,
+                inscrito sob o CPF/CNPJ <span class="bold-text">${receiptData.cpf}</span>,
+                a importância supra de <span class="bold-text">${extenso}</span>.
+                
+                <div class="reference-area">
+                  <div class="reference-label">Referente ao pagamento do aluguel do imóvel situado em:</div>
+                  <div class="reference-text">
+                    ${receiptData.endereco}, ${receiptData.numero} ${receiptData.complemento ? `- ${receiptData.complemento}` : ''} - ${receiptData.bairro}, ${receiptData.cidade} - ${receiptData.estado}, CEP: ${receiptData.cep}
+                  </div>
+                </div>
+
+                <div class="meta-line">
+                  <div class="meta-item">
+                    <span class="meta-label">Competência:</span>
+                    <span class="meta-value">${receiptData.competencia}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">Vencimento:</span>
+                    <span class="meta-value">${receiptData.vencimento}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="footer-area">
+                <div class="date-placeholder">
+                  Local/Data: ____________________________________, ______ de ______________________ de 20______
+                </div>
+                <div class="signature-box">
+                  <div class="signature-line"></div>
+                  <div class="locador-name">${receiptData.locador}</div>
+                  <div class="locador-doc">Locador - ${receiptData.locador_cpf || ''}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Divider with scissor icon -->
+            <div class="divider">
+              <span class="divider-text">✂️ dobra ou corte</span>
+            </div>
+
+            <!-- 2ª Via -->
+            <div class="receipt-card">
+              <div class="header-flex">
+                <div class="title-area">
+                  <div class="flex-row-title">
+                    <span class="title">Recibo</span>
+                    <span class="via-badge">2ª Via - Inquilino</span>
+                  </div>
+                  <span class="doc-no">Nº 0001/${anoAtual}</span>
+                </div>
+                <div class="value-box">${valorFormatado}</div>
+              </div>
+
+              <div class="body-content">
+                Recebemos de <span class="bold-text">${receiptData.inquilino}</span>,
+                inscrito sob o CPF/CNPJ <span class="bold-text">${receiptData.cpf}</span>,
+                a importância supra de <span class="bold-text">${extenso}</span>.
+                
+                <div class="reference-area">
+                  <div class="reference-label">Referente ao pagamento do aluguel do imóvel situado em:</div>
+                  <div class="reference-text">
+                    ${receiptData.endereco}, ${receiptData.numero} ${receiptData.complemento ? `- ${receiptData.complemento}` : ''} - ${receiptData.bairro}, ${receiptData.cidade} - ${receiptData.estado}, CEP: ${receiptData.cep}
+                  </div>
+                </div>
+
+                <div class="meta-line">
+                  <div class="meta-item">
+                    <span class="meta-label">Competência:</span>
+                    <span class="meta-value">${receiptData.competencia}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">Vencimento:</span>
+                    <span class="meta-value">${receiptData.vencimento}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="footer-area">
+                <div class="date-placeholder">
+                  Local/Data: ____________________________________, ______ de ______________________ de 20______
+                </div>
+                <div class="signature-box">
+                  <div class="signature-line"></div>
+                  <div class="locador-name">${receiptData.locador}</div>
+                  <div class="locador-doc">Locador - ${receiptData.locador_cpf || ''}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <script>
+            // Automatically launch native print dialog on page load
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 300);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    win.document.close();
+  };
+
   const generateContractTemplate = (form: HTMLFormElement, templateContent?: string) => {
     const rawData = Object.fromEntries(new FormData(form).entries());
     const imovel = imoveis.find(i => i.id === rawData.imovel_id);
@@ -4096,35 +4525,31 @@ export default function DashboardPage() {
                 </button>
               </div>
               
-              <div className="p-8 space-y-12 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/30" id="printable-area">
-                <div className="bg-white border border-slate-200 p-12 rounded-lg shadow-sm space-y-10 relative overflow-hidden">
-                  {/* Decorative Border like in the image */}
-                  <div className="absolute inset-0 border-8 border-slate-50 pointer-events-none opacity-50" />
-                  
-                  <div className="flex justify-between items-start relative z-10">
-                    <div className="space-y-1">
-                      <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase italic">Recibo</h1>
-                      <p className="text-xs font-black text-slate-400 tracking-widest uppercase">{`Nº 0001/${new Date().getFullYear()}`}</p>
-                    </div>
-                    <div className="text-right">
-                      {isEditing ? (
+              <div className="p-4 sm:p-8 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/30" id="printable-area">
+                {isEditing ? (
+                  /* Single Edit Card to avoid double-editing confusion */
+                  <div className="bg-white border border-slate-200 p-6 md:p-12 rounded-lg shadow-sm space-y-10 relative overflow-hidden">
+                    <div className="absolute inset-0 border-8 border-slate-50 pointer-events-none opacity-50" />
+                    
+                    <div className="flex justify-between items-start relative z-10">
+                      <div className="space-y-1">
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase italic animate-pulse">Editar Recibo</h1>
+                        <p className="text-xs font-black text-slate-400 tracking-widest uppercase">{`Nº 0001/${new Date().getFullYear()}`}</p>
+                      </div>
+                      <div className="text-right">
                         <div className="flex flex-col gap-1 items-end">
                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Valor R$</span>
                            <input 
                              type="number" 
                              value={receiptData.valor} 
-                             onChange={(e) => handleReceiptChange('valor', parseFloat(e.target.value))}
-                             className="text-3xl font-black text-blue-600 border-2 border-blue-100 rounded-xl px-4 py-1 w-40 outline-none focus:border-blue-400 transition-all text-right"
+                             onChange={(e) => handleReceiptChange('valor', parseFloat(e.target.value) || 0)}
+                             className="text-3xl font-black text-blue-600 border-2 border-blue-100 rounded-xl px-4 py-1 w-40 outline-none focus:border-blue-400 transition-all text-right animate-pulse"
                            />
                         </div>
-                      ) : (
-                        <p className="text-4xl font-black text-blue-600 tracking-tight">{formatarMoeda(receiptData.valor)}</p>
-                      )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-6 text-slate-800 leading-relaxed text-lg relative z-10">
-                    {isEditing ? (
+                    <div className="space-y-6 text-slate-800 leading-relaxed text-lg relative z-10">
                       <div className="space-y-6 p-6 bg-slate-50 rounded-2xl border border-slate-100">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-1">
@@ -4191,41 +4616,69 @@ export default function DashboardPage() {
                           </div>
                         </div>
                       </div>
-                    ) : (
-                      <div className="space-y-8 font-medium text-slate-700 leading-relaxed md:text-xl">
-                        <p>
-                          Recebemos de <span className="font-black text-slate-900 border-b-2 border-slate-900 px-1">{receiptData.inquilino}</span>, 
-                          inscrito sob o CPF/CNPJ <span className="font-black text-slate-900">{receiptData.cpf}</span>, 
-                          a importância supra de <span className="font-black text-slate-900">{numeroParaExtenso(receiptData.valor)}</span>.
-                        </p>
-                        
-                        <div className="space-y-2">
-                          <p className="text-sm font-black text-slate-400 uppercase tracking-widest">Referente ao pagamento do aluguel do imóvel situado em:</p>
-                          <p className="font-black text-slate-800">
-                             {receiptData.endereco}, {receiptData.numero} {receiptData.complemento ? `- ${receiptData.complemento}` : ''} - {receiptData.bairro}, {receiptData.cidade} - {receiptData.estado}, CEP: {receiptData.cep}
-                          </p>
-                        </div>
-                        
-                        <p className="flex gap-4 items-center flex-wrap">
-                          <span>Competência: <span className="font-black text-slate-900">{receiptData.competencia}</span></span>
-                          <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                          <span>Vencimento: <span className="font-black text-slate-900">{receiptData.vencimento}</span></span>
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-20 flex flex-col items-center gap-12 relative z-10">
-                    <p className="text-slate-300 font-bold italic border-b border-dashed border-slate-200 pb-2 text-sm w-full text-center">
-                       Local/Data: ____________________________________, ______ de ______________________ de 20______
-                    </p>
-                    <div className="flex flex-col items-center gap-1 text-center mt-6">
-                      <div className="w-80 h-px bg-slate-900 mb-2" />
-                      <p className="text-lg font-black text-slate-900 uppercase tracking-tight">{receiptData.locador}</p>
-                      <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">Locador - {receiptData.locador_cpf}</span>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  /* Double Read-Only Vias - Renders 1a and 2a side by side or stacked, fits perfectly on 1 Printed page */
+                  ['1ª VIA - LOCADOR', '2ª VIA - INQUILINO'].map((viaLabel, idx) => (
+                    <React.Fragment key={viaLabel}>
+                      {idx > 0 && (
+                        <div className="border-t-2 border-dashed border-slate-300 my-4 py-2 text-center text-[10px] font-black tracking-widest text-slate-400 uppercase relative print-divider flex justify-center items-center gap-2 no-print">
+                          ✂️ COLOQUE AQUI A DOBRA OU CORTE DO RECIBO
+                        </div>
+                      )}
+                      <div className="bg-white border border-slate-200 p-8 md:p-12 rounded-lg shadow-sm space-y-10 relative overflow-hidden print-card">
+                        {/* Decorative Border */}
+                        <div className="absolute inset-0 border-8 border-slate-50 pointer-events-none opacity-50 print:hidden" />
+                        
+                        <div className="flex justify-between items-start relative z-10 print-header-flex">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-3">
+                              <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight uppercase italic print-title-size">Recibo</h1>
+                              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full print-via-label">{viaLabel}</span>
+                            </div>
+                            <p className="text-xs font-black text-slate-400 tracking-widest uppercase print-doc-no">{`Nº 0001/${new Date().getFullYear()}`}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-3xl md:text-4xl font-black text-blue-600 tracking-tight print-value-size">{formatarMoeda(receiptData.valor)}</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-8 font-medium text-slate-700 leading-relaxed md:text-xl print-body-size">
+                          <p>
+                            Recebemos de <span className="font-black text-slate-900 border-b-2 border-slate-900 px-1">{receiptData.inquilino}</span>, 
+                            inscrito sob o CPF/CNPJ <span className="font-black text-slate-900">{receiptData.cpf}</span>, 
+                            a importância supra de <span className="font-black text-slate-900">{numeroParaExtenso(receiptData.valor)}</span>.
+                          </p>
+                          
+                          <div className="space-y-2 print-ref-spacing">
+                            <p className="text-sm font-black text-slate-400 uppercase tracking-widest print-ref-label">Referente ao pagamento do aluguel do imóvel situado em:</p>
+                            <p className="font-black text-slate-800">
+                               {receiptData.endereco}, {receiptData.numero} {receiptData.complemento ? `- ${receiptData.complemento}` : ''} - {receiptData.bairro}, {receiptData.cidade} - {receiptData.estado}, CEP: {receiptData.cep}
+                            </p>
+                          </div>
+                          
+                          <p className="flex gap-4 items-center flex-wrap print-meta">
+                            <span>Competência: <span className="font-black text-slate-900">{receiptData.competencia}</span></span>
+                            <span className="w-1 h-1 bg-slate-300 rounded-full print:hidden" />
+                            <span>Vencimento: <span className="font-black text-slate-900">{receiptData.vencimento}</span></span>
+                          </p>
+                        </div>
+
+                        <div className="pt-16 flex flex-col items-center gap-8 relative z-10 print-signature-area">
+                          <p className="text-slate-300 font-bold italic border-b border-dashed border-slate-200 pb-2 text-sm w-full text-center print-date-line">
+                             Local/Data: ____________________________________, ______ de ______________________ de 20______
+                          </p>
+                          <div className="flex flex-col items-center gap-1 text-center mt-4 print-sign-line">
+                            <div className="w-80 h-px bg-slate-900 mb-2 print-sign-bar" />
+                            <p className="text-lg font-black text-slate-900 uppercase tracking-tight print-locador-name">{receiptData.locador}</p>
+                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none print-locador-doc">Locador - {receiptData.locador_cpf}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </React.Fragment>
+                  ))
+                )}
               </div>
 
               <div className="p-8 border-t border-slate-100 flex justify-center flex-wrap gap-4 bg-white/80 backdrop-blur-md">
@@ -4245,7 +4698,7 @@ export default function DashboardPage() {
                   Baixar PDF
                 </button>
                 <button 
-                  onClick={() => window.print()}
+                  onClick={handlePrintReceipt}
                   className="px-8 py-3.5 bg-blue-600 text-white font-black uppercase tracking-widest text-[10px] rounded-xl hover:bg-blue-700 shadow-xl shadow-blue-200 flex items-center gap-3 transition-all transform hover:-translate-y-1 active:scale-95"
                 >
                   <Printer size={14} />
@@ -5123,20 +5576,113 @@ export default function DashboardPage() {
 
       <style jsx global>{`
         @media print {
+          /* Hide all page content except printable-area and its children */
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
           #printable-area, #printable-area * {
-            visibility: visible;
+            visibility: visible !important;
           }
           #printable-area {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: visible;
-            padding: 20px; 
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 100% !important;
+            max-height: 100% !important;
+            margin: 0 !important;
+            padding: 15px !important; 
+            overflow: hidden !important;
+            background: white !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            box-shadow: none !important;
+          }
+          /* Override styles in the receipt cards to fit A4 on 1 page */
+          .print-card {
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            padding: 16px !important;
+            margin: 0 !important;
+            background: white !important;
+            box-shadow: none !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 12px !important;
+            flex: 1 !important;
+            max-height: 48% !important; /* Forces each card to occupy around 48% of the A4 page height */
+            box-sizing: border-box !important;
+          }
+          /* Custom dividers inside the card */
+          .print-card > * + * {
+            margin-top: 0 !important;
+          }
+          /* Shrink typography for print to fit single A4 page */
+          .print-title-size {
+            font-size: 20px !important;
+            line-height: 1.2 !important;
+          }
+          .print-via-label {
+            font-size: 8px !important;
+            padding: 2px 6px !important;
+          }
+          .print-doc-no {
+            font-size: 9px !important;
+            margin-top: 2px !important;
+          }
+          .print-value-size {
+            font-size: 20px !important;
+            line-height: 1.2 !important;
+          }
+          .print-body-size {
+            font-size: 11px !important;
+            line-height: 1.4 !important;
+            margin-top: 8px !important;
+          }
+          .print-body-size > * {
+            margin-top: 6px !important;
+          }
+          .print-ref-spacing {
+            margin-top: 4px !important;
+          }
+          .print-ref-label {
+            font-size: 8px !important;
+          }
+          .print-meta {
+            font-size: 11px !important;
+            margin-top: 6px !important;
+          }
+          .print-signature-area {
+            padding-top: 10px !important;
+            margin-top: auto !important;
+            gap: 10px !important;
+          }
+          .print-date-line {
+            font-size: 10px !important;
+            padding-bottom: 2px !important;
+          }
+          .print-sign-line {
+            margin-top: 4px !important;
+            gap: 2px !important;
+          }
+          .print-sign-bar {
+            width: 240px !important;
+            margin-bottom: 2px !important;
+          }
+          .print-locador-name {
+            font-size: 11px !important;
+          }
+          .print-locador-doc {
+            font-size: 8px !important;
+          }
+          .print-divider {
+            margin: 4px 0 !important;
+            padding: 0 !important;
+            border-top: 1px dashed #cbd5e1 !important;
+            font-size: 8px !important;
+            text-align: center !important;
           }
         }
       `}</style>
