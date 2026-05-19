@@ -2145,7 +2145,8 @@ export default function DashboardPage() {
             status: rawData.status,
             cemig: rawData.cemig,
             copasa: rawData.copasa,
-            descricao: rawData.descricao
+            descricao: rawData.descricao,
+            proprietario_id: userProfile?.role === 'PROPRIETARIO' ? userProfile.proprietario_id : (rawData.proprietario_id || null)
           };
           const { error: err } = await supabase.from('imoveis').update(payload).eq('id', editingItem.id);
           dbError = err;
@@ -2161,7 +2162,8 @@ export default function DashboardPage() {
             nacionalidade: rawData.nacionalidade || null,
             naturalidade: rawData.naturalidade || null,
             uf_nascimento: rawData.uf_nascimento || null,
-            documentos_fiador: finalGuarantorDocs
+            documentos_fiador: finalGuarantorDocs,
+            proprietario_id: userProfile?.role === 'PROPRIETARIO' ? userProfile.proprietario_id : (rawData.proprietario_id || null)
           };
           
           // Fiador fields
@@ -3345,6 +3347,19 @@ export default function DashboardPage() {
 
                   {activeTab === 'inquilinos' && (
                     <div className="space-y-3">
+                      {userProfile?.role !== 'PROPRIETARIO' && (
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block tracking-tight">Proprietário (Opcional)</label>
+                          <select 
+                            name="proprietario_id" 
+                            defaultValue={editingItem?.proprietario_id || ""} 
+                            className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all appearance-none bg-white"
+                          >
+                            <option value="">Selecione um proprietário...</option>
+                            {proprietarios.map(pr => <option key={pr.id} value={pr.id}>{pr.nome}</option>)}
+                          </select>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 gap-3">
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block tracking-tight flex justify-between">
