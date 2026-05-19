@@ -663,6 +663,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const handleAuthError = async () => {
+      console.log('handleAuthError: limpando sessão devido a erro técnico');
       try {
         await supabase.auth.signOut();
       } catch (e) {
@@ -675,22 +676,47 @@ export default function DashboardPage() {
             localStorage.removeItem(key);
           }
         });
+        // Tenta limpar cookies também se possível (alguns browsers/configs usam cookies)
+        document.cookie.split(";").forEach(function(c) { 
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        });
       }
       setSession(null);
       setUserProfile(null);
       setAuthLoading(false);
+      
+      // Se estávamos num loop, um reload pode ajudar a resetar o estado do cliente Supabase
+      if (typeof window !== 'undefined') {
+        // Recarregar apenas se detectarmos que estamos presos
+        const lastError = sessionStorage.getItem('last_auth_error_time');
+        const now = Date.now();
+        if (!lastError || (now - parseInt(lastError)) > 10000) {
+          sessionStorage.setItem('last_auth_error_time', now.toString());
+          window.location.reload();
+        }
+      }
     };
 
     const initAuth = async () => {
       console.log('initAuth: começando');
+      
+      // Fallback de timeout: se em 8 segundos não resolver, libera o loading
+      const fallbackTimer = setTimeout(() => {
+        if (authLoading) {
+          console.warn('initAuth: timeout atingido, liberando loading');
+          setAuthLoading(false);
+        }
+      }, 8000);
+
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
+        clearTimeout(fallbackTimer);
         console.log('initAuth: getSession result', { session, error });
         
         if (error) {
           console.error('Erro ao buscar sessão inicial:', error);
           const msg = error.message?.toLowerCase() || '';
-          if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
+          if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid') || msg.includes('expired')) {
             console.log('initAuth: erro de auth, tratando');
             await handleAuthError();
           } else {
@@ -709,9 +735,10 @@ export default function DashboardPage() {
           setAuthLoading(false);
         }
       } catch (err: any) {
+        clearTimeout(fallbackTimer);
         console.error('Falha no carregamento da autenticação:', err);
         const msg = err?.message?.toLowerCase() || '';
-        if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
+        if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid') || msg.includes('expired')) {
           console.log('initAuth: exceção de auth, tratando');
           await handleAuthError();
         } else {
@@ -725,20 +752,15 @@ export default function DashboardPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
       console.log('Auth event change:', event);
-      try {
-        setSession(session);
-        if (session) {
-          await fetchProfile(session.user.id, session.user.email);
-        } else {
-          setUserProfile(null);
-          setAuthLoading(false);
-        }
-      } catch (e: any) {
-        console.error('Error in onAuthStateChange:', e);
-        const msg = e.message?.toLowerCase() || '';
-        if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
-           await handleAuthError();
-        }
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+         setSession(session);
+         if (session) {
+           fetchProfile(session.user.id, session.user.email);
+         }
+      } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+        setSession(null);
+        setUserProfile(null);
+        setAuthLoading(false);
       }
     });
 
@@ -917,23 +939,34 @@ export default function DashboardPage() {
         // Banco vazio. Se tiver local, migra para o banco.
         if (localTemplates.length > 0) {
           try {
-            const toInsert = localTemplates.map((t: any) => ({
-              id: t.id || (Math.random().toString(36).substring(2, 9) + Date.now().toString(16)),
-              name: t.name || 'Modelo Migrado',
-              content: t.content || '',
-              font_size: t.fontSize || 12,
-              font_color: t.fontColor || '#000000',
-              bold: t.bold || false,
-              alignment: t.alignment || 'justify',
-              user_id: session.user.id
-            }));
-            
-            const { data: insertedValues, error: insErr } = await supabase.from('contract_templates').insert(toInsert).select();
+            console.log("Iniciando migração de templates locais para o Supabase...");
+            const toInsert = localTemplates.map((t: any) => {
+              // Garante que o ID seja um UUID válido ou deixe o banco gerar se for novo
+              // Aqui, vamos tentar manter o ID se parecer um UUID, senão geramos um novo
+              const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(t.id || '');
+              
+              return {
+                id: isUuid ? t.id : undefined, // se não for uuid, deixa o banco gerar (ou use uuid abaixo)
+                name: String(t.name || 'Modelo Migrado').substring(0, 100),
+                content: t.content || '',
+                font_size: Number(t.fontSize || 12),
+                font_color: t.fontColor || '#000000',
+                bold: !!t.bold,
+                alignment: (['left', 'center', 'right', 'justify'].includes(t.alignment) ? t.alignment : 'justify'),
+                user_id: session.user.id
+              };
+            });
+
+            // Se algum ID for undefined, o Supabase vai gerar. Se todos tiverem ID, vai tentar inserir.
+            // Para ser seguro contra conflitos, usamos upsert se tivermos IDs.
+            const { data: insertedValues, error: insErr } = await supabase.from('contract_templates').upsert(toInsert).select();
             
             if (insErr) {
-              console.error("Erro ao migrar templates para o banco:", insErr);
+              console.error("Erro ao migrar templates para o banco:", JSON.stringify(insErr, null, 2));
+              // Fallback para local se falhar a migração
               setContractTemplates(localTemplates);
             } else if (insertedValues) {
+              console.log("Migração de templates concluída com sucesso.");
               const mapped = insertedValues.map((t: any) => ({
                 id: t.id,
                 name: t.name,
@@ -1136,10 +1169,16 @@ export default function DashboardPage() {
   useEffect(() => {
     const loadData = async () => {
       if (session && userProfile) {
-        await fetchData();
-        // Log de acesso
-        if (session.user.id) {
-           recordLog('ACESSO', 'sessão', session.user.id, { email: session.user.email });
+        try {
+          await fetchData();
+          // Log de acesso
+          if (session.user.id) {
+             recordLog('ACESSO', 'sessão', session.user.id, { email: session.user.email });
+          }
+        } catch (err) {
+          console.error("Erro crítico em loadData:", err);
+          // Se falhar drasticamente, garante que sai do loading pelo menos
+          setTemplatesLoaded(true);
         }
       }
     };
