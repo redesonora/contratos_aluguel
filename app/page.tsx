@@ -708,13 +708,22 @@ export default function DashboardPage() {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      setSession(session);
-      if (session) {
-        fetchProfile(session.user.id, session.user.email);
-      } else {
-        setUserProfile(null);
-        setAuthLoading(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
+      console.log('Auth event change:', event);
+      try {
+        setSession(session);
+        if (session) {
+          await fetchProfile(session.user.id, session.user.email);
+        } else {
+          setUserProfile(null);
+          setAuthLoading(false);
+        }
+      } catch (e: any) {
+        console.error('Error in onAuthStateChange:', e);
+        const msg = e.message?.toLowerCase() || '';
+        if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
+           await handleAuthError();
+        }
       }
     });
 
@@ -865,78 +874,87 @@ export default function DashboardPage() {
       
       const hasRealLocalTemplates = localTemplates.length > 1 || (localTemplates.length === 1 && localTemplates[0]?.name !== 'Residencial Padrão');
 
-      if (tpRes.data && tpRes.data.length > 0) {
-        if (hasRealLocalTemplates) {
-          // Merge: Apenas mantém o local ativo para ser "synced" para cima pelo useEffect
-          // Isso evita perder o localStorage se o banco tiver apenas o padrão
-          const dbHasReal = tpRes.data.length > 1 || (tpRes.data.length === 1 && tpRes.data[0].name !== 'Residencial Padrão');
-          if (!dbHasReal) {
-             // Use local templates
-             setContractTemplates(localTemplates);
-          } else {
-             // Ambos tem templates reais? Idealmente mesclamos, mas para evitar complexidade,
-             // vamos carregar o banco.
-             setContractTemplates(tpRes.data.map((t: any) => ({
-                id: t.id,
-                name: t.name,
-                content: t.content,
-                fontSize: t.font_size,
-                fontColor: t.font_color,
-                bold: t.bold,
-                alignment: t.alignment
-              })));
-          }
-        } else {
-          setContractTemplates(tpRes.data.map((t: any) => ({
-            id: t.id,
-            name: t.name,
-            content: t.content,
-            fontSize: t.font_size,
-            fontColor: t.font_color,
-            bold: t.bold,
-            alignment: t.alignment
-          })));
-        }
+      if (tpRes.error) {
+        console.error('Erro ao buscar templates do banco:', tpRes.error);
+        setContractTemplates(localTemplates.length > 0 ? localTemplates : [{
+          id: 'dev-standard-id',
+          name: 'Residencial Padrão',
+          content: '<h1>CONTRATO DE LOCAÇÃO RESIDENCIAL</h1><p>Conteúdo do contrato...</p>',
+          fontSize: 12,
+          fontColor: '#000000',
+          bold: false,
+          alignment: 'justify'
+        }]);
+      } else if (tpRes.data && tpRes.data.length > 0) {
+        // Encontrou dados no Supabase. Priorizamos o Supabase.
+        const dbTemplates = tpRes.data.map((t: any) => ({
+          id: t.id,
+          name: t.name,
+          content: t.content,
+          fontSize: t.font_size,
+          fontColor: t.font_color,
+          bold: t.bold,
+          alignment: (t.alignment || 'justify') as 'left' | 'center' | 'right' | 'justify'
+        }));
+        setContractTemplates(dbTemplates);
+        localStorage.setItem('contratos_templates', JSON.stringify(dbTemplates));
       } else {
-        // Se estiver vazio no banco, tentar salvar do localStorage para o Supabase e na memória
+        // Banco vazio. Se tiver local, migra para o banco.
         if (localTemplates.length > 0) {
           try {
-              const newId = Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-              const toInsert = localTemplates.map(t => ({
-                id: t.id || newId,
-                name: t.name || 'Modelo Migrado',
-                content: t.content || '',
-                font_size: t.fontSize || 12,
-                font_color: t.fontColor || '#000000',
-                bold: t.bold || false,
-                alignment: t.alignment || 'justify',
-                user_id: session.user.id
-              }));
-            const { data: insertedValues } = await supabase.from('contract_templates').insert(toInsert).select();
-            if (insertedValues) {
-              setContractTemplates(insertedValues.map((t: any) => ({
+            const toInsert = localTemplates.map((t: any) => ({
+              id: t.id || (Math.random().toString(36).substring(2, 9) + Date.now().toString(16)),
+              name: t.name || 'Modelo Migrado',
+              content: t.content || '',
+              font_size: t.fontSize || 12,
+              font_color: t.fontColor || '#000000',
+              bold: t.bold || false,
+              alignment: t.alignment || 'justify',
+              user_id: session.user.id
+            }));
+            
+            const { data: insertedValues, error: insErr } = await supabase.from('contract_templates').insert(toInsert).select();
+            
+            if (insErr) {
+              console.error("Erro ao migrar templates para o banco:", insErr);
+              setContractTemplates(localTemplates);
+            } else if (insertedValues) {
+              const mapped = insertedValues.map((t: any) => ({
                 id: t.id,
                 name: t.name,
                 content: t.content,
                 fontSize: t.font_size,
                 fontColor: t.font_color,
                 bold: t.bold,
-                alignment: t.alignment
-              })));
+                alignment: (t.alignment || 'justify') as 'left' | 'center' | 'right' | 'justify'
+              }));
+              setContractTemplates(mapped);
+              localStorage.setItem('contratos_templates', JSON.stringify(mapped));
             }
-          } catch(e) {
-            console.error("Erro ao migrar templates do localStorage", e);
+          } catch (insE) {
+            console.error("Exceção ao migrar:", insE);
+            setContractTemplates(localTemplates);
           }
         } else {
-          // Caso final: Tudo vazio, usar o padrão
-          setContractTemplates([{ 
-            name: 'Residencial Padrão', 
-            content: `CONTRATO DE LOCAÇÃO RESIDENCIAL\n\nLOCADOR: [DADOS DO PROPRIETÁRIO]\nLOCATÁRIO: {{inquilino}}, CPF: {{cpf}}\n\nOBJETO: O imóvel localizado em {{imovel}}.\n\nCLÁUSULA PRIMEIRA - DO VALOR: O aluguel mensal é de R$ {{valor}}.\n\nCLÁUSULA SEGUNDA - DO PRAZO: O contrato tem início em {{data_inicio}} e término em {{data_fim}}.\n\n[RESTANTE DAS CLÁUSULAS PADRÃO...]`,
+          // Tudo vazio, criar o primeiro padrão
+          const defaultTemplate: {
+            id: string,
+            name: string,
+            content: string,
+            fontSize: number,
+            fontColor: string,
+            bold: boolean,
+            alignment: 'left' | 'center' | 'right' | 'justify'
+          }[] = [{ 
+            id: 'dev-standard-id',
+            name: 'Residencial Padrão',
+            content: '<h1>CONTRATO DE LOCAÇÃO RESIDENCIAL</h1><p>Conteúdo do contrato...</p>',
             fontSize: 12,
             fontColor: '#000000',
             bold: false,
             alignment: 'justify'
-          }]);
+          }];
+          setContractTemplates(defaultTemplate);
         }
       }
 
