@@ -706,7 +706,7 @@ export default function DashboardPage() {
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session) => {
       setSession(session);
       if (session) {
         fetchProfile(session.user.id, session.user.email);
