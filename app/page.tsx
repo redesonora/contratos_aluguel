@@ -451,7 +451,7 @@ export default function DashboardPage() {
             await supabase.from('contract_templates')
               .delete()
               .eq('user_id', session.user.id)
-              .not('id', 'in', '(' + currentIds.map(id => `"${id}"`).join(',') + ')');
+              .not('id', 'in', '(' + currentIds.map(id => `'${id}'`).join(',') + ')');
           } else {
              // Deleta todos se vazio
              await supabase.from('contract_templates')
