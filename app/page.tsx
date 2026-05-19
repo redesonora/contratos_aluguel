@@ -413,10 +413,14 @@ export default function DashboardPage() {
   }[]>([]);
 
   useEffect(() => {
-    if (!templatesLoaded || !session?.user) return;
+    if (!templatesLoaded || !session?.user || !userProfile) return;
+    
+    // Verifica se os templates carregados pertencem ao usuário atual (prevenção extra)
+    // Se estivermos em um estado inconsistente, evitamos salvar
     
     try {
-      localStorage.setItem('contratos_templates', JSON.stringify(contractTemplates));
+      const storageKey = `contratos_templates_${session.user.id}`;
+      localStorage.setItem(storageKey, JSON.stringify(contractTemplates));
     } catch (e) {
       console.warn("Storage error:", e);
     }
@@ -424,7 +428,7 @@ export default function DashboardPage() {
     // Configura um timer para debouncing de 2 segundos antes de salvar no supabase
     const timer = setTimeout(() => {
       const syncWithSupabase = async () => {
-        if (!session?.user) return;
+        if (!session?.user || !templatesLoaded) return;
         
         // Garante que templates criados localmente tenham um id
         let changed = false;
@@ -761,6 +765,16 @@ export default function DashboardPage() {
         setSession(null);
         setUserProfile(null);
         setAuthLoading(false);
+        // Limpeza rigorosa de estados para evitar vazamento
+        setImoveis([]);
+        setInquilinos([]);
+        setProprietarios([]);
+        setContratos([]);
+        setPagamentos([]);
+        setContractTemplates([]);
+        setTemplatesLoaded(false);
+        setNotifications([]);
+        setLogs([]);
       }
     });
 
@@ -900,7 +914,8 @@ export default function DashboardPage() {
       setPagamentos(paRes.data || []);
 
       // Migração e carregamento de templates do banco
-      const localSaved = localStorage.getItem('contratos_templates');
+      const userStorageKey = `contratos_templates_${session.user.id}`;
+      const localSaved = localStorage.getItem(userStorageKey);
       let localTemplates: any[] = [];
       try {
         if (localSaved) {
@@ -934,9 +949,9 @@ export default function DashboardPage() {
           alignment: (t.alignment || 'justify') as 'left' | 'center' | 'right' | 'justify'
         }));
         setContractTemplates(dbTemplates);
-        localStorage.setItem('contratos_templates', JSON.stringify(dbTemplates));
+        localStorage.setItem(userStorageKey, JSON.stringify(dbTemplates));
       } else {
-        // Banco vazio. Se tiver local, migra para o banco.
+        // Banco vazio. Se tiver local (específico do usuário!), migra para o banco.
         if (localTemplates.length > 0) {
           try {
             console.log("Iniciando migração de templates locais para o Supabase...");
@@ -977,7 +992,7 @@ export default function DashboardPage() {
                 alignment: (t.alignment || 'justify') as 'left' | 'center' | 'right' | 'justify'
               }));
               setContractTemplates(mapped);
-              localStorage.setItem('contratos_templates', JSON.stringify(mapped));
+              localStorage.setItem(userStorageKey, JSON.stringify(mapped));
             }
           } catch (insE) {
             console.error("Exceção ao migrar:", insE);
