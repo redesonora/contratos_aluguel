@@ -89,6 +89,15 @@ import {
   ReceiptData 
 } from '../types';
 
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 import { SidebarItem } from '../components/SidebarItem';
 import { RichEditor } from '../components/RichEditor';
 import { TagItem } from '../components/TagItem';
@@ -433,10 +442,10 @@ export default function DashboardPage() {
         // Garante que templates criados localmente tenham um id
         let changed = false;
         const validTemplates = contractTemplates.map(t => {
-          if (!t.id) {
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t.id || '');
+          if (!t.id || !isUuid) {
             changed = true;
-            const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-            return { ...t, id: newId };
+            return { ...t, id: generateUUID() };
           }
           return t;
         });
@@ -929,7 +938,7 @@ export default function DashboardPage() {
       if (tpRes.error) {
         console.error('Erro ao buscar templates do banco:', tpRes.error);
         setContractTemplates(localTemplates.length > 0 ? localTemplates : [{
-          id: 'dev-standard-id',
+          id: generateUUID(),
           name: 'Residencial Padrão',
           content: '<h1>CONTRATO DE LOCAÇÃO RESIDENCIAL</h1><p>Conteúdo do contrato...</p>',
           fontSize: 12,
@@ -956,12 +965,11 @@ export default function DashboardPage() {
           try {
             console.log("Iniciando migração de templates locais para o Supabase...");
             const toInsert = localTemplates.map((t: any) => {
-              // Garante que o ID seja um UUID válido ou deixe o banco gerar se for novo
-              // Aqui, vamos tentar manter o ID se parecer um UUID, senão geramos um novo
-              const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(t.id || '');
+              // Garante que o ID seja um UUID válido
+              const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t.id || '');
               
               return {
-                id: isUuid ? t.id : undefined, // se não for uuid, deixa o banco gerar (ou use uuid abaixo)
+                id: isUuid ? t.id : generateUUID(),
                 name: String(t.name || 'Modelo Migrado').substring(0, 100),
                 content: t.content || '',
                 font_size: Number(t.fontSize || 12),
@@ -972,8 +980,7 @@ export default function DashboardPage() {
               };
             });
 
-            // Se algum ID for undefined, o Supabase vai gerar. Se todos tiverem ID, vai tentar inserir.
-            // Para ser seguro contra conflitos, usamos upsert se tivermos IDs.
+            // Usamos upsert para evitar erros de duplicidade se o ID já existir
             const { data: insertedValues, error: insErr } = await supabase.from('contract_templates').upsert(toInsert).select();
             
             if (insErr) {
