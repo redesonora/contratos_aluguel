@@ -1370,7 +1370,8 @@ export default function DashboardPage() {
           const { error: prepayError } = await supabase
             .from('pagamentos')
             .delete()
-            .eq('contrato_id', itemToDelete.id);
+            .eq('contrato_id', itemToDelete.id)
+            .eq('user_id', session.user.id);
             
           if (prepayError) {
             console.error('Erro ao limpar pagamentos:', prepayError);
@@ -1379,7 +1380,13 @@ export default function DashboardPage() {
         }
       }
 
-      const { error, count } = await supabase.from(itemToDelete.type).delete({ count: 'exact' }).eq('id', itemToDelete.id);
+      console.log(`Iniciando exclusão de ${itemToDelete.type}: ${itemToDelete.id} para o usuário ${session.user.id}`);
+      
+      const { error, count } = await supabase
+        .from(itemToDelete.type)
+        .delete({ count: 'exact' })
+        .eq('id', itemToDelete.id)
+        .eq('user_id', session.user.id);
       
       if (error) {
         if (error.code === '23503') {
@@ -1394,7 +1401,12 @@ export default function DashboardPage() {
         throw error;
       }
 
-      console.log(`Deleção concluída: ${itemToDelete.type} ${itemToDelete.id}. Registros afetados: ${count}`);
+      if (count === 0) {
+        console.warn(`Tentativa de exclusão falhou: Nenhum registro de ${itemToDelete.type} com ID ${itemToDelete.id} foi encontrado ou você não tem permissão.`);
+        throw new Error("O registro não pôde ser excluído do banco de dados. Verifique se você tem permissões de exclusão para este item.");
+      }
+
+      console.log(`Deleção concluída com sucesso: ${itemToDelete.type} ${itemToDelete.id}. Registros afetados: ${count}`);
 
       await recordLog('EXCLUIR', itemToDelete.type, itemToDelete.id);
       
@@ -1411,6 +1423,52 @@ export default function DashboardPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveTemplates = async (templates: any[]) => {
+    if (!session?.user) return;
+    
+    try {
+      const toUpsert = templates.map(t => ({
+        id: t.id,
+        name: t.name,
+        content: t.content,
+        font_size: t.fontSize || 12,
+        font_color: t.fontColor || '#000000',
+        bold: !!t.bold,
+        alignment: t.alignment || 'justify',
+        user_id: session.user.id
+      }));
+
+      const { error } = await supabase.from('contract_templates').upsert(toUpsert);
+      if (error) throw error;
+      
+      const userStorageKey = `contratos_templates_${session.user.id}`;
+      localStorage.setItem(userStorageKey, JSON.stringify(templates));
+      
+      console.log("Templates salvos com sucesso.");
+    } catch (err) {
+      console.error("Erro ao salvar templates:", err);
+      throw err;
+    }
+  };
+
+  const handleDeleteTemplateDB = async (templateId: string) => {
+    if (!session?.user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('contract_templates')
+        .delete()
+        .eq('id', templateId)
+        .eq('user_id', session.user.id);
+        
+      if (error) throw error;
+      console.log("Template excluído do banco.");
+    } catch (err) {
+      console.error("Erro ao excluir template do banco:", err);
+      throw err;
     }
   };
   
@@ -2690,6 +2748,8 @@ export default function DashboardPage() {
             setContractTemplates={setContractTemplates}
             notificationDays={notificationDays}
             setNotificationDays={setNotificationDays}
+            onSave={handleSaveTemplates}
+            onDeleteTemplate={handleDeleteTemplateDB}
           />
         );
       }

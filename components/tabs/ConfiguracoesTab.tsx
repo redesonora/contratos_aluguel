@@ -15,7 +15,8 @@ import {
   Target,
   Hash,
   ShieldAlert,
-  Building
+  Building,
+  Loader2
 } from 'lucide-react';
 import { RichEditor } from '../RichEditor';
 import { TagItem } from '../TagItem';
@@ -25,18 +26,23 @@ interface ConfiguracoesTabProps {
   setContractTemplates: (templates: any[]) => void;
   notificationDays: number;
   setNotificationDays: (days: number) => void;
+  onSave?: (templates: any[]) => Promise<void>;
+  onDeleteTemplate?: (templateId: string) => Promise<void>;
 }
 
 export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
   contractTemplates,
   setContractTemplates,
   notificationDays,
-  setNotificationDays
+  setNotificationDays,
+  onSave,
+  onDeleteTemplate
 }) => {
   const [showTagGuide, setShowTagGuide] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(contractTemplates[0]?.id || null);
   const [activeDropdown, setActiveDropdown] = useState<'size' | 'color' | null>(null);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const selectedTemplate = contractTemplates.find(t => t.id === selectedTemplateId) || contractTemplates[0];
   const selectedIndex = contractTemplates.findIndex(t => t.id === (selectedTemplateId || contractTemplates[0]?.id));
@@ -63,11 +69,25 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
     setSelectedTemplateId(newId);
   };
 
-  const handleDeleteTemplate = () => {
+  const handleDeleteTemplate = async () => {
     if (templateToDelete) {
-      const newTemplates = contractTemplates.filter(t => t.id !== templateToDelete);
+      const idToDelete = templateToDelete;
+      const newTemplates = contractTemplates.filter(t => t.id !== idToDelete);
+      
+      // Se tiver uma função de delete real (Supabase), chama
+      if (onDeleteTemplate) {
+        try {
+          await onDeleteTemplate(idToDelete);
+        } catch (err) {
+          console.error("Erro ao excluir template:", err);
+          alert("Erro ao excluir o modelo no servidor. Tente novamente.");
+          setTemplateToDelete(null);
+          return;
+        }
+      }
+
       setContractTemplates(newTemplates);
-      if (selectedTemplateId === templateToDelete) {
+      if (selectedTemplateId === idToDelete) {
         setSelectedTemplateId(newTemplates[0]?.id || null);
       }
       setTemplateToDelete(null);
@@ -81,9 +101,22 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
 
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  const handleSave = () => {
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+  const handleSave = async () => {
+    if (onSave) {
+      setIsSaving(true);
+      try {
+        await onSave(contractTemplates);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } catch (err) {
+        console.error("Erro ao salvar:", err);
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    }
   };
 
   const tagGroups = [
@@ -279,10 +312,11 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                        )}
                        <button 
                          onClick={handleSave}
-                         className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg active:scale-95"
+                         disabled={isSaving}
+                         className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg active:scale-95 disabled:opacity-50"
                        >
-                          <Save size={14} />
-                          Salvar Modelo
+                          {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                          {isSaving ? 'Salvando...' : 'Salvar Modelo'}
                        </button>
                     </div>
                   </div>
