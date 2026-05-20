@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "REALIZZE - Gestão Imobiliária",
-  description: "Sistema profissional de gestão imobiliária",
+  title: "REALIZZE - Gestão de Contratos",
+  description: "Sistema profissional de gestão de contratos e fluxo de caixa.",
 };
 
 export default function RootLayout({

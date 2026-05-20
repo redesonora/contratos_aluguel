@@ -254,7 +254,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           <div className="flex items-end justify-between mb-12">
             <div>
               <h2 className="text-3xl font-black text-slate-900 tracking-tighter mb-2">Casos de Sucesso & Dicas</h2>
-              <p className="text-slate-500 font-medium">Conteúdos que ajudam você a escalar a gestão de seus imóveis.</p>
+              <p className="text-slate-500 font-medium">Conteúdos que ajudam você a escalar a gestão de seus contratos.</p>
             </div>
             <button className="hidden md:flex text-sm font-bold text-blue-600 uppercase tracking-widest items-center gap-1 hover:text-blue-700 transition-colors">
               Ver todos os posts <ChevronRight size={16} />
@@ -270,12 +270,12 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             <BlogCard 
               tag="Tendências"
               title="Contratos Digitais: Porque o papel está reduzindo seus lucros"
-              desc="Assinaturas eletrônicas e envios ágeis podem economizar horas semanais do seu time financeiro."
+              desc="Assinaturas eletrônicas e envios ágeis podem economizar horas semanais do seu time de gestão."
             />
             <BlogCard 
               tag="Sucesso"
               title="De 50 a 300 contratos administrados em menos de 1 ano"
-              desc="Estudo de caso da Imobiliária Central, que triplicou seus resultados após migrar para uma solução integrada."
+              desc="Estudo de caso da Central de Acordos, que triplicou seus resultados após migrar para uma solução integrada."
             />
           </div>
         </div>

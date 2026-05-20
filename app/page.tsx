@@ -888,6 +888,25 @@ export default function DashboardPage() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setLoginError(null);
+    setLoginSuccess(null);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        }
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      handleErrorModal(err.message || 'Erro ao autenticar com o Google');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRecoverPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
@@ -3848,6 +3867,44 @@ export default function DashboardPage() {
               >
                 ← Voltar para Entrar
               </button>
+            )}
+
+            {authTab !== 'recover' && (
+              <>
+                <div className="relative py-2 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-slate-100"></div>
+                  </div>
+                  <span className="relative bg-white px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ou continue com</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full py-4 border-2 border-slate-200 hover:border-slate-300 rounded-2xl font-black text-xs transition-all flex justify-center items-center gap-3 bg-white text-slate-700 active:scale-95 disabled:opacity-50 hover:bg-slate-50 shadow-sm"
+                >
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.65 1.58 15.01 1 12 1 7.37 1 3.4 3.65 1.48 7.5l3.85 3c.92-2.74 3.49-4.46 6.67-4.46z"
+                    />
+                    <path
+                      fill="#4285F4"
+                      d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.43a5.5 5.5 0 0 1-2.39 3.62l3.71 2.88c2.17-2 3.74-4.94 3.74-8.65z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.33 14.28c-.24-.72-.37-1.49-.37-2.28s.13-1.56.37-2.28L1.48 6.72A11.96 11.96 0 0 0 0 12c0 1.92.45 3.74 1.48 5.28l3.85-3z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.18 0-5.75-1.72-6.67-4.46l-3.85 3A11.96 11.96 0 0 0 12 23z"
+                    />
+                  </svg>
+                  {authTab === 'login' ? 'Entrar com Google' : 'Cadastrar com Google'}
+                </button>
+              </>
             )}
           </form>
 

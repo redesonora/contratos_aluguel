@@ -1,6 +1,6 @@
 {
-  "name": "REALIZE - Gestão Imobiliária",
-  "description": "Sistema profissional de gestão imobiliária para controle de contratos, proprietários, inquilinos e fluxo de caixa.",
+  "name": "REALIZZE - Gestão de Contratos",
+  "description": "Sistema profissional de gestão de contratos para controle de acordos, proprietários, inquilinos e fluxo de caixa.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
