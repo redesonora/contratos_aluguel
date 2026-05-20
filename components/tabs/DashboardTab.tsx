@@ -113,10 +113,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               <span className="text-xl font-black text-indigo-600">{Math.round(stats.alugadosPercent)}%</span>
             </div>
           </div>
-          <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Ocupação Total</h3>
+          <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Locações Ativas / Em Uso</h3>
           <div className="flex items-end gap-1">
             <p className="text-2xl font-black text-slate-800 tracking-tight">{stats.alugadosCount}</p>
-            <p className="text-[10px] font-bold text-slate-400 mb-1">/ {stats.totalImoveis} total</p>
+            <p className="text-[10px] font-bold text-slate-400 mb-1">/ {stats.totalImoveis} bens/itens</p>
           </div>
         </motion.div>
       </section>

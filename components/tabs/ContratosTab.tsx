@@ -248,7 +248,7 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
             type="text" 
-            placeholder="Buscar por endereço, inquilino ou proprietário..."
+            placeholder="Buscar por bem / item, locatário ou proprietário / cedente..."
             className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
             value={contractSearch}
             onChange={(e) => setContractSearch(e.target.value)}
@@ -275,11 +275,11 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
                       <Building size={16} />
                     </div>
                     <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight line-clamp-1">
-                      {co.imoveis?.apelido || co.imoveis?.endereco || 'Imóvel sem endereço'}
+                      {co.imoveis?.apelido || co.imoveis?.endereco || 'Bem / Item sem identificação'}
                     </h4>
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium ml-9 line-clamp-1">
-                    {co.imoveis?.endereco ? `${co.imoveis.endereco}, ${co.imoveis.numero || 'S/N'}` : 'Endereço não informado'}
+                    {co.imoveis?.endereco ? `${co.imoveis.endereco}, ${co.imoveis.numero || 'S/N'}` : 'Localização/Endereço não informado'}
                   </p>
                 </div>
                 <div className={`text-[10px] px-3 py-1.5 rounded-xl font-black uppercase tracking-widest shadow-sm ${
@@ -295,13 +295,13 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="space-y-1">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <User size={10} /> Locatário
+                    <User size={10} /> Locatário / Cliente
                   </p>
-                  <p className="text-xs font-bold text-slate-700 truncate">{co.inquilinos?.nome || 'Inquilino s/ nome'}</p>
+                  <p className="text-xs font-bold text-slate-700 truncate">{co.inquilinos?.nome || 'Locatário s/ nome'}</p>
                 </div>
                 <div className="space-y-1 border-l border-slate-100 pl-4">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <User size={10} /> Proprietário
+                    <User size={10} /> Cedente / Proprietário
                   </p>
                   <p className="text-xs font-bold text-slate-700 truncate">{co.proprietarios?.nome || 'Não informado'}</p>
                 </div>

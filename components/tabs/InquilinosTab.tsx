@@ -68,7 +68,7 @@ export const InquilinosTab: React.FC<InquilinosTabProps> = ({
           <table className="w-full text-left min-w-[600px]">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr className="text-slate-500 text-[10px] uppercase tracking-widest font-black">
-              <SortHeader label="Inquilino" sortKey="nome" activeTab="inquilinos" />
+              <SortHeader label="Locatário / Cliente" sortKey="nome" activeTab="inquilinos" />
               <th className="px-6 py-4">Contato</th>
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4 text-right">Ações</th>
@@ -128,7 +128,7 @@ export const InquilinosTab: React.FC<InquilinosTabProps> = ({
             ))}
             {paginatedInquilinos.length === 0 && (
               <tr>
-                <td colSpan={4} className="text-center py-20 text-slate-400 font-medium italic">Nenhum inquilino {showArchived ? 'arquivado' : 'cadastrado'}.</td>
+                <td colSpan={4} className="text-center py-20 text-slate-400 font-medium italic">Nenhum locatário/cliente {showArchived ? 'arquivado' : 'cadastrado'}.</td>
               </tr>
             )}
           </tbody>

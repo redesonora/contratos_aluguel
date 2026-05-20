@@ -134,9 +134,12 @@ export default function DashboardPage() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
   const [pwdForm, setPwdForm] = useState({ current: '', new: '', confirm: '' });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [myProfileName, setMyProfileName] = useState('');
+  const [myProfileEmail, setMyProfileEmail] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [notificationDays, setNotificationDays] = useState(60);
@@ -178,7 +181,7 @@ export default function DashboardPage() {
     proprietarios: 1,
     inquilinos: 1
   });
-  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const [authTab, setAuthTab] = useState<'login' | 'register' | 'recover'>('login');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [activeEditorDropdown, setActiveEditorDropdown] = useState<'size' | 'color' | null>(null);
   const [clausulasHtml, setClausulasHtml] = useState('');
@@ -211,20 +214,37 @@ export default function DashboardPage() {
     
     try {
       setLoading(true);
-      const { error } = await supabase
+      
+      let payloadToUpdate = { ...updatedData };
+      let { error } = await supabase
         .from('user_profiles')
-        .update(updatedData)
+        .update(payloadToUpdate)
         .eq('id', editingUser.id);
         
+      if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.toLowerCase().includes('email'))) {
+        delete payloadToUpdate.email;
+        const { error: retryError } = await supabase
+          .from('user_profiles')
+          .update(payloadToUpdate)
+          .eq('id', editingUser.id);
+        error = retryError;
+      }
+      
       if (error) throw error;
       
       // Atualizar lista local
-      setPerfis(prev => prev.map(p => p.id === editingUser.id ? { ...p, ...updatedData } : p));
+      setPerfis(prev => prev.map(p => p.id === editingUser.id ? { ...p, ...payloadToUpdate } : p));
+      
+      // Se estiver atualizando a PRÓPRIA conta, atualizar o state userProfile
+      if (userProfile && userProfile.id === editingUser.id) {
+          setUserProfile({...userProfile, ...payloadToUpdate} as UserProfile);
+      }
+      
       setEditingUser(null);
-      // Opcional: mostrar toast de sucesso
+      alert("Usuário atualizado com sucesso!");
     } catch (err: any) {
       console.error('Erro ao atualizar usuário:', err?.message || err || 'Erro desconhecido');
-      // Opcional: mostrar toast de erro
+      alert("Erro ao atualizar usuário: " + (err?.message || 'Verifique o console para mais detalhes.'));
     } finally {
       setLoading(false);
     }
@@ -595,6 +615,7 @@ export default function DashboardPage() {
 
           const newProfileFull = {
             ...newProfileBase,
+            email: userEmail || null,
             plano: 'Nenhum',
             status_pagamento: 'Sem Assinatura'
           };
@@ -606,7 +627,7 @@ export default function DashboardPage() {
             console.error('Erro ao inserir novo perfil:', JSON.stringify(insertError));
             
             // Se falhou por causa de coluna esquecida (PGRST204 ou 42703), tentamos o base
-            if (insertError.code === 'PGRST204' || insertError.code === '42703') {
+            if (insertError.code === 'PGRST204' || insertError.code === '42703' || insertError.message?.toLowerCase().includes('email')) {
               const { error: retryError } = await supabase.from('user_profiles').insert(newProfileBase);
               if (retryError) throw retryError;
               
@@ -645,6 +666,16 @@ export default function DashboardPage() {
           await supabase.from('user_profiles').update({ last_access: new Date().toISOString() }).eq('id', userId);
         } catch (err) {
           console.warn('Falha ao atualizar last_access:', err);
+        }
+
+        // Auto-sincronizar o e-mail se estiver sem ele no perfil
+        if (!finalData.email && userEmail) {
+          try {
+            await supabase.from('user_profiles').update({ email: userEmail }).eq('id', userId);
+            finalData.email = userEmail;
+          } catch (updateErr) {
+            console.warn('Falha silenciosa ao sincronizar e-mail no user_profiles (provavelmente a coluna email ainda não existe no DB):', updateErr);
+          }
         }
 
         // Auto-upgrade o pioneiro para MASTER
@@ -709,6 +740,26 @@ export default function DashboardPage() {
         }
       }
     };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const err = event.reason;
+      const msg = err?.message?.toLowerCase() || '';
+      if (
+        msg.includes('refresh token') || 
+        msg.includes('not found') || 
+        msg.includes('invalid') || 
+        msg.includes('expired') ||
+        (err?.name === 'AuthApiError' && err?.status === 400)
+      ) {
+        console.warn('Capturado Unhandled Rejection de Auth no Supabase:', err);
+        event.preventDefault();
+        handleAuthError();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    }
 
     const initAuth = async () => {
       console.log('initAuth: começando');
@@ -787,15 +838,40 @@ export default function DashboardPage() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      }
+    };
   }, []);
 
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginSuccess, setLoginSuccess] = useState<string | null>(null);
+  const [registeredEmailWelcome, setRegisteredEmailWelcome] = useState<string | null>(null);
+
+  const translateErrorMsg = (msg: string | null | undefined) => {
+    if (!msg) return 'Ocorreu um erro desconhecido.';
+    const txt = msg.toLowerCase();
+    if (txt.includes('user already exists')) return 'Este e-mail já está cadastrado no sistema. Por favor, faça login ou recupere sua senha.';
+    if (txt.includes('database error saving new user')) return 'Erro no banco de dados. Este e-mail pode ter um cadastro residual no sistema de autenticação.';
+    if (txt.includes('rate limit')) return 'Muitas tentativas! Limite de acessos atingido por segurança. Aguarde cerca de 1 hora.';
+    if (txt.includes('invalid login credentials') || txt.includes('invalid grant')) return 'E-mail ou senha inválidos. Por favor, tente novamente.';
+    if (txt.includes('password should be') || txt.includes('weak_password')) return 'A senha deve conter pelo menos 6 caracteres.';
+    if (txt.includes('confirm') || txt.includes('not verified')) return 'E-mail não verificado! Acesse o link de confirmação enviado ao seu e-mail.';
+    if (txt.includes('network')) return 'Falha de rede. Verifique sua conexão com a internet.';
+    return msg.startsWith('Erro de duplicidade') || msg.startsWith('Ops!') || msg.startsWith('E-mail') || msg.startsWith('Sua senha') || msg.startsWith('As senhas') || msg.startsWith('CPF') ? msg : `Erro: ${msg}`;
+  };
+
+  const handleErrorModal = (msg: string) => {
+    setLoginError(translateErrorMsg(msg));
+  };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setLoginError(null);
+    setLoginSuccess(null);
     const formData = new FormData(e.currentTarget);
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
@@ -804,7 +880,28 @@ export default function DashboardPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
     } catch (err: any) {
-      setLoginError(err.message || 'Erro na autenticação');
+      handleErrorModal(err.message || 'Erro na autenticação');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRecoverPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setLoginError(null);
+    setLoginSuccess(null);
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/`,
+      });
+      if (error) throw error;
+      setLoginSuccess('Processo de redefinição iniciado. Verifique sua caixa de entrada para redefinir sua senha.');
+    } catch (err: any) {
+      handleErrorModal(err.message || 'Erro ao enviar e-mail de redefinição de senha.');
     } finally {
       setLoading(false);
     }
@@ -814,13 +911,45 @@ export default function DashboardPage() {
     e.preventDefault();
     setLoading(true);
     setLoginError(null);
+    setLoginSuccess(null);
     const formData = new FormData(e.currentTarget);
     const nome = formData.get('nome') as string;
     const username = formData.get('username') as string;
     const email = formData.get('email') as string;
-    const cpf = formData.get('cpf') as string;
+    const rawCpf = (formData.get('cpf') as string) || '';
     const password = formData.get('password') as string;
     const confirmPassword = formData.get('confirmPassword') as string;
+
+    const cleanCpf = rawCpf.replace(/\D/g, '');
+
+    const isValidCpf = (val: string): boolean => {
+      const clean = val.replace(/\D/g, '');
+      if (clean.length !== 11) return false;
+      if (/^(\d)\1{10}$/.test(clean)) return false;
+      let sum = 0;
+      for (let i = 0; i < 9; i++) {
+        sum += parseInt(clean.charAt(i)) * (10 - i);
+      }
+      let rev = 11 - (sum % 11);
+      if (rev === 10 || rev === 11) rev = 0;
+      if (rev !== parseInt(clean.charAt(9))) return false;
+      sum = 0;
+      for (let i = 0; i < 10; i++) {
+        sum += parseInt(clean.charAt(i)) * (11 - i);
+      }
+      rev = 11 - (sum % 11);
+      if (rev === 10 || rev === 11) rev = 0;
+      if (rev !== parseInt(clean.charAt(10))) return false;
+      return true;
+    };
+
+    if (!isValidCpf(cleanCpf)) {
+      setLoginError('CPF inválido. Por favor, digite um CPF válido.');
+      setLoading(false);
+      return;
+    }
+
+    const cpf = `${cleanCpf.slice(0, 3)}.${cleanCpf.slice(3, 6)}.${cleanCpf.slice(6, 9)}-${cleanCpf.slice(9, 11)}`;
 
     if (password !== confirmPassword) {
       setLoginError('As senhas não coincidem.');
@@ -829,6 +958,50 @@ export default function DashboardPage() {
     }
 
     try {
+      // Verificar se este CPF ou e-mail já existe no banco de dados (user_profiles)
+      let isDuplicate = false;
+      let duplicateReason = '';
+
+      const { data: dupDataVal, error: checkError } = await supabase
+        .from('user_profiles')
+        .select('id, nome, email, cpf')
+        .or(`email.eq.${email.trim()},cpf.eq.${cpf.trim()}`);
+
+      if (checkError && (checkError.code === '42703' || checkError.code === 'PGRST204' || checkError.message?.toLowerCase().includes('email'))) {
+        // Fallback: buscar apenas por cpf caso o email não seja coluna de consulta ou dê erro
+        const { data: fallbackCheck } = await supabase
+          .from('user_profiles')
+          .select('id, nome, cpf')
+          .eq('cpf', cpf.trim());
+        
+        if (fallbackCheck && fallbackCheck.length > 0) {
+          isDuplicate = true;
+          duplicateReason = `Este CPF (${cpf}) já está registrado em nosso sistema.`;
+        }
+      } else if (dupDataVal && dupDataVal.length > 0) {
+        isDuplicate = true;
+        const findEmail = dupDataVal.find((p: any) => p.email?.trim().toLowerCase() === email.trim().toLowerCase());
+        const findCpf = dupDataVal.find((p: any) => p.cpf?.trim() === cpf.trim());
+
+        if (findEmail && findCpf) {
+          duplicateReason = `O E-mail (${email}) e o CPF (${cpf}) já estão registrados.`;
+        } else if (findEmail) {
+          duplicateReason = `O E-mail (${email}) já está registrado.`;
+        } else if (findCpf) {
+          duplicateReason = `O CPF (${cpf}) já está registrado.`;
+        } else {
+          duplicateReason = `O CPF (${cpf}) ou E-mail (${email}) informado já está cadastrado no sistema.`;
+        }
+      }
+
+      if (isDuplicate) {
+        handleErrorModal(
+          `Ops! ${duplicateReason} Se você já possui uma conta, recupere seus dados de acesso clicando no botão "Criar Conta / Entrar" e depois em "Recuperar" na parte inferior da tela.`
+        );
+        setLoading(false);
+        return;
+      }
+
       const { data: { user }, error: signUpError } = await supabase.auth.signUp({ 
         email, 
         password,
@@ -841,14 +1014,64 @@ export default function DashboardPage() {
         }
       });
       
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        if (signUpError.message?.toLowerCase().includes('user already exists')) {
+          handleErrorModal(
+            `Erro de duplicidade: O e-mail (${email}) já está cadastrado no sistema. Por favor, use a opção de redefinição de senha.`
+          );
+          setLoading(false);
+          return;
+        }
+        if (signUpError.message?.toLowerCase().includes('rate limit')) {
+          handleErrorModal(
+            `Limite de envios excedido por segurança. Por favor, aguarde cerca de 1 hora para cadastrar novos usuários ou ajuste o Rate Limit no painel Authentication do seu Supabase.`
+          );
+          setLoading(false);
+          return;
+        }
+        throw signUpError;
+      }
       
       if (user) {
-        // O fetchProfile será chamado automaticamente pelo useEffect onAuthStateChange
-        setLoginError('Cadastro realizado! Se o e-mail não estiver confirmado, verifique sua caixa de entrada.');
+        // Garantir que criamos o registro imediatamente na tabela user_profiles com o e-mail preenchido!
+        try {
+          const { count, error: countError } = await supabase.from('user_profiles').select('*', { count: 'exact', head: true });
+          const role = (count === 0 && !countError) ? 'MASTER' : 'CORRETOR';
+          const approved = role === 'MASTER';
+          
+          const newProfileFull = {
+            id: user.id,
+            role,
+            nome,
+            cpf,
+            email, // <-- setting the email correctly!
+            approved,
+            plano: 'Nenhum',
+            status_pagamento: 'Sem Assinatura',
+            trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+          };
+          
+          const { error: insertError } = await supabase.from('user_profiles').upsert(newProfileFull);
+          if (insertError && (insertError.code === 'PGRST204' || insertError.code === '42703' || insertError.message?.toLowerCase().includes('email'))) {
+            // Tentar novamente excluindo a coluna email
+            const { email: ignoredEmail, ...newProfileBase } = newProfileFull;
+            await supabase.from('user_profiles').upsert(newProfileBase);
+          }
+        } catch(ex_profile) {
+          console.error("Erro ao pré-criar perfil:", ex_profile);
+        }
+
+        setRegisteredEmailWelcome(email);
+        setLoginSuccess('Cadastro de novo usuário realizado com sucesso! Enviamos um e-mail de confirmação para você. Por favor, confirme seu e-mail para poder acessar o sistema.');
       }
     } catch (err: any) {
-      setLoginError(err.message || 'Erro ao realizar cadastro');
+      if (err.message?.toLowerCase().includes('user already exists')) {
+        handleErrorModal(
+          `Erro de duplicidade: O e-mail (${email}) já está cadastrado no sistema. Por favor, use a opção de redefinição de senha.`
+        );
+      } else {
+        handleErrorModal(err.message || 'Erro ao realizar cadastro');
+      }
     } finally {
       setLoading(false);
     }
@@ -856,6 +1079,51 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+  };
+
+  useEffect(() => {
+    if (isMyProfileOpen && userProfile) {
+      setMyProfileName(userProfile.nome || '');
+      setMyProfileEmail(userProfile.email || '');
+    }
+  }, [isMyProfileOpen, userProfile]);
+
+  const handleUpdateMyProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userProfile?.id) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          nome: myProfileName,
+          email: myProfileEmail
+        })
+        .eq('id', userProfile.id);
+
+      if (error && (error.code === '42703' || error.message?.toLowerCase().includes('email'))) {
+        // Retry but only update name
+        const { error: retryError } = await supabase
+          .from('user_profiles')
+          .update({
+            nome: myProfileName
+          })
+          .eq('id', userProfile.id);
+        if (retryError) throw retryError;
+      } else if (error) {
+        throw error;
+      }
+      
+      setUserProfile(prev => prev ? { ...prev, nome: myProfileName, email: myProfileEmail } : null);
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+      setIsMyProfileOpen(false);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao atualizar perfil.');
+      setTimeout(() => setErrorMsg(null), 3000);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Fetch Data
@@ -3160,12 +3428,33 @@ export default function DashboardPage() {
                }
             }}
             handleDeleteUser={async (id, role) => {
-               if (userProfile?.id !== id && confirm(`Remover acesso?`)) {
-                 const { error } = await supabase.from('user_profiles').delete().eq('id', id);
-                 if (!error) fetchData();
+               if (userProfile?.id === id) {
+                 return { success: false, error: "Você não pode se auto-excluir do sistema." };
                }
+               if (role === 'MASTER') {
+                 return { success: false, error: "Usuários com nível MASTER não podem ser excluídos." };
+               }
+               
+               // Tenta usar a função RPC que exclui da auth.users e user_profiles
+               const { error } = await supabase.rpc('delete_user_by_id', { p_user_id: id });
+               
+               if (error) {
+                 if (error.code === 'PGRST202' || error.message?.includes('function delete_user_by_id') || error.message?.toLowerCase().includes('não permitida') || error.message?.toLowerCase().includes('could not find')) {
+                   // Fallback para apenas avisar que a função do DB ainda não foi criada
+                   return { 
+                     success: false, 
+                     error: "A exclusão de conta completa exige um ajuste no banco de dados. Por favor, execute as instruções do arquivo SUPABASE_SCHEMA.sql (seção delete_user_by_id) no SQL Editor do Supabase." 
+                   };
+                 }
+                 console.error("Erro ao excluir usuário:", error);
+                 return { success: false, error: error.message || 'Erro ao excluir usuário do banco de dados.' };
+               }
+               
+               fetchData();
+               return { success: true };
             }}
             onEditUser={(user) => setEditingUser(user)}
+            onSyncData={fetchData}
           />
         );
       }
@@ -3198,7 +3487,74 @@ export default function DashboardPage() {
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative">
+        {registeredEmailWelcome && (
+          <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white p-8 sm:p-10 rounded-[2.5rem] shadow-2xl w-full max-w-lg border-2 border-slate-100 relative text-center"
+            >
+              <button 
+                onClick={() => {
+                  setRegisteredEmailWelcome(null);
+                  setAuthTab('login');
+                }}
+                className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition-colors"
+                title="Fechar"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-50">
+                <CheckCircle2 size={40} strokeWidth={2.5} className="animate-bounce" />
+              </div>
+
+              <span className="text-[10px] font-black tracking-widest text-emerald-600 bg-emerald-50 px-4 py-1.5 rounded-full uppercase">
+                🎉 Cadastro Iniciado!
+              </span>
+
+              <h2 className="text-2xl sm:text-3.5xl font-black text-slate-800 tracking-tight uppercase mt-4 leading-tight">
+                Seja Bem-Vindo à REALIZZE!
+              </h2>
+
+              <p className="text-sm font-medium text-slate-500 mt-4 leading-relaxed">
+                Faltam apenas alguns passos para você começar! Enviamos um e-mail de confirmação para:
+              </p>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 my-4 font-mono text-xs text-blue-600 font-bold tracking-tight select-all break-all">
+                {registeredEmailWelcome}
+              </div>
+
+              <div className="text-left text-xs text-slate-400 space-y-3 p-4 bg-blue-50/50 rounded-2xl border border-blue-100/30">
+                <p className="font-bold uppercase tracking-widest text-[9px] text-blue-600 mb-1">Passos para ativação de sua conta:</p>
+                <div className="flex gap-2">
+                  <span className="font-black text-blue-600">1.</span>
+                  <span>Acesse sua caixa de entrada (ou lixo eletrônico/spam).</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="font-black text-blue-600">2.</span>
+                  <span>Abra o e-mail de registro enviado pela nossa equipe do Supabase e clique em <strong>Confirmar E-mail</strong> (Confirm Email).</span>
+                </div>
+                <div className="flex gap-2">
+                  <span className="font-black text-blue-600">3.</span>
+                  <span>Depois de confirmado, você poderá logar no sistema com as suas credenciais para usufruir de seus 7 dias grátis de trial.</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setRegisteredEmailWelcome(null);
+                  setAuthTab('login');
+                }}
+                className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-xs tracking-widest py-4 rounded-2xl shadow-lg shadow-blue-100 hover:shadow-xl transition-all active:scale-95"
+              >
+                Concluir e ir para o Login
+              </button>
+            </motion.div>
+          </div>
+        )}
+
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -3209,30 +3565,114 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-black tracking-tight">ImobiSaaS</h1>
           </div>
           
-          <div className="bg-slate-50 p-1.5 rounded-2xl flex items-center gap-2 mb-8">
-            <button 
-              onClick={() => { setAuthTab('login'); setLoginError(null); }}
-              className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                authTab === 'login' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              Entrar
-            </button>
-            <button 
-              onClick={() => { setAuthTab('register'); setLoginError(null); }}
-              className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                authTab === 'register' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-              }`}
-            >
-              Cadastrar
-            </button>
-          </div>
+          {authTab !== 'recover' ? (
+            <div className="bg-slate-50 p-1.5 rounded-2xl flex items-center gap-2 mb-8">
+              <button 
+                onClick={() => { setAuthTab('login'); setLoginError(null); setLoginSuccess(null); }}
+                className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                  authTab === 'login' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                Entrar
+              </button>
+              <button 
+                onClick={() => { setAuthTab('register'); setLoginError(null); setLoginSuccess(null); }}
+                className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                  authTab === 'register' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                Cadastrar
+              </button>
+            </div>
+          ) : (
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Recuperar Senha</h2>
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Insira seu e-mail de cadastro para receber as instruções</p>
+            </div>
+          )}
 
-          <form onSubmit={authTab === 'login' ? handleLogin : handleRegister} className="space-y-5">
+          <form onSubmit={authTab === 'login' ? handleLogin : authTab === 'register' ? handleRegister : handleRecoverPassword} className="space-y-5">
+            {loginSuccess && (
+              <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-emerald-100 relative text-center"
+                >
+                  <button 
+                    onClick={() => setLoginSuccess(null)}
+                    type="button"
+                    className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                  
+                  <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-50 animate-bounce">
+                    <CheckCircle2 size={32} strokeWidth={2.5} />
+                  </div>
+                  
+                  <h3 className="text-[17px] font-black text-slate-800 mb-3 uppercase tracking-tight">Sucesso</h3>
+                  <p className="text-sm font-medium text-slate-600 leading-relaxed max-w-[280px] mx-auto mb-8">
+                    {loginSuccess}
+                  </p>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setLoginSuccess(null)}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-100 hover:shadow-xl active:scale-95 transition-all font-black text-[11px] uppercase tracking-widest py-4 rounded-xl"
+                  >
+                    Continuar
+                  </button>
+                </motion.div>
+              </div>
+            )}
+
             {loginError && (
-              <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-xs font-bold border border-red-100 flex items-center gap-3 animate-shake">
-                <AlertCircle size={18} className="shrink-0" />
-                <span>{loginError}</span>
+              <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-red-100 relative text-center"
+                >
+                  <button 
+                    onClick={() => setLoginError(null)}
+                    type="button"
+                    className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                  
+                  <div className="w-16 h-16 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-red-50 animate-shake">
+                    <AlertCircle size={32} strokeWidth={2.5} />
+                  </div>
+                  
+                  <h3 className="text-[17px] font-black text-slate-800 mb-3 uppercase tracking-tight">Ocorreu um erro</h3>
+                  <p className="text-sm font-medium text-slate-600 leading-relaxed max-w-[280px] mx-auto mb-8">
+                    {loginError}
+                  </p>
+                  
+                  {authTab === 'register' && (loginError.includes('duplicidade') || loginError.includes('cadastrado')) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthTab('recover');
+                        setLoginError(null);
+                        setLoginSuccess(null);
+                      }}
+                      className="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 active:scale-95 transition-all font-black text-[11px] uppercase tracking-widest py-4 rounded-xl text-center mb-3"
+                    >
+                      Ir para Recuperar Senha →
+                    </button>
+                  )}
+                  
+                  <button
+                    type="button"
+                    onClick={() => setLoginError(null)}
+                    className="w-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 transition-all font-black text-[11px] uppercase tracking-widest py-4 rounded-xl"
+                  >
+                    Tentar Novamente
+                  </button>
+                </motion.div>
               </div>
             )}
 
@@ -3290,6 +3730,20 @@ export default function DashboardPage() {
                     name="cpf" 
                     type="text" 
                     required 
+                    maxLength={14}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const digits = value.replace(/\D/g, '').slice(0, 11);
+                      let formatted = digits;
+                      if (digits.length > 3 && digits.length <= 6) {
+                        formatted = `${digits.slice(0, 3)}.${digits.slice(3)}`;
+                      } else if (digits.length > 6 && digits.length <= 9) {
+                        formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+                      } else if (digits.length > 9) {
+                        formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+                      }
+                      e.target.value = formatted;
+                    }}
                     className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-emerald-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
                     placeholder="000.000.000-00"
                   />
@@ -3297,19 +3751,21 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Senha</label>
-              <div className="relative group">
-                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
-                <input 
-                  name="password" 
-                  type="password" 
-                  required 
-                  className={`w-full bg-slate-50/50 border-2 border-slate-100 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all ${authTab === 'login' ? 'focus:border-blue-400' : 'focus:border-emerald-400'}`}
-                  placeholder="••••••••"
-                />
+            {authTab !== 'recover' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Senha</label>
+                <div className="relative group">
+                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+                  <input 
+                    name="password" 
+                    type="password" 
+                    required 
+                    className={`w-full bg-slate-50/50 border-2 border-slate-100 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all ${authTab === 'login' ? 'focus:border-blue-400' : 'focus:border-emerald-400'}`}
+                    placeholder="••••••••"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {authTab === 'register' && (
               <div className="space-y-1.5">
@@ -3333,16 +3789,28 @@ export default function DashboardPage() {
               className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg flex justify-center items-center gap-3 active:scale-95 ${
                 authTab === 'login' 
                   ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100' 
-                  : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-100'
+                  : authTab === 'register'
+                    ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-100'
+                    : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-100'
               } disabled:opacity-50`}
             >
               {loading ? <Loader2 className="animate-spin" size={18} /> : (
                 <>
-                  {authTab === 'login' ? 'Acessar Dashboard' : 'Criar minha conta'}
+                  {authTab === 'login' ? 'Acessar Dashboard' : authTab === 'register' ? 'Criar minha conta' : 'Enviar E-mail de Recuperação'}
                   <ChevronRight size={18} />
                 </>
               )}
             </button>
+            
+            {authTab === 'recover' && (
+              <button 
+                type="button"
+                onClick={() => { setAuthTab('login'); setLoginError(null); setLoginSuccess(null); }}
+                className="w-full text-center text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-600 py-2.5"
+              >
+                ← Voltar para Entrar
+              </button>
+            )}
           </form>
 
           {authTab === 'register' && (
@@ -3363,7 +3831,7 @@ export default function DashboardPage() {
 
           {authTab === 'login' && (
             <p className="text-center mt-8 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-              Esqueceu sua senha? <button className="text-blue-500 hover:underline">Recuperar</button>
+              Esqueceu sua senha? <button type="button" onClick={() => { setAuthTab('recover'); setLoginError(null); setLoginSuccess(null); }} className="text-blue-500 hover:underline">Recuperar</button>
             </p>
           )}
         </motion.div>
@@ -3374,7 +3842,9 @@ export default function DashboardPage() {
   const isTrialActive = userProfile?.trial_ends_at ? new Date(userProfile.trial_ends_at) > new Date() : false;
   const trialDaysLeft = userProfile?.trial_ends_at ? Math.max(0, Math.ceil((new Date(userProfile.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
 
-  if (userProfile && !userProfile.approved && userProfile.role !== 'MASTER') {
+  const isAccessBlocked = userProfile && userProfile.role !== 'MASTER' && !userProfile.approved && !isTrialActive;
+
+  if (isAccessBlocked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans">
         <motion.div 
@@ -3466,7 +3936,7 @@ export default function DashboardPage() {
           {can('VIEW', 'proprietarios') && (
             <SidebarItem 
               icon={Building2} 
-              label="Proprietários" 
+              label="Cedentes / Proprietários" 
               active={activeTab === 'proprietarios'} 
               onClick={() => { setActiveTab('proprietarios'); setIsSidebarOpen(false); setShowArchived(false); }} 
             />
@@ -3474,7 +3944,7 @@ export default function DashboardPage() {
           {can('VIEW', 'imoveis') && (
             <SidebarItem 
               icon={Building2} 
-              label="Imóveis" 
+              label="Bens / Itens" 
               active={activeTab === 'imoveis'} 
               onClick={() => { setActiveTab('imoveis'); setIsSidebarOpen(false); setShowArchived(false); }} 
             />
@@ -3482,7 +3952,7 @@ export default function DashboardPage() {
           {can('VIEW', 'inquilinos') && (
             <SidebarItem 
               icon={Users} 
-              label="Inquilinos" 
+              label="Locatários / Clientes" 
               active={activeTab === 'inquilinos'} 
               onClick={() => { setActiveTab('inquilinos'); setIsSidebarOpen(false); setShowArchived(false); }} 
             />
@@ -3545,11 +4015,17 @@ export default function DashboardPage() {
             <p className="text-xs font-bold text-slate-700 truncate">{userProfile?.nome || session?.user?.email?.split('@')[0] || 'Gleison Isaias'}</p>
           </div>
           <button 
+            onClick={() => setIsMyProfileOpen(true)}
+            className="text-[10px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest p-2 transition-colors text-left flex items-center gap-1.5"
+          >
+            Meu Perfil
+          </button>
+          <button 
             onClick={() => {
               setPwdForm({ current: '', new: '', confirm: '' });
               setIsChangePasswordOpen(true);
             }}
-            className="text-[10px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest p-2 transition-colors text-left"
+            className="text-[10px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest p-2 transition-colors text-left flex items-center gap-1.5"
           >
             Alterar Senha
           </button>
@@ -3675,9 +4151,9 @@ export default function DashboardPage() {
               <form onSubmit={handleCreateSubmit} className="flex flex-col h-full overflow-hidden">
                 <div className="p-3 sm:p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 flex-shrink-0">
                   <h2 className="text-base sm:text-lg font-black text-slate-800 uppercase tracking-tight">
-                    {editingItem ? 'Editar ' : 'Novo '}{activeTab === 'imoveis' ? 'Imóvel' : 
-                         activeTab === 'inquilinos' ? 'Inquilino' :
-                         activeTab === 'proprietarios' ? 'Proprietário' :
+                    {editingItem ? 'Editar ' : 'Novo '}{activeTab === 'imoveis' ? 'Bem / Item' : 
+                         activeTab === 'inquilinos' ? 'Locatário / Cliente' :
+                         activeTab === 'proprietarios' ? 'Cedente / Proprietário' :
                          activeTab === 'contratos' ? 'Contrato' : 'Pagamento'}
                   </h2>
                   <button type="button" onClick={() => {
@@ -3698,7 +4174,7 @@ export default function DashboardPage() {
                     <>
                       <div>
                         <label className="text-[10px] font-black text-blue-600 uppercase mb-1 block flex justify-between">
-                          Apelido / Nome do Imóvel
+                          Apelido / Identificação do Bem / Item
                           {formErrors.apelido && <span className="text-red-500 normal-case font-bold">{formErrors.apelido}</span>}
                         </label>
                         <input 
@@ -3706,7 +4182,7 @@ export default function DashboardPage() {
                           defaultValue={editingItem?.apelido}
                           onBlur={handleFieldBlur}
                           className={`w-full border-2 ${formErrors.apelido ? 'border-red-200 bg-red-50' : 'border-slate-100'} focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-bold transition-all placeholder:font-normal`} 
-                          placeholder="Ex: Casa do Centro, Apartamento 301..."
+                          placeholder="Ex: Apartamento 301, Carro Sedan, Furadeira Profissional..."
                         />
                       </div>
                       <div className="grid grid-cols-6 gap-3">
@@ -3733,14 +4209,14 @@ export default function DashboardPage() {
                         </div>
                         <div className="col-span-3">
                           <div className="flex items-center gap-1 mb-1">
-                            <label className="text-[10px] font-black text-slate-500 uppercase block tracking-tight">Tipo Imóvel</label>
+                            <label className="text-[10px] font-black text-slate-500 uppercase block tracking-tight">Tipo de Bem / Item</label>
                             <div className="group relative">
                               <Info size={12} className="text-slate-400 cursor-help" />
                               <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-56 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl z-[60] leading-tight">
-                                <p className="font-bold mb-1 text-blue-400">Residencial:</p>
-                                <p className="mb-2 text-slate-300">Imóveis para moradia. O sistema aplica regras padrão para contratos de locação residencial.</p>
-                                <p className="font-bold mb-1 text-purple-400">Comercial:</p>
-                                <p className="text-slate-300">Imóveis para fins de negócio. Afeta a vigência de prazos e permissões específicas de zoneamento.</p>
+                                <p className="font-bold mb-1 text-blue-400">Residencial / Pessoal:</p>
+                                <p className="mb-2 text-slate-300">Bens/itens para moradia, uso pessoal ou locação residencial padrão.</p>
+                                <p className="font-bold mb-1 text-purple-400">Comercial / Negógio:</p>
+                                <p className="text-slate-300">Bens/itens para fins de negócio, comercial, frotas, ferramentas e zoneamento.</p>
                                 <div className="absolute left-2 top-full w-2 h-2 bg-slate-800 rotate-45 -mt-1"></div>
                               </div>
                             </div>
@@ -3753,18 +4229,18 @@ export default function DashboardPage() {
                       </div>
 
                       <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase mb-1 block tracking-tight">Status do Imóvel</label>
+                        <label className="text-[10px] font-black text-slate-500 uppercase mb-1 block tracking-tight">Status do Bem / Item</label>
                         <select name="status" defaultValue={editingItem?.status || "Disponível"} className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all appearance-none bg-white">
                           <option value="Disponível">Disponível</option>
-                          <option value="Alugado">Alugado</option>
+                          <option value="Alugado">Alugado / Em Uso</option>
                           <option value="Em Manutenção">Em Manutenção</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase mb-1 block tracking-tight">Proprietário (Opcional)</label>
+                        <label className="text-[10px] font-black text-slate-500 uppercase mb-1 block tracking-tight">Cedente / Proprietário (Opcional)</label>
                         <select name="proprietario_id" defaultValue={editingItem?.proprietario_id || ""} className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all appearance-none bg-white">
-                          <option value="">Selecione um proprietário...</option>
+                          <option value="">Selecione um cedente / proprietário...</option>
                           {proprietarios.map(p => (
                             <option key={p.id} value={p.id}>{p.nome}</option>
                           ))}
@@ -4168,14 +4644,14 @@ export default function DashboardPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block tracking-tight flex justify-between">
-                            <span>Imóvel</span>
+                            <span>Bem / Item de Locação</span>
                             {formErrors.imovel_id && <span className="text-red-500 normal-case font-bold">{formErrors.imovel_id}</span>}
                           </label>
                           {imoveis.length > 0 ? (
                             <select name="imovel_id" defaultValue={editingItem?.imovel_id || ""} required onBlur={handleFieldBlur} onChange={(e) => {
                               // Se alterar imóvel, atualizar proprietário se necessário? Não, o fluxo é Proprietário -> Imóvel
                             }} className={`w-full border-2 ${formErrors.imovel_id ? 'border-red-200 bg-red-50' : 'border-slate-100'} focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all appearance-none bg-white`}>
-                              <option value="">Selecione o Imóvel...</option>
+                              <option value="">Selecione o Bem / Item...</option>
                               {imoveis
                                 .filter(im => !contractProprietarioId || im.proprietario_id === contractProprietarioId)
                                 .map(im => {
@@ -4188,23 +4664,23 @@ export default function DashboardPage() {
                                       className={isRented ? 'text-slate-300' : ''}
                                     >
                                       {im.apelido ? `[${im.apelido}] ${im.endereco}` : im.endereco}, {im.numero} 
-                                      {isRented ? ' (INDISPONÍVEL - JÁ ALUGADO)' : ` (${im.status || 'Disponível'})`}
+                                      {isRented ? ' (INDISPONÍVEL)' : ` (${im.status || 'Disponível'})`}
                                     </option>
                                   );
                                 })}
                             </select>
                           ) : (
-                            <p className="text-[10px] text-red-500 font-bold bg-red-50 p-2 rounded-lg border border-red-100 italic">Nenhum imóvel disponível para este proprietário.</p>
+                            <p className="text-[10px] text-red-500 font-bold bg-red-50 p-2 rounded-lg border border-red-100 italic">Nenhum bem/item disponível para este proprietário/cedente.</p>
                           )}
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block tracking-tight flex justify-between">
-                            <span>Inquilino / Locatário</span>
+                            <span>Locatário / Cliente</span>
                             {formErrors.inquilino_id && <span className="text-red-500 normal-case font-bold">{formErrors.inquilino_id}</span>}
                           </label>
                           {inquilinos.length > 0 ? (
                             <select name="inquilino_id" defaultValue={editingItem?.inquilino_id || ""} required onBlur={handleFieldBlur} className={`w-full border-2 ${formErrors.inquilino_id ? 'border-red-200 bg-red-50' : 'border-slate-100'} focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all appearance-none bg-white`}>
-                              <option value="">Selecione o Inquilino...</option>
+                              <option value="">Selecione o Locatário / Cliente...</option>
                               {inquilinos.map(inq => <option key={inq.id} value={inq.id}>{inq.nome}</option>)}
                             </select>
                           ) : (
@@ -4726,7 +5202,7 @@ export default function DashboardPage() {
                     <Building2 size={24} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Detalhes do Imóvel</h2>
+                    <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Detalhes do Bem / Item</h2>
                     <p className="text-xs text-slate-500 font-medium">Informações completas e localização</p>
                   </div>
                 </div>
@@ -4759,7 +5235,7 @@ export default function DashboardPage() {
                           </span>
                        </div>
                        <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Tipo de Imóvel</label>
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Tipo de Bem / Item</label>
                           <span className="text-xs font-bold text-slate-700 uppercase">{viewingItem.tipo_imovel || 'RESIDENCIAL'}</span>
                        </div>
                     </div>
@@ -5042,6 +5518,124 @@ export default function DashboardPage() {
                 <button 
                   type="submit"
                   form="change-pwd-form"
+                  disabled={loading}
+                  className="bg-blue-600 border border-blue-700 text-white px-6 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200/50 flex items-center justify-center gap-2 flex-1 max-w-[160px]"
+                >
+                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Salvar'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Meu Perfil Modal */}
+      <AnimatePresence>
+        {isMyProfileOpen && userProfile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl relative overflow-hidden flex flex-col"
+            >
+              <div className="px-8 pt-8 pb-4 border-b border-slate-50 flex items-center justify-between">
+                <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2 uppercase">
+                  <User size={20} className="text-blue-500" />
+                  Meu Perfil
+                </h3>
+                <button onClick={() => setIsMyProfileOpen(false)} className="text-slate-300 hover:text-slate-500"><X size={24} /></button>
+              </div>
+
+              <div className="p-8 space-y-6 text-slate-700 overflow-y-auto max-h-[60vh]">
+                {/* Visual Avatar Card */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-lg">
+                    {userProfile.nome ? userProfile.nome.charAt(0).toUpperCase() : '?'}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-800 leading-tight">{userProfile.nome}</h4>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">
+                      {userProfile.role} • {userProfile.plano || 'Sem Plano'}
+                    </p>
+                  </div>
+                </div>
+
+                <form id="my-profile-form" onSubmit={handleUpdateMyProfile} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">Nome Completo</label>
+                    <input 
+                      type="text"
+                      required
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all text-sm"
+                      placeholder="Nome do usuário"
+                      value={myProfileName}
+                      onChange={(e) => setMyProfileName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block">E-mail</label>
+                    <input 
+                      type="email"
+                      required
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all text-sm"
+                      placeholder="seu@email.com"
+                      value={myProfileEmail}
+                      onChange={(e) => setMyProfileEmail(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block mb-1">CPF</span>
+                      <p className="font-mono text-xs font-bold text-slate-700 bg-slate-50/80 px-3 py-2 rounded-xl border border-slate-100">{userProfile.cpf || 'Sem CPF'}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 block mb-1">Pagamento</span>
+                      <p className="text-xs font-bold text-slate-700 bg-slate-50/80 px-3 py-2 rounded-xl border border-slate-100 uppercase">{userProfile.status_pagamento || 'Sem Plano'}</p>
+                    </div>
+                  </div>
+
+                  {userProfile.trial_ends_at && (
+                    <div className="bg-purple-50 p-4 border border-purple-100/30 rounded-xl flex items-center gap-3">
+                      <Clock size={16} className="text-purple-600" />
+                      <div>
+                        <p className="text-[10px] font-black text-purple-700 uppercase tracking-widest">Período de Acesso Trial</p>
+                        <p className="text-xs text-purple-900 font-bold mt-0.5">Expira em: {new Date(userProfile.trial_ends_at).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                    </div>
+                  )}
+                </form>
+
+                <div className="w-full h-px bg-slate-50" />
+                
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMyProfileOpen(false);
+                      setPwdForm({ current: '', new: '', confirm: '' });
+                      setIsChangePasswordOpen(true);
+                    }}
+                    className="w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold uppercase text-[10px] tracking-widest hover:bg-blue-100 transition-all text-center"
+                  >
+                    Alterar Senha de Acesso
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-8 bg-slate-50 flex items-center justify-end gap-3 rounded-b-[2.5rem]">
+                <button 
+                  type="button"
+                  onClick={() => setIsMyProfileOpen(false)}
+                  className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  form="my-profile-form"
                   disabled={loading}
                   className="bg-blue-600 border border-blue-700 text-white px-6 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200/50 flex items-center justify-center gap-2 flex-1 max-w-[160px]"
                 >

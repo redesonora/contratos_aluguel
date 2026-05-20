@@ -42,7 +42,7 @@ export const ProprietariosTab: React.FC<ProprietariosTabProps> = ({
       <div className="p-4 border-b border-slate-100">
         <input 
           type="text" 
-          placeholder="Buscar proprietário..." 
+          placeholder="Buscar proprietário / cedente..." 
           value={proprietarioSearch}
           onChange={(e) => setProprietarioSearch(e.target.value)}
           className="w-full px-4 py-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -52,7 +52,7 @@ export const ProprietariosTab: React.FC<ProprietariosTabProps> = ({
         <table className="w-full text-left min-w-[600px]">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr className="text-slate-500 text-[10px] uppercase tracking-widest font-black">
-              <SortHeader label="Proprietário" sortKey="nome" activeTab="proprietarios" />
+              <SortHeader label="Proprietário / Cedente" sortKey="nome" activeTab="proprietarios" />
               <SortHeader label="Cidade" sortKey="cidade" activeTab="proprietarios" />
               <th className="px-6 py-4">Contato</th>
               <th className="px-6 py-4 text-right">Ações</th>
@@ -104,7 +104,7 @@ export const ProprietariosTab: React.FC<ProprietariosTabProps> = ({
           ))}
           {paginatedProprietarios.length === 0 && (
             <tr>
-              <td colSpan={4} className="text-center py-20 text-slate-400 font-medium italic">Nenhum proprietário {showArchived ? 'arquivado' : 'cadastrado'}.</td>
+              <td colSpan={4} className="text-center py-20 text-slate-400 font-medium italic">Nenhum proprietário/cedente {showArchived ? 'arquivado' : 'cadastrado'}.</td>
             </tr>
           )}
         </tbody>

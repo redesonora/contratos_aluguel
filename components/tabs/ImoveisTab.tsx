@@ -80,7 +80,7 @@ export const ImoveisTab: React.FC<ImoveisTabProps> = ({
           </span>
           <input 
             type="text"
-            placeholder="Pesquisar endereço, bairro, cep ou apelido..."
+            placeholder="Pesquisar bem / item, endereço, apelido..."
             value={imovelSearch}
             onChange={(e) => setImovelSearch(e.target.value)}
             className="pl-8 pr-4 py-2 border-2 border-slate-100 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-400 transition-all w-full bg-white"
@@ -126,7 +126,7 @@ export const ImoveisTab: React.FC<ImoveisTabProps> = ({
           <table className="w-full text-left min-w-[600px]">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr className="text-slate-500 text-[10px] uppercase tracking-widest font-black">
-                <SortHeader label="Imóvel / Endereço" sortKey="endereco" activeTab="imoveis" />
+                <SortHeader label="Bem / Item / Endereço" sortKey="endereco" activeTab="imoveis" />
                 <SortHeader label="Bairro" sortKey="bairro" activeTab="imoveis" />
                 <SortHeader label="Tipo" sortKey="tipo_imovel" activeTab="imoveis" />
                 <th className="px-6 py-4">Status</th>
@@ -219,7 +219,7 @@ export const ImoveisTab: React.FC<ImoveisTabProps> = ({
             </AnimatePresence>
             {paginatedImoveis.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center py-20 text-slate-400 font-medium italic">Nenhum imóvel {showArchived ? 'arquivado' : 'cadastrado'}.</td>
+                <td colSpan={5} className="text-center py-20 text-slate-400 font-medium italic">Nenhum bem/item {showArchived ? 'arquivado' : 'cadastrado'}.</td>
               </tr>
             )}
           </tbody>
