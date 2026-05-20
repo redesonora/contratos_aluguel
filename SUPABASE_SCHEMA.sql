@@ -295,11 +295,11 @@ BEGIN
     DELETE FROM public.audit_logs WHERE user_id = p_user_id;
     DELETE FROM public.contract_templates WHERE user_id = p_user_id;
     
-    UPDATE public.proprietarios SET user_id = auth.uid() WHERE user_id = p_user_id;
-    UPDATE public.inquilinos SET user_id = auth.uid() WHERE user_id = p_user_id;
-    UPDATE public.imoveis SET user_id = auth.uid() WHERE user_id = p_user_id;
-    UPDATE public.contratos SET user_id = auth.uid() WHERE user_id = p_user_id;
-    UPDATE public.pagamentos SET user_id = auth.uid() WHERE user_id = p_user_id;
+    DELETE FROM public.pagamentos WHERE user_id = p_user_id;
+    DELETE FROM public.contratos WHERE user_id = p_user_id;
+    DELETE FROM public.imoveis WHERE user_id = p_user_id;
+    DELETE FROM public.inquilinos WHERE user_id = p_user_id;
+    DELETE FROM public.proprietarios WHERE user_id = p_user_id;
 
     -- Update referencias à proprietario_id/inquilino_id caso esse usuario deletado os possuia?
     -- Como a exclusão é do user logado e não do proprietário de negócio... 
