@@ -110,6 +110,7 @@ import { PagamentosTab } from '../components/tabs/PagamentosTab';
 import { LogsTab } from '../components/tabs/LogsTab';
 import { UsuariosTab } from '../components/tabs/UsuariosTab';
 import { ConfiguracoesTab } from '../components/tabs/ConfiguracoesTab';
+import { LandingPage } from './components/LandingPage';
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -182,6 +183,7 @@ export default function DashboardPage() {
     inquilinos: 1
   });
   const [authTab, setAuthTab] = useState<'login' | 'register' | 'recover'>('login');
+  const [showAuth, setShowAuth] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [activeEditorDropdown, setActiveEditorDropdown] = useState<'size' | 'color' | null>(null);
   const [clausulasHtml, setClausulasHtml] = useState('');
@@ -1444,11 +1446,11 @@ export default function DashboardPage() {
     if (type === 'VENCIMENTO') {
       subject = `AVISO: Vencimento de Contrato de Locação - ${enderecoImovel}`;
       const dataFim = new Date(contrato.data_fim + 'T00:00:00').toLocaleDateString('pt-BR');
-      body = `Olá, ${nomeInquilino}.\n\nGostaríamos de informar que seu contrato de locação do imóvel em ${enderecoImovel} está próximo do vencimento em ${dataFim}.\n\nPor favor, entre em contato conosco para discutirmos a renovação ou os próximos passos.\n\nAtenciosamente,\nGestão Imobiliária`;
+      body = `Olá, ${nomeInquilino}.\n\nGostaríamos de informar que seu contrato de locação do imóvel em ${enderecoImovel} está próximo do vencimento em ${dataFim}.\n\nPor favor, entre em contato conosco para discutirmos a renovação ou os próximos passos.\n\nAtenciosamente,\nGestão de Contratos`;
     } else {
       subject = `AVISO: Pendência Financeira / Aluguel em Aberto - ${enderecoImovel}`;
       const dataVenc = nextDueDate ? nextDueDate.toLocaleDateString('pt-BR') : `dia ${contrato.dia_vencimento}`;
-      body = `Olá, ${nomeInquilino}.\n\nIdentificamos que o pagamento do aluguel referente ao imóvel em ${enderecoImovel}, com vencimento em ${dataVenc}, ainda não consta em nosso sistema.\n\nCaso o pagamento já tenha sido realizado, por favor desconsidere este e-mail e nos envie o comprovante para regularização.\n\nAtenciosamente,\nGestão Imobiliária`;
+      body = `Olá, ${nomeInquilino}.\n\nIdentificamos que o pagamento do aluguel referente ao imóvel em ${enderecoImovel}, com vencimento em ${dataVenc}, ainda não consta em nosso sistema.\n\nCaso o pagamento já tenha sido realizado, por favor desconsidere este e-mail e nos envie o comprovante para regularização.\n\nAtenciosamente,\nGestão de Contratos`;
     }
 
     const mailtoUrl = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -1632,19 +1634,38 @@ export default function DashboardPage() {
         if (contract) {
           imovelIdToRelease = contract.imovel_id;
           
-          console.log(`Limpando parcelas do contrato ${itemToDelete.id} para o usuário ${session.user.id}`);
-          // Recomenda-se que a tabela pagamentos tenha user_id para facilitar o RLS, 
-          // ou que o RLS seja baseado no contrato.
-          const { error: prepayError } = await supabase
-            .from('pagamentos')
-            .delete()
+          await supabase.from('pagamentos').delete()
             .eq('contrato_id', itemToDelete.id)
             .eq('user_id', session.user.id);
-            
-          if (prepayError) {
-            console.error('Erro ao limpar pagamentos:', prepayError);
-            throw prepayError;
-          }
+        }
+      } 
+      else if (itemToDelete.type === 'imoveis') {
+        // Cascade: Excluir todos os contratos e seus pagamentos deste imóvel
+        const conts = contratos.filter(c => c.imovel_id === itemToDelete.id);
+        for (const c of conts) {
+          await supabase.from('pagamentos').delete().eq('contrato_id', c.id).eq('user_id', session.user.id);
+          await supabase.from('contratos').delete().eq('id', c.id).eq('user_id', session.user.id);
+        }
+      }
+      else if (itemToDelete.type === 'inquilinos') {
+        // Cascade: Excluir todos os contratos deste inquilino
+        const conts = contratos.filter(c => c.inquilino_id === itemToDelete.id);
+        for (const c of conts) {
+          await supabase.from('pagamentos').delete().eq('contrato_id', c.id).eq('user_id', session.user.id);
+          await supabase.from('contratos').delete().eq('id', c.id).eq('user_id', session.user.id);
+        }
+      }
+      else if (itemToDelete.type === 'proprietarios') {
+        // Cascade: Excluir todos os contratos ligados ao proprietario
+        const conts = contratos.filter(c => c.proprietario_id === itemToDelete.id);
+        for (const c of conts) {
+          await supabase.from('pagamentos').delete().eq('contrato_id', c.id).eq('user_id', session.user.id);
+          await supabase.from('contratos').delete().eq('id', c.id).eq('user_id', session.user.id);
+        }
+        // Excluir imoveis que pertecem ao proprietário
+        const imvs = imoveis.filter(im => im.proprietario_id === itemToDelete.id);
+        for (const im of imvs) {
+          await supabase.from('imoveis').delete().eq('id', im.id).eq('user_id', session.user.id);
         }
       }
 
@@ -1658,23 +1679,18 @@ export default function DashboardPage() {
       
       if (error) {
         if (error.code === '23503') {
-          // Identify relation
           let relation = 'registros vinculados';
           if (itemToDelete.type === 'imoveis') relation = 'contratos ativos ou histórico';
           if (itemToDelete.type === 'inquilinos') relation = 'contratos ativos';
           if (itemToDelete.type === 'proprietarios') relation = 'imóveis ou contratos';
-          
-          throw new Error(`Não é possível excluir este registro pois existem ${relation}. Exclua primeiro os dados dependentes.`);
+          throw new Error(`Não foi possível excluir completamente. Restam vínculos no banco remoto. Detalhes: ${error.message}`);
         }
         throw error;
       }
 
       if (count === 0) {
-        console.warn(`Tentativa de exclusão falhou: Nenhum registro de ${itemToDelete.type} com ID ${itemToDelete.id} foi encontrado ou você não tem permissão.`);
-        throw new Error("O registro não pôde ser excluído do banco de dados. Verifique se você tem permissões de exclusão para este item.");
+        throw new Error("O registro não pôde ser excluído do banco de dados (não encontrado ou sem permissão).");
       }
-
-      console.log(`Deleção concluída com sucesso: ${itemToDelete.type} ${itemToDelete.id}. Registros afetados: ${count}`);
 
       await recordLog('EXCLUIR', itemToDelete.type, itemToDelete.id);
       
@@ -3486,8 +3502,30 @@ export default function DashboardPage() {
   }
 
   if (!session) {
+    if (!showAuth) {
+      return (
+        <LandingPage 
+          onLogin={() => {
+            setAuthTab('login');
+            setShowAuth(true);
+          }}
+          onRegister={() => {
+            setAuthTab('register');
+            setShowAuth(true);
+          }}
+        />
+      );
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative">
+        <button 
+          onClick={() => setShowAuth(false)}
+          className="absolute top-6 left-6 text-slate-500 hover:text-slate-700 font-black text-[11px] uppercase tracking-widest flex items-center gap-2 transition-colors z-50 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200"
+        >
+          ← Voltar ao Início
+        </button>
+
         {registeredEmailWelcome && (
           <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
             <motion.div 
