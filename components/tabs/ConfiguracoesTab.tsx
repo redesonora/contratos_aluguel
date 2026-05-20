@@ -16,7 +16,8 @@ import {
   Hash,
   ShieldAlert,
   Building,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { RichEditor } from '../RichEditor';
 import { TagItem } from '../TagItem';
@@ -43,6 +44,82 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
   const [activeDropdown, setActiveDropdown] = useState<'size' | 'color' | null>(null);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // States para Elaboração de Modelo com IA
+  const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
+  const [contractType, setContractType] = useState('Contrato de Locação Residencial');
+  const [customType, setCustomType] = useState('');
+  const [contractRulesPrompt, setContractRulesPrompt] = useState('');
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  const handleGenerateAiTemplate = async () => {
+    const finalType = contractType === 'Outro' ? customType : contractType;
+    if (!finalType.trim()) {
+      setGenerationError("Por favor, informe o tipo de contrato.");
+      return;
+    }
+
+    setIsAiGenerating(true);
+    setGenerationError(null);
+
+    try {
+      const response = await fetch('/api/contracts/generate-template', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tipo: finalType,
+          detalhes: contractRulesPrompt,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao conectar-se à IA de contratos.");
+      }
+
+      const generatedContent = data.content;
+
+      // Criar id único
+      const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+
+      const newTemplate = {
+        id: newId,
+        name: `🤖 [IA] ${finalType}`,
+        content: generatedContent,
+      };
+
+      const updatedTemplates = [...contractTemplates, newTemplate];
+      setContractTemplates(updatedTemplates);
+      setSelectedTemplateId(newId);
+      setIsPromptModalOpen(false);
+      
+      // Limpa os prompts para a próxima
+      setContractRulesPrompt("");
+      setCustomType("");
+      
+      // Se tiver callback de salvar, chama automaticamente para persistir no Supabase!
+      if (onSave) {
+        try {
+          await onSave(updatedTemplates);
+        } catch (saveErr) {
+          console.error("Erro ao persistir o modelo gerado pela IA no servidor:", saveErr);
+        }
+      }
+    } catch (err: any) {
+      console.error("Erro durante a elaboração de modelo com IA:", err);
+      setGenerationError(err.message || "Não foi possível elaborar o modelo com assistência de IA. Tente novamente.");
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
 
   const selectedTemplate = contractTemplates.find(t => t.id === selectedTemplateId) || contractTemplates[0];
   const selectedIndex = contractTemplates.findIndex(t => t.id === (selectedTemplateId || contractTemplates[0]?.id));
@@ -211,13 +288,22 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Edite seus modelos e utilize tags para preenchimento automático.</p>
              </div>
           </div>
-          <button 
-            onClick={handleAddTemplate}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95"
-          >
-            <PlusCircle size={14} />
-            Novo Modelo
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <button 
+              onClick={() => setIsPromptModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95"
+            >
+              <Sparkles size={14} />
+              Elaborar com IA
+            </button>
+            <button 
+              onClick={handleAddTemplate}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95"
+            >
+              <PlusCircle size={14} />
+              Novo Modelo
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6 bg-slate-50 p-6 rounded-[2.5rem] border border-slate-200">
@@ -462,6 +548,109 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
                  className="px-8 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all"
                >
                  Fechar Guia
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Contract Model Maker Modal */}
+      {isPromptModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => !isAiGenerating && setIsPromptModalOpen(false)} />
+          <div className="relative bg-white w-full max-w-2xl max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden border border-white flex flex-col motion-safe:animate-in motion-safe:zoom-in-95 duration-200">
+            <div className="p-8 border-b border-slate-100 bg-white flex justify-between items-center">
+               <div className="flex items-center gap-4">
+                 <div className="p-3 bg-indigo-100 text-indigo-600 rounded-2xl shadow-lg shadow-indigo-50">
+                   <Sparkles size={24} />
+                 </div>
+                 <div>
+                    <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase italic flex items-center gap-2">Elaborar Modelo com IA</h2>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">Escreva as diretrizes e a Inteligência Artificial criará um modelo estruturado com tags automáticas.</p>
+                 </div>
+               </div>
+               <button onClick={() => !isAiGenerating && setIsPromptModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all">
+                 <X size={24} className="text-slate-400" />
+               </button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto flex-1 space-y-6 custom-scrollbar bg-slate-50/55">
+               <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1">Tipo de Contrato</label>
+                 <select 
+                   value={contractType}
+                   onChange={(e) => setContractType(e.target.value)}
+                   className="w-full bg-white border-2 border-slate-100 focus:border-indigo-400 outline-none rounded-2xl px-4 py-3 font-bold text-sm transition-all"
+                 >
+                   <option value="Contrato de Locação Residencial">Contrato de Locação Residencial</option>
+                   <option value="Contrato de Locação Comercial">Contrato de Locação Comercial</option>
+                   <option value="Contrato de Compra e Venda de Imóvel">Contrato de Compra e Venda de Imóvel</option>
+                   <option value="Contrato de Locação por Temporada">Contrato de Locação por Temporada</option>
+                   <option value="Outro">Outro (Digitar personalizado...)</option>
+                 </select>
+               </div>
+
+               {contractType === 'Outro' && (
+                 <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1">Digite o Nome do Tipo de Contrato</label>
+                   <input 
+                     type="text"
+                     placeholder="Ex: Contrato de Comodato de Imóvel"
+                     value={customType}
+                     onChange={(e) => setCustomType(e.target.value)}
+                     className="w-full bg-white border-2 border-slate-100 focus:border-indigo-400 outline-none rounded-2xl px-4 py-3 font-bold text-sm transition-all"
+                   />
+                 </div>
+               )}
+
+               <div className="space-y-2">
+                 <div className="flex justify-between items-center ml-1">
+                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Exigências, Cláusulas e Regras Especiais</label>
+                   <span className="text-[9px] text-slate-400 font-bold uppercase">Cláusulas Personalizadas</span>
+                 </div>
+                 <textarea 
+                   rows={5}
+                   placeholder="Ex: Reajuste anual pelo IPCA, prazo de 30 meses, proibir animais domésticos, multa rescisória proporcional de 3 aluguéis, solicitar caução de 3 meses como garantia..."
+                   value={contractRulesPrompt}
+                   onChange={(e) => setContractRulesPrompt(e.target.value)}
+                   className="w-full bg-white border-2 border-slate-100 focus:border-indigo-400 outline-none rounded-2xl px-4 py-3 font-bold text-sm transition-all resize-none leading-relaxed"
+                 />
+                 <p className="text-[10px] text-slate-400 font-bold leading-normal ml-1 bg-slate-100/50 p-3 rounded-xl border border-slate-200/50">
+                   💡 <strong className="text-slate-600">Dica da IA:</strong> Você pode descrever de forma livre. A IA irá incluir automaticamente as seções jurídicas padrão e inserir as tags dinâmicas como <code className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-black text-[9px]">{"{{locador_nome}}"}</code>, <code className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-black text-[9px]">{"{{valor_aluguel}}"}</code> etc., nos campos corretos para que sejam substituídos automaticamente ao emitir um contrato real!
+                 </p>
+               </div>
+
+               {generationError && (
+                 <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-xs rounded-2xl font-semibold">
+                   ⚠️ {generationError}
+                 </div>
+               )}
+            </div>
+            
+            <div className="p-8 bg-white border-t border-slate-100 flex justify-between items-center">
+               <button 
+                 onClick={() => setIsPromptModalOpen(false)}
+                 disabled={isAiGenerating}
+                 className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
+               >
+                 Cancelar
+               </button>
+               <button 
+                 onClick={handleGenerateAiTemplate}
+                 disabled={isAiGenerating}
+                 className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 disabled:opacity-50"
+               >
+                 {isAiGenerating ? (
+                   <>
+                     <Loader2 className="animate-spin" size={14} />
+                     Elaborando com IA...
+                   </>
+                 ) : (
+                   <>
+                     <Sparkles size={14} />
+                     Elaborar Contrato
+                   </>
+                 )}
                </button>
             </div>
           </div>
