@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, useScroll, useTransform } from 'motion/react';
-import { Home, ShieldCheck, Zap, LineChart, FileText, ChevronRight, CheckCircle2, TrendingUp, Building, MessageCircle, Gift, BookOpen, Users } from 'lucide-react';
+import { Home, ShieldCheck, Zap, LineChart, FileText, ChevronRight, CheckCircle2, TrendingUp, Building, MessageCircle, Gift, BookOpen, Users, Database, Building2, Wrench, Car } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 interface LandingPageProps {
@@ -43,6 +43,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           </div>
           <div className="hidden md:flex items-center gap-8">
             <a href="#recursos" className="text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors uppercase tracking-widest">Recursos</a>
+            <a href="#planos" className="text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors uppercase tracking-widest">Planos</a>
             <a href="#afiliados" className="text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors uppercase tracking-widest">Afiliados</a>
             <a href="#blog" className="text-sm font-bold text-slate-500 hover:text-blue-600 transition-colors uppercase tracking-widest">Blog</a>
             <div className="h-6 w-[2px] bg-slate-200"></div>
@@ -71,23 +72,12 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             transition={{ duration: 0.8, ease: "easeOut" }}
             className="flex flex-col gap-8 items-start"
           >
-            <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-600 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">
-              <span className="flex h-2 w-2 relative">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-              </span>
-              O Padrão Ouro em Gestão de Contratos
-            </div>
-            
             <h1 className="text-5xl lg:text-7xl font-black text-slate-900 tracking-tighter leading-[1.05]">
-              Gestão de Contratos <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500">
-                Sem Complicações.
-              </span>
+              Controle suas locações de ponta a ponta sem planilhas bagunçadas.
             </h1>
             
             <p className="text-lg text-slate-500 font-medium leading-relaxed max-w-xl">
-              Automatize cobranças, gerencie dezenas de contratos, e tenha total controle com métricas preditivas que projetam sua receita futura.
+              Crie contratos digitais, gerencie valores a pagar e envie recibos automáticos para locação de imóveis, ferramentas e carros. Tudo em um só lugar.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mt-4">
@@ -95,23 +85,9 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 onClick={onRegister}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-2xl shadow-blue-200 hover:shadow-blue-300 transition-all active:scale-95 flex items-center justify-center gap-3 group"
               >
-                Crie sua conta agora
+                Experimentar Sistema Grátis
                 <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
               </button>
-            </div>
-            
-            <div className="flex items-center gap-6 mt-6">
-              <div className="flex -space-x-4">
-                {[1,2,3,4].map(i => (
-                  <div key={i} className={`w-10 h-10 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center overflow-hidden z-[${4-i}]`} style={{ zIndex: 4-i }}>
-                    <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" />
-                  </div>
-                ))}
-              </div>
-              <div className="text-xs font-bold text-slate-500">
-                <span className="text-slate-800 font-black block text-sm">Mais de 500+</span>
-                empresas confiam
-              </div>
             </div>
           </motion.div>
 
@@ -119,8 +95,8 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             style={{ y: y1 }}
             className="relative hidden lg:block"
           >
-            <div className="absolute inset-0 bg-gradient-to-tr from-blue-100 to-emerald-50 rounded-[3rem] transform rotate-3 scale-105 -z-10 blur-xl opacity-70"></div>
-            <div className="bg-white border-2 border-slate-100 p-8 rounded-[3rem] shadow-2xl flex flex-col gap-6 relative z-10 hover:border-blue-200 transition-colors duration-500">
+            <div className="absolute inset-0 bg-gradient-to-tr from-blue-100 to-emerald-50 rounded-[3rem] transform rotate-3 scale-105 -z-10 blur-xl opacity-70 animate-pulse duration-[8s]"></div>
+            <div className="bg-white border-2 border-slate-150 p-8 rounded-[3rem] shadow-2xl flex flex-col gap-6 relative z-10 hover:border-blue-200 transition-colors duration-500">
               <div className="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
@@ -128,7 +104,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   </div>
                   <div>
                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Receita Prevista</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Até Setembro</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Próximos Meses</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -161,45 +137,200 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                    <div className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mt-1">Saudabilidade</div>
                 </div>
               </div>
-
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Features */}
-      <section id="recursos" className="py-24 bg-white border-y border-slate-100">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tighter mb-6">Tudo que você precisa em um só lugar.</h2>
-            <p className="text-slate-500 font-medium">Deixe as planilhas no passado. Nossa plataforma consolida contratos, financeiro e métricas avançadas num fluxo de trabalho inteligente.</p>
-          </div>
+      {/* Trust Elements */}
+      <section className="bg-white py-16 border-y border-slate-100">
+        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-3 gap-10">
+          {[
+            { icon: ShieldCheck, title: "Ambiente 100% Seguro", desc: "Dados criptografados e armazenados com segurança." },
+            { icon: Database, title: "Backup Diário Automático", desc: "Suas informações e contratos sempre salvos e protegidos." },
+            { icon: MessageCircle, title: "Suporte Humanizado", desc: "Atendimento via WhatsApp para tirar suas dúvidas sempre que precisar." }
+          ].map((item, i) => (
+            <div key={i} className="flex flex-col items-center text-center gap-4">
+              <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl">
+                <item.icon size={32} />
+              </div>
+              <h3 className="font-black text-lg tracking-tight">{item.title}</h3>
+              <p className="text-sm text-slate-500">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
+      {/* Features - Niches */}
+      <section id="recursos" className="py-24 bg-slate-50 border-y border-slate-100">
+        <div className="max-w-7xl mx-auto px-6">
+          <h2 className="text-4xl font-black text-slate-900 tracking-tighter text-center mb-16">Específico para o seu negócio</h2>
           <div className="grid md:grid-cols-3 gap-8">
             <FeatureCard 
-              icon={<FileText size={32} />}
-              title="Geração de Contratos"
-              desc="Gere contratos em PDF automaticamente usando templates personalizáveis com a sua marca e dados preenchidos na hora."
+              icon={<Building2 size={32} />}
+              title="Para Imóveis"
+              desc="Controle o vencimento do aluguel de inquilinos, reajustes e gere recibos de quitação sem complicações."
               color="text-blue-600"
               bg="bg-blue-50"
               border="border-blue-100"
             />
             <FeatureCard 
-              icon={<LineChart size={32} />}
-              title="Previsibilidade Financeira"
-              desc="Acompanhe gráficos preditivos de receitas, taxas de inadimplência e projeções financeiras automatizadas para seu negócio escalável."
-              color="text-emerald-600"
-              bg="bg-emerald-50"
-              border="border-emerald-100"
-            />
-            <FeatureCard 
-              icon={<Zap size={32} />}
-              title="Automação Inteligente"
-              desc="Disparo de lembretes, reajustes automáticos pelo IPCA e validação inteligente de pagamentos para não gerar atritos."
+              icon={<Wrench size={32} />}
+              title="Para Ferramentas"
+              desc="Monitore o prazo de devolução de maquinários e cobre diárias ou períodos com precisão."
               color="text-amber-600"
               bg="bg-amber-50"
               border="border-amber-100"
             />
+            <FeatureCard 
+              icon={<Car size={32} />}
+              title="Para Carros e Frotas"
+              desc="Gerencie as parcelas de motoristas de aplicativo e acompanhe o fluxo financeiro semanal ou mensal."
+              color="text-emerald-600"
+              bg="bg-emerald-50"
+              border="border-emerald-100"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing / Planos */}
+      <section id="planos" className="py-24 bg-white border-b border-slate-100 relative">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
+            <h2 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tighter leading-tight">
+              Planos Amigáveis que Crescem com Você
+            </h2>
+            <p className="text-slate-500 font-medium text-lg leading-relaxed">
+              Precificação justa baseada no número de contratos ativos que você gerencia. Sem tarifas ocultas, cancele quando quiser.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {/* Gratuito */}
+            <div className="bg-slate-50 border-2 border-slate-100 p-8 rounded-[2.5rem] flex flex-col justify-between hover:border-blue-200 transition-all group hover:bg-white hover:shadow-xl hover:shadow-slate-100">
+              <div>
+                <span className="text-[10px] font-black tracking-widest uppercase text-slate-400 bg-slate-200/50 group-hover:bg-slate-100 px-3 py-1.5 rounded-full inline-block mb-6">Freemium</span>
+                <h3 className="text-2xl font-black text-slate-800 mb-2">Gratuito</h3>
+                <p className="text-xs text-slate-500 font-medium mb-6">Perfeito para locadores iniciantes testarem o sistema sem burocracia.</p>
+                <div className="mb-6 flex items-baseline gap-1">
+                  <span className="text-4xl font-black text-slate-800">R$ 0</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ sempre</span>
+                </div>
+                <div className="h-[2px] bg-slate-100 mb-6"></div>
+                <ul className="space-y-3 mb-8">
+                  <li className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Até <strong>1 contrato ativo</strong>
+                  </li>
+                  <li className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Gestão Geral de Ativos
+                  </li>
+                  <li className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Envio de Recibos Básicos
+                  </li>
+                </ul>
+              </div>
+              <button onClick={onRegister} className="w-full py-3.5 bg-slate-200 hover:bg-blue-600 hover:text-white text-slate-750 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all">
+                Começar Grátis
+              </button>
+            </div>
+
+            {/* Iniciante */}
+            <div className="bg-slate-50 border-2 border-slate-100 p-8 rounded-[2.5rem] flex flex-col justify-between hover:border-blue-200 transition-all group hover:bg-white hover:shadow-xl hover:shadow-slate-100">
+              <div>
+                <span className="text-[10px] font-black tracking-widest uppercase text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full inline-block mb-6">Autônomo</span>
+                <h3 className="text-2xl font-black text-slate-800 mb-2">Iniciante</h3>
+                <p className="text-xs text-slate-500 font-medium mb-6">Ideal para proprietários de bens ou imóveis autônomos.</p>
+                <div className="mb-6 flex items-baseline gap-1">
+                  <span className="text-4xl font-black text-slate-800">R$ 49,90</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
+                </div>
+                <div className="h-[2px] bg-slate-100 mb-6"></div>
+                <ul className="space-y-3 mb-8">
+                  <li className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Até <strong>10 contratos ativos</strong>
+                  </li>
+                  <li className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Contratos e Recibos Extras
+                  </li>
+                  <li className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Notificações Avançadas
+                  </li>
+                </ul>
+              </div>
+              <button onClick={onRegister} className="w-full py-3.5 bg-blue-600 text-white hover:bg-blue-700 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-100">
+                Escolher Iniciante
+              </button>
+            </div>
+
+            {/* Profissional */}
+            <div className="bg-white border-2 border-blue-600 relative p-8 rounded-[2.5rem] flex flex-col justify-between transition-all group shadow-xl shadow-blue-50 hover:shadow-blue-100">
+              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-600 text-white text-[9px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">Excelente Custo-Benefício</div>
+              <div>
+                <span className="text-[10px] font-black tracking-widest uppercase text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full inline-block mb-6 text-center w-full">Mais Vendido 🏆</span>
+                <h3 className="text-2xl font-black text-slate-800 mb-2">Profissional</h3>
+                <p className="text-xs text-slate-500 font-medium mb-6">Indicado para imobiliárias, corretores e locadoras em expansão.</p>
+                <div className="mb-6 flex items-baseline gap-1">
+                  <span className="text-4xl font-black text-slate-800">R$ 99,90</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
+                </div>
+                <div className="h-[2px] bg-indigo-50 mb-6"></div>
+                <ul className="space-y-3 mb-8">
+                  <li className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Até <strong>50 contratos ativos</strong>
+                  </li>
+                  <li className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Assistente IA de Contratos 🤖
+                  </li>
+                  <li className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Notificações automáticas WhatsApp
+                  </li>
+                </ul>
+              </div>
+              <button onClick={onRegister} className="w-full py-3.5 bg-blue-600 text-white hover:bg-blue-700 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-200">
+                Começar Profissional
+              </button>
+            </div>
+
+            {/* Ilimitado */}
+            <div className="bg-slate-50 border-2 border-slate-100 p-8 rounded-[2.5rem] flex flex-col justify-between hover:border-blue-200 transition-all group hover:bg-white hover:shadow-xl hover:shadow-slate-100">
+              <div>
+                <span className="text-[10px] font-black tracking-widest uppercase text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full inline-block mb-6">Corporativo</span>
+                <h3 className="text-2xl font-black text-slate-800 mb-2">Ilimitado</h3>
+                <p className="text-xs text-slate-500 font-medium mb-6">Para grandes locadoras de frotas e incorporadoras comerciais.</p>
+                <div className="mb-6 flex items-baseline gap-1">
+                  <span className="text-4xl font-black text-slate-800">R$ 199,90</span>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
+                </div>
+                <div className="h-[2px] bg-slate-100 mb-6"></div>
+                <ul className="space-y-3 mb-8">
+                  <li className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Contratos <strong>Ilimitados</strong>
+                  </li>
+                  <li className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Painel Multi-Usuários Ilimitados
+                  </li>
+                  <li className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
+                    Suporte e Implantação VIP
+                  </li>
+                </ul>
+              </div>
+              <button onClick={onRegister} className="w-full py-3.5 bg-slate-900 text-white hover:bg-slate-800 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all">
+                Falar c/ Especialista
+              </button>
+            </div>
           </div>
         </div>
       </section>

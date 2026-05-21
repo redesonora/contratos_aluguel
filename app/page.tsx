@@ -628,10 +628,29 @@ export default function DashboardPage() {
           if (insertError) {
             console.error('Erro ao inserir novo perfil:', JSON.stringify(insertError));
             
+            // Tratamento explícito para chave duplicada (concorrência)
+            if (insertError.code === '23505') {
+              const { data: refetchedData } = await supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle();
+              if (refetchedData) {
+                setUserProfile(refetchedData);
+                return;
+              }
+            }
+            
             // Se falhou por causa de coluna esquecida (PGRST204 ou 42703), tentamos o base
             if (insertError.code === 'PGRST204' || insertError.code === '42703' || insertError.message?.toLowerCase().includes('email')) {
               const { error: retryError } = await supabase.from('user_profiles').insert(newProfileBase);
-              if (retryError) throw retryError;
+              
+              if (retryError) {
+                if (retryError.code === '23505') {
+                  const { data: refetchedData } = await supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle();
+                  if (refetchedData) {
+                    setUserProfile(refetchedData);
+                    return;
+                  }
+                }
+                throw retryError;
+              }
               
               // Se deu certo o retry, buscamos os dados (mesmo parciais)
               const { data: retryData } = await supabase.from('user_profiles').select('*').eq('id', userId).maybeSingle();
@@ -3038,7 +3057,31 @@ export default function DashboardPage() {
         }
       } else {
         // Insert logic
+        const userPlanLimits: {[key: string]: number} = {
+          'Nenhum': 1, // Default / Freemium
+          'Iniciante': 10,
+          'Profissional': 50,
+          'Ilimitado': Infinity
+        };
+        const userPlan = userProfile?.plano || 'Nenhum';
+        // Perfis administrativos (MASTER e ADMIN) possuem limites ilimitados
+        const isUnlimitedUser = userProfile?.role === 'MASTER' || userProfile?.role === 'ADMIN';
+        
+        // Se o usuário tiver um trial_ends_at configurado e a data atual for menor, ele está no Free Trial de 7 dias
+        const isTrialActive = userProfile?.trial_ends_at && new Date(userProfile.trial_ends_at) > new Date();
+        
+        // Se estiver no trial e no plano inicial (Nenhum/Trial), damos o limite do plano Profissional (50) para ele poder testar os recursos ricos e IA
+        const effectivePlan = (isTrialActive && (userPlan === 'Nenhum' || userPlan === 'Trial' || !userPlan)) ? 'Profissional' : userPlan;
+        
+        const limit = isUnlimitedUser ? Infinity : (userPlanLimits[effectivePlan] || 1);
+        const planDisplayName = isTrialActive && (userPlan === 'Nenhum' || userPlan === 'Trial' || !userPlan) ? 'Teste Grátis (Profissional)' : userPlan;
+
         if (activeTab === 'imoveis') {
+          const activeImoveisCount = imoveis.filter(i => !i.arquivado).length;
+          if (activeImoveisCount >= limit) {
+            throw new Error(`Você atingiu o limite de ${limit} bens/itens ativos do seu plano (${planDisplayName}). Faça upgrade para continuar.`);
+          }
+
           const payload = { 
             apelido: rawData.apelido,
             endereco: rawData.endereco,
@@ -3059,6 +3102,11 @@ export default function DashboardPage() {
           const { error: err } = await supabase.from('imoveis').insert([payload]);
           dbError = err;
         } else if (activeTab === 'inquilinos') {
+          const activeInquilinosCount = inquilinos.filter(i => !i.arquivado).length;
+          if (activeInquilinosCount >= limit) {
+            throw new Error(`Você atingiu o limite de ${limit} locatários/clientes ativos do seu plano (${planDisplayName}). Faça upgrade para continuar.`);
+          }
+
           const payload: any = { 
             nome: rawData.nome,
             cpf_cnpj: rawData.cpf_cnpj || null,
@@ -3103,6 +3151,11 @@ export default function DashboardPage() {
 
           dbError = err;
         } else if (activeTab === 'proprietarios') {
+          const activeProprietariosCount = proprietarios.filter(p => !p.arquivado).length;
+          if (activeProprietariosCount >= limit) {
+            throw new Error(`Você atingiu o limite de ${limit} cedentes/proprietários ativos do seu plano (${planDisplayName}). Faça upgrade para continuar.`);
+          }
+
           const { error: err } = await supabase.from('proprietarios').insert([{ 
             nome: rawData.nome,
             cpf_cnpj: rawData.cpf_cnpj,
@@ -3120,6 +3173,14 @@ export default function DashboardPage() {
         } else if (activeTab === 'contratos') {
           // Check if property is already rented before creating a NEW contract
           if (!editingItem) {
+            
+            // Tiered Pricing Plan Limit Check
+            const activeContractCount = contratos.filter(c => !c.arquivado).length;
+            
+            if (activeContractCount >= limit) {
+              throw new Error(`Você atingiu o limite de ${limit} contratos ativos do seu plano (${planDisplayName}). Faça upgrade para continuar.`);
+            }
+
             // First check by property status (fast)
             const { data: checkImovel } = await supabase
               .from('imoveis')
@@ -5651,7 +5712,7 @@ export default function DashboardPage() {
                   <div>
                     <h4 className="font-bold text-slate-800 leading-tight">{userProfile.nome}</h4>
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">
-                      {userProfile.role} • {userProfile.plano || 'Sem Plano'}
+                      {userProfile.role} • {userProfile.trial_ends_at && new Date(userProfile.trial_ends_at) > new Date() && (userProfile.plano === 'Nenhum' || userProfile.plano === 'Trial' || !userProfile.plano) ? 'Teste Grátis (Profissional)' : (userProfile.plano || 'Sem Plano')}
                     </p>
                   </div>
                 </div>
