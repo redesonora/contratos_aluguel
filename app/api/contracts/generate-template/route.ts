@@ -1,15 +1,27 @@
 import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
 
-// Instancia o cliente Gemini no servidor seguindo o padrão recomendado.
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
+// Função para inicialização tardia (lazy initialization) do cliente Gemini.
+// Isso evita erros ao carregar a rota quando a chave não está definida
+// e nos permite retornar uma mensagem de erro amigável ao usuário.
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey.trim() === "") {
+    throw new Error(
+      "A variável de ambiente GEMINI_API_KEY não foi encontrada ou está vazia no servidor. " +
+      "Por favor, configure a chave de API do Gemini (GEMINI_API_KEY) nas variáveis de ambiente " +
+      "do seu projeto de publicação (ex: painel do Vercel nas configurações de Environment Variables)."
+    );
   }
-});
+  return new GoogleGenAI({
+    apiKey: apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      }
+    }
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,6 +29,14 @@ export async function POST(req: NextRequest) {
 
     if (!tipo) {
       return NextResponse.json({ error: "É necessário informar o tipo de contrato." }, { status: 400 });
+    }
+
+    // Inicializa o cliente Gemini de forma segura
+    let ai;
+    try {
+      ai = getGeminiClient();
+    } catch (initError: any) {
+      return NextResponse.json({ error: initError.message }, { status: 401 });
     }
 
     const systemInstruction = `Você é um advogado especialista em direito imobiliário brasileiro e elaborador de contratos de alto nível.
