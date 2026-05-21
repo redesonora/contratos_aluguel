@@ -12,6 +12,7 @@
     "@google/genai": "^2.5.0",
     "@supabase/supabase-js": "^2.45.4",
     "@tailwindcss/postcss": "^4.3.0",
+    "@vercel/analytics": "^2.0.1",
     "clsx": "^2.1.1",
     "extenso": "^2.1.0",
     "jspdf": "^4.2.1",
