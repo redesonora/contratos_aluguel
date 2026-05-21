@@ -582,6 +582,34 @@ export default function DashboardPage() {
         console.error('DEBUG: Detalhes do erro Supabase (Code):', error.code);
         console.error('DEBUG: Detalhes do erro Supabase (Full):', JSON.stringify(error, null, 2));
         
+        const errorMsg = error.message?.toLowerCase() || '';
+        if (
+          errorMsg.includes('refresh token') || 
+          errorMsg.includes('not found') || 
+          errorMsg.includes('invalid') || 
+          errorMsg.includes('expired') ||
+          error.code === 'PGRST301' || 
+          error.code === 'PGRST302'
+        ) {
+          console.warn('fetchProfile: Detectado erro de refresh token ou autenticação inválida no objeto de erro da query. Tratando...');
+          try { await supabase.auth.signOut(); } catch(e) {}
+          if (typeof window !== 'undefined') {
+            Object.keys(localStorage).forEach(key => {
+              if (key.includes('-auth-token')) {
+                localStorage.removeItem(key);
+              }
+            });
+            // Limpar cookies de auth
+            document.cookie.split(";").forEach((c) => { 
+              document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+          }
+          setSession(null);
+          setUserProfile(null);
+          setAuthLoading(false);
+          return;
+        }
+
         if (error.code === '42P01') {
           console.error('ERRO CRÍTICO: A tabela "user_profiles" não existe no banco de dados.');
           console.info('DICA: Execute o conteúdo do arquivo SUPABASE_SCHEMA.sql no Editor SQL do seu painel Supabase.');
@@ -4878,145 +4906,6 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="pt-4 border-t border-slate-100">
-                        <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block tracking-tight">Arquivo PDF do Contrato</label>
-                        <div className="relative group">
-                          {contractFileUrl && !contractFileToUpload ? (
-                            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100 mb-2">
-                               <div className="flex items-center gap-3">
-                                  <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                                    <FileText size={16} />
-                                  </div>
-                                  <div>
-                                    <p className="text-[10px] font-black text-blue-700 uppercase">Contrato Selecionado</p>
-                                    <p className="text-[11px] text-slate-500 font-medium truncate max-w-[200px]">documento_anexo.pdf</p>
-                                  </div>
-                               </div>
-                               <button 
-                                 type="button"
-                                 onClick={() => setContractFileUrl(null)}
-                                 className="p-2 text-blue-400 hover:text-red-500 transition-colors"
-                               >
-                                 <X size={16} />
-                               </button>
-                            </div>
-                          ) : contractFileToUpload ? (
-                            <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100 mb-2">
-                               <div className="flex items-center gap-3">
-                                  <div className="p-2 bg-amber-100 text-amber-600 rounded-lg animate-pulse">
-                                    <FileText size={16} />
-                                  </div>
-                                  <div>
-                                    <p className="text-[10px] font-black text-amber-700 uppercase">Novo Arquivo</p>
-                                    <p className="text-[11px] text-slate-500 font-medium truncate max-w-[200px]">{contractFileToUpload.name}</p>
-                                  </div>
-                               </div>
-                               <button 
-                                 type="button"
-                                 onClick={() => setContractFileToUpload(null)}
-                                 className="p-2 text-amber-400 hover:text-red-500 transition-colors"
-                               >
-                                 <X size={16} />
-                               </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-4 hover:border-blue-400 transition-all cursor-pointer bg-slate-50 group-hover:bg-blue-50/30">
-                              <input 
-                                type="file" 
-                                accept=".pdf"
-                                onChange={(e) => {
-                                  if (e.target.files?.[0]) {
-                                    setContractFileToUpload(e.target.files[0]);
-                                  }
-                                }}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                              />
-                              <div className="text-center">
-                                <FileUp size={24} className="mx-auto text-slate-400 mb-1 group-hover:text-blue-500 transition-colors" />
-                                <p className="text-[10px] font-bold text-slate-500 group-hover:text-blue-700">Selecione o PDF do Contrato</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                        <div className="pt-2">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-tight">Cláusulas do Contrato (Edição Rica)</label>
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 flex flex-col gap-0.5">
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">Modelo Selecionado</label>
-                                <select 
-                                  className="text-[10px] bg-white border-2 border-slate-100 px-2 py-1.5 rounded-lg font-bold text-slate-600 focus:outline-none focus:border-blue-400 transition-all min-w-[140px]"
-                                  value={selectedTemplateIdx}
-                                  onChange={(e) => setSelectedTemplateIdx(parseInt(e.target.value))}
-                                >
-                                  {contractTemplates.map((t, idx) => (
-                                    <option key={idx} value={idx}>{t.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <div className="flex flex-col gap-0.5">
-                                <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1 text-center">Alinhamento</label>
-                                <div className="flex items-center border-2 border-slate-100 rounded-lg overflow-hidden bg-white">
-                                  <button
-                                    type="button"
-                                    onClick={() => setContractAlignment('left')}
-                                    className={`p-1.5 transition-colors ${contractAlignment === 'left' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-50'}`}
-                                    title="Alinhar à Esquerda"
-                                  >
-                                    <AlignLeft size={14} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setContractAlignment('center')}
-                                    className={`p-1.5 transition-colors ${contractAlignment === 'center' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-50'}`}
-                                    title="Centralizar"
-                                  >
-                                    <AlignCenter size={14} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setContractAlignment('right')}
-                                    className={`p-1.5 transition-colors ${contractAlignment === 'right' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-50'}`}
-                                    title="Alinhar à Direita"
-                                  >
-                                    <AlignRight size={14} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setContractAlignment('justify')}
-                                    className={`p-1.5 transition-colors ${contractAlignment === 'justify' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-50'}`}
-                                    title="Justificar"
-                                  >
-                                    <AlignJustify size={14} />
-                                  </button>
-                                </div>
-                                <input type="hidden" name="alinhamento_texto" value={contractAlignment} />
-                              </div>
-                              <button 
-                                type="button"
-                                onClick={(e) => {
-                                  const form = (e.target as HTMLElement).closest('form');
-                                  if (form) generateContractTemplate(form as HTMLFormElement);
-                                }}
-                                className="mt-3 text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-black uppercase tracking-widest transition-all shadow-md shadow-blue-100 flex items-center gap-1"
-                              >
-                                Aplicar Modelo
-                              </button>
-                            </div>
-                          </div>
-                          
-                          <input type="hidden" name="clausulas" value={clausulasHtml} />
-                          <RichEditor 
-                            content={clausulasHtml}
-                            onChange={(html) => setClausulasHtml(html)}
-                            activeDropdown={activeEditorDropdown}
-                            setActiveDropdown={setActiveEditorDropdown}
-                          />
-                        </div>
-
-                      <div className="pt-4 border-t border-slate-100">
                         <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block tracking-tight">Anexar Documentos (RG, Comprovantes, etc)</label>
                         
                         <div className="flex flex-wrap gap-2 mb-3">
@@ -5063,6 +4952,108 @@ export default function DashboardPage() {
                             <PlusCircle size={24} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Clique ou arraste arquivos para anexar</p>
                           </div>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-4 border-t border-slate-100">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-tight">Cláusulas do Contrato (Edição Rica)</label>
+                          <div className="flex items-end gap-2">
+                            <div className="flex-1 flex flex-col gap-0.5">
+                              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">Modelo Selecionado</label>
+                              <select 
+                                className="text-[10px] bg-white border-2 border-slate-100 px-2 py-1.5 rounded-lg font-bold text-slate-600 focus:outline-none focus:border-blue-400 transition-all min-w-[140px]"
+                                value={selectedTemplateIdx}
+                                onChange={(e) => setSelectedTemplateIdx(parseInt(e.target.value))}
+                              >
+                                {contractTemplates.map((t, idx) => (
+                                  <option key={idx} value={idx}>{t.name}</option>
+                                ))}
+                              </select>
+                              <input type="hidden" name="alinhamento_texto" value={contractAlignment} />
+                            </div>
+
+                            <button 
+                              type="button"
+                              onClick={(e) => {
+                                const form = (e.target as HTMLElement).closest('form');
+                                if (form) generateContractTemplate(form as HTMLFormElement);
+                              }}
+                              className="text-[10px] bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-black uppercase tracking-widest transition-all shadow-md shadow-blue-100 flex items-center gap-1 h-[34px] justify-center"
+                            >
+                              Aplicar Modelo
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <input type="hidden" name="clausulas" value={clausulasHtml} />
+                        <RichEditor 
+                          content={clausulasHtml}
+                          onChange={(html) => setClausulasHtml(html)}
+                          activeDropdown={activeEditorDropdown}
+                          setActiveDropdown={setActiveEditorDropdown}
+                        />
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-100">
+                        <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block tracking-tight">Arquivo PDF do Contrato</label>
+                        <div className="relative group">
+                          {contractFileUrl && !contractFileToUpload ? (
+                             <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-100 mb-2">
+                                <div className="flex items-center gap-3">
+                                   <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                                     <FileText size={16} />
+                                   </div>
+                                   <div>
+                                     <p className="text-[10px] font-black text-blue-700 uppercase">Contrato Selecionado</p>
+                                     <p className="text-[11px] text-slate-500 font-medium truncate max-w-[200px]">documento_anexo.pdf</p>
+                                   </div>
+                                </div>
+                                <button 
+                                  type="button"
+                                  onClick={() => setContractFileUrl(null)}
+                                  className="p-2 text-blue-400 hover:text-red-500 transition-colors"
+                                >
+                                  <X size={16} />
+                                </button>
+                             </div>
+                          ) : contractFileToUpload ? (
+                             <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100 mb-2">
+                                <div className="flex items-center gap-3">
+                                   <div className="p-2 bg-amber-100 text-amber-600 rounded-lg animate-pulse">
+                                     <FileText size={16} />
+                                   </div>
+                                   <div>
+                                     <p className="text-[10px] font-black text-amber-700 uppercase">Novo Arquivo</p>
+                                     <p className="text-[11px] text-slate-500 font-medium truncate max-w-[200px]">{contractFileToUpload.name}</p>
+                                   </div>
+                                </div>
+                                <button 
+                                  type="button"
+                                  onClick={() => setContractFileToUpload(null)}
+                                  className="p-2 text-amber-400 hover:text-red-500 transition-colors"
+                                >
+                                  <X size={16} />
+                                </button>
+                             </div>
+                          ) : (
+                             <div className="flex items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-4 hover:border-blue-400 transition-all cursor-pointer bg-slate-50 group-hover:bg-blue-50/30">
+                               <input 
+                                 type="file" 
+                                 accept=".pdf"
+                                 onChange={(e) => {
+                                   if (e.target.files?.[0]) {
+                                     setContractFileToUpload(e.target.files[0]);
+                                   }
+                                 }}
+                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                               />
+                               <div className="text-center">
+                                 <FileUp size={24} className="mx-auto text-slate-400 mb-1 group-hover:text-blue-500 transition-colors" />
+                                 <p className="text-[10px] font-bold text-slate-500 group-hover:text-blue-700">Selecione o PDF do Contrato</p>
+                               </div>
+                             </div>
+                          )}
                         </div>
                       </div>
                     </div>

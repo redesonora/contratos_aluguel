@@ -1,5 +1,55 @@
 import { createClient } from '@supabase/supabase-js';
 
+// No lado do cliente, registrar imediatamente o listener de unhandledrejection
+// para capturar erros assíncronos do Supabase GoTrue Auth (Refresh Token Not Found, etc)
+// o mais cedo possível na inicialização do app.
+if (typeof window !== 'undefined') {
+  const handleAuthErrorGlobal = () => {
+    console.warn('Limpando sessão local devido a erro crítico de refresh/autenticação.');
+    try {
+      // Limpar todos os tokens do localStorage do Supabase
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
+      // Limpar cookies para evitar loops de cookies expirados
+      document.cookie.split(";").forEach((c) => { 
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+      });
+    } catch (e) {
+      console.error('Erro ao limpar dados locais de auth:', e);
+    }
+  };
+
+  const handleRejection = (event: PromiseRejectionEvent) => {
+    try {
+      const err = event.reason;
+      const msg = err?.message?.toLowerCase() || '';
+      if (
+        msg.includes('refresh token') || 
+        msg.includes('not found') || 
+        msg.includes('invalid') || 
+        msg.includes('expired') ||
+        (err?.name === 'AuthApiError' && (err?.status === 400 || err?.status === 401))
+      ) {
+        console.error('Capturado unhandled rejection de autenticação antecipadamente no Supabase:', err);
+        event.preventDefault();
+        event.stopPropagation();
+        handleAuthErrorGlobal();
+        // Recarrega de forma limpa para recriar o cliente sem estado obsoleto
+        setTimeout(() => {
+          window.location.reload();
+        }, 150);
+      }
+    } catch (e) {
+      // Evitar que erros no próprio interceptador travem a execução
+    }
+  };
+
+  window.addEventListener('unhandledrejection', handleRejection);
+}
+
 let supabaseInstance: any = null;
 
 export const getSupabase = () => {
