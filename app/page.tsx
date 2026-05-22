@@ -3708,7 +3708,9 @@ export default function DashboardPage() {
         >
           <div className="flex items-center gap-3 text-blue-600 mb-8 justify-center">
             <Home size={32} strokeWidth={2.5} />
-            <h1 className="text-2xl font-black tracking-tight">ImobiSaaS</h1>
+            <h1 className="text-2xl font-black tracking-tight">
+              realizze<span className="text-blue-600">app</span>
+            </h1>
           </div>
           
           {authTab !== 'recover' ? (
@@ -3724,7 +3726,7 @@ export default function DashboardPage() {
               <button 
                 onClick={() => { setAuthTab('register'); setLoginError(null); setLoginSuccess(null); }}
                 className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                  authTab === 'register' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                  authTab === 'register' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
                 Cadastrar
@@ -3827,12 +3829,12 @@ export default function DashboardPage() {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
                   <div className="relative group">
-                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" />
+                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
                     <input 
                       name="nome" 
                       type="text" 
                       required 
-                      className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-emerald-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
+                      className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
                       placeholder="Seu nome completo"
                     />
                   </div>
@@ -3840,12 +3842,12 @@ export default function DashboardPage() {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Usuário</label>
                   <div className="relative group">
-                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" />
+                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
                     <input 
                       name="username" 
                       type="text" 
                       required 
-                      className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-emerald-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
+                      className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
                       placeholder="Gleison"
                     />
                   </div>
@@ -3861,7 +3863,7 @@ export default function DashboardPage() {
                   name="email" 
                   type="email" 
                   required 
-                  className={`w-full bg-slate-50/50 border-2 border-slate-100 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all ${authTab === 'login' ? 'focus:border-blue-400' : 'focus:border-emerald-400'}`}
+                  className="w-full bg-slate-50/50 border-2 border-slate-100 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all focus:border-blue-400"
                   placeholder="seu@email.com"
                 />
               </div>
@@ -3871,7 +3873,7 @@ export default function DashboardPage() {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CPF</label>
                 <div className="relative group">
-                  <BadgeDollarSign size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" />
+                  <BadgeDollarSign size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
                   <input 
                     name="cpf" 
                     type="text" 
@@ -3890,7 +3892,7 @@ export default function DashboardPage() {
                       }
                       e.target.value = formatted;
                     }}
-                    className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-emerald-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
+                    className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
                     placeholder="000.000.000-00"
                   />
                 </div>
@@ -3906,7 +3908,7 @@ export default function DashboardPage() {
                     name="password" 
                     type="password" 
                     required 
-                    className={`w-full bg-slate-50/50 border-2 border-slate-100 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all ${authTab === 'login' ? 'focus:border-blue-400' : 'focus:border-emerald-400'}`}
+                    className="w-full bg-slate-50/50 border-2 border-slate-100 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all focus:border-blue-400"
                     placeholder="••••••••"
                   />
                 </div>
@@ -3917,12 +3919,12 @@ export default function DashboardPage() {
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Confirmar Senha</label>
                 <div className="relative group">
-                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" />
+                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
                   <input 
                     name="confirmPassword" 
                     type="password" 
                     required 
-                    className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-emerald-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
+                    className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
                     placeholder="••••••••"
                   />
                 </div>
@@ -3933,11 +3935,9 @@ export default function DashboardPage() {
               type="submit"
               disabled={loading}
               className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg flex justify-center items-center gap-3 active:scale-95 ${
-                authTab === 'login' 
+                authTab === 'login' || authTab === 'register'
                   ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100' 
-                  : authTab === 'register'
-                    ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-100'
-                    : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-100'
+                  : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-100'
               } disabled:opacity-50`}
             >
               {loading ? <Loader2 className="animate-spin" size={18} /> : (
@@ -4069,7 +4069,7 @@ export default function DashboardPage() {
       <header className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 z-50 sticky top-0">
         <div className="flex items-center gap-2 text-blue-600">
           <Home size={24} strokeWidth={2.5} />
-          <h1 className="text-lg font-bold tracking-tight italic">REALIZE<span className="text-blue-600">.</span></h1>
+          <h1 className="text-lg font-bold tracking-tight italic">REALIZZE<span className="text-blue-600">.</span></h1>
         </div>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-slate-600">
           {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
@@ -4097,7 +4097,7 @@ export default function DashboardPage() {
       `}>
         <div className="flex items-center gap-2 text-blue-600 px-2">
           <Home size={28} strokeWidth={2.5} />
-          <h1 className="text-xl font-bold tracking-tight italic">REALIZE<span className="text-blue-600">.</span></h1>
+          <h1 className="text-xl font-bold tracking-tight italic">REALIZZE<span className="text-blue-600">.</span></h1>
         </div>
         
         <nav className="flex flex-col gap-1 flex-1 overflow-y-auto custom-scrollbar">
