@@ -3709,7 +3709,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 text-blue-600 mb-8 justify-center">
             <Home size={32} strokeWidth={2.5} />
             <h1 className="text-2xl font-black tracking-tight">
-              realizze<span className="text-blue-600">app</span>
+              REALIZZE<span className="text-blue-600">APP</span>
             </h1>
           </div>
           
@@ -3848,7 +3848,7 @@ export default function DashboardPage() {
                       type="text" 
                       required 
                       className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
-                      placeholder="Gleison"
+                      placeholder="Escolha seu usuário"
                     />
                   </div>
                 </div>
