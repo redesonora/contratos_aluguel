@@ -88,7 +88,14 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseErr) {
+        setTestResult({ success: false, message: 'Não foi possível ler a resposta do servidor. Por favor, verifique se seu servidor já carregou a rota e tente novamente.' });
+        return;
+      }
+
       if (response.ok && data.success) {
         setTestResult({ success: true, message: 'Sucesso! Chave conectada com sucesso.' });
       } else {
