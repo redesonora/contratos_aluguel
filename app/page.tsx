@@ -184,6 +184,16 @@ export default function DashboardPage() {
   });
   const [authTab, setAuthTab] = useState<'login' | 'register' | 'recover'>('login');
   const [showAuth, setShowAuth] = useState(false);
+  const [selectedPlanSignUp, setSelectedPlanSignUp] = useState<'Gratuito' | 'Iniciante' | 'Profissional' | 'Ilimitado'>('Gratuito');
+  const [billingCycleSignUp, setBillingCycleSignUp] = useState<'mensal' | 'anual'>('mensal');
+  const [checkoutCycle, setCheckoutCycle] = useState<'mensal' | 'anual'>('mensal');
+  const [checkoutMethod, setCheckoutMethod] = useState<'pix' | 'cartao'>('pix');
+  const [checkoutCardName, setCheckoutCardName] = useState('');
+  const [checkoutCardNumber, setCheckoutCardNumber] = useState('');
+  const [checkoutCardExpiry, setCheckoutCardExpiry] = useState('');
+  const [checkoutCardCvv, setCheckoutCardCvv] = useState('');
+  const [checkoutCpf, setCheckoutCpf] = useState('');
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [activeEditorDropdown, setActiveEditorDropdown] = useState<'size' | 'color' | null>(null);
   const [clausulasHtml, setClausulasHtml] = useState('');
@@ -646,12 +656,12 @@ export default function DashboardPage() {
           const newProfileFull = {
             ...newProfileBase,
             email: userEmail || null,
-            plano: 'Nenhum',
-            status_pagamento: 'Sem Assinatura'
+            plano: 'Gratuito',
+            status_pagamento: 'PAGO'
           };
           
-          // Tentar inserir com todos os campos
-          const { error: insertError } = await supabase.from('user_profiles').insert(newProfileFull);
+          // Tentar inserir/upsertar com todos os campos
+          const { error: insertError } = await supabase.from('user_profiles').upsert(newProfileFull);
           
           if (insertError) {
             console.error('Erro ao inserir novo perfil:', JSON.stringify(insertError));
@@ -667,7 +677,7 @@ export default function DashboardPage() {
             
             // Se falhou por causa de coluna esquecida (PGRST204 ou 42703), tentamos o base
             if (insertError.code === 'PGRST204' || insertError.code === '42703' || insertError.message?.toLowerCase().includes('email')) {
-              const { error: retryError } = await supabase.from('user_profiles').insert(newProfileBase);
+              const { error: retryError } = await supabase.from('user_profiles').upsert(newProfileBase);
               
               if (retryError) {
                 if (retryError.code === '23505') {
@@ -690,10 +700,10 @@ export default function DashboardPage() {
                 role: 'MASTER', 
                 nome: meta.full_name || userEmail?.split('@')[0] || 'Usuário (Modo Seguro)', 
                 approved: true, 
-                plano: 'Pro',
+                plano: 'Gratuito',
                 status_pagamento: 'PAGO',
                 data_inicio: new Date().toISOString(),
-                trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                trial_ends_at: null,
                 last_access: new Date().toISOString(),
                 proprietario_id: null 
               };
@@ -1107,16 +1117,17 @@ export default function DashboardPage() {
           const role = (count === 0 && !countError) ? 'MASTER' : 'CORRETOR';
           const approved = role === 'MASTER';
           
+          const isPlanPaid = selectedPlanSignUp !== 'Gratuito';
           const newProfileFull = {
             id: user.id,
             role,
             nome,
             cpf,
             email, // <-- setting the email correctly!
-            approved,
-            plano: 'Nenhum',
-            status_pagamento: 'Sem Assinatura',
-            trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+            approved: !isPlanPaid || approved,
+            plano: selectedPlanSignUp,
+            status_pagamento: isPlanPaid ? 'Pendente' : 'PAGO',
+            trial_ends_at: null
           };
           
           const { error: insertError } = await supabase.from('user_profiles').upsert(newProfileFull);
@@ -3086,23 +3097,17 @@ export default function DashboardPage() {
       } else {
         // Insert logic
         const userPlanLimits: {[key: string]: number} = {
-          'Nenhum': 1, // Default / Freemium
+          'Gratuito': 1,
+          'Nenhum': 1,
           'Iniciante': 10,
           'Profissional': 50,
           'Ilimitado': Infinity
         };
-        const userPlan = userProfile?.plano || 'Nenhum';
-        // Perfis administrativos (MASTER e ADMIN) possuem limites ilimitados
-        const isUnlimitedUser = userProfile?.role === 'MASTER' || userProfile?.role === 'ADMIN';
+        const userPlan = userProfile?.plano || 'Gratuito';
+        const isUnlimitedUser = userProfile?.role === 'ADMIN';
         
-        // Se o usuário tiver um trial_ends_at configurado e a data atual for menor, ele está no Free Trial de 7 dias
-        const isTrialActive = userProfile?.trial_ends_at && new Date(userProfile.trial_ends_at) > new Date();
-        
-        // Se estiver no trial e no plano inicial (Nenhum/Trial), damos o limite do plano Profissional (50) para ele poder testar os recursos ricos e IA
-        const effectivePlan = (isTrialActive && (userPlan === 'Nenhum' || userPlan === 'Trial' || !userPlan)) ? 'Profissional' : userPlan;
-        
-        const limit = isUnlimitedUser ? Infinity : (userPlanLimits[effectivePlan] || 1);
-        const planDisplayName = isTrialActive && (userPlan === 'Nenhum' || userPlan === 'Trial' || !userPlan) ? 'Teste Grátis (Profissional)' : userPlan;
+        const limit = isUnlimitedUser ? Infinity : (userPlanLimits[userPlan] || 1);
+        const planDisplayName = userPlan;
 
         if (activeTab === 'imoveis') {
           const activeImoveisCount = imoveis.filter(i => !i.arquivado).length;
@@ -3672,7 +3677,9 @@ export default function DashboardPage() {
             setAuthTab('login');
             setShowAuth(true);
           }}
-          onRegister={() => {
+          onRegister={(plan, cycle) => {
+            if (plan) setSelectedPlanSignUp(plan);
+            if (cycle) setBillingCycleSignUp(cycle);
             setAuthTab('register');
             setShowAuth(true);
           }}
@@ -4078,10 +4085,10 @@ export default function DashboardPage() {
     );
   }
 
-  const isTrialActive = userProfile?.trial_ends_at ? new Date(userProfile.trial_ends_at) > new Date() : false;
-  const trialDaysLeft = userProfile?.trial_ends_at ? Math.max(0, Math.ceil((new Date(userProfile.trial_ends_at).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))) : 0;
+  const isTrialActive = false;
+  const trialDaysLeft = 0;
 
-  const isAccessBlocked = userProfile && userProfile.role !== 'MASTER' && !userProfile.approved && !isTrialActive;
+  const isAccessBlocked = userProfile && userProfile.role !== 'MASTER' && !userProfile.approved;
 
   if (isAccessBlocked) {
     return (
@@ -4114,6 +4121,330 @@ export default function DashboardPage() {
             </button>
           </div>
         </motion.div>
+      </div>
+    );
+  }
+
+  const isPaymentPending = userProfile && userProfile.role === 'MASTER' && 
+    (userProfile.plano === 'Iniciante' || userProfile.plano === 'Profissional' || userProfile.plano === 'Ilimitado') && 
+    userProfile.status_pagamento !== 'PAGO';
+
+  if (isPaymentPending) {
+    const plansLimits: {[key: string]: number} = { 'Iniciante': 10, 'Profissional': 50, 'Ilimitado': Infinity };
+    const prices: {[key: string]: {mensal: number, anual: number}} = {
+      'Iniciante': { mensal: 49.90, anual: 39.90 },
+      'Profissional': { mensal: 99.90, anual: 79.90 },
+      'Ilimitado': { mensal: 199.90, anual: 149.90 }
+    };
+    const currentPrices = prices[userProfile.plano || 'Iniciante'] || { mensal: 49.90, anual: 39.90 };
+    const pricePerMonth = checkoutCycle === 'mensal' ? currentPrices.mensal : currentPrices.anual;
+    const yearlyBillingAmount = currentPrices.anual * 12;
+    const finalBillAmount = checkoutCycle === 'mensal' ? pricePerMonth : yearlyBillingAmount;
+
+    const handleConfirmPayment = async () => {
+      try {
+        setCheckoutLoading(true);
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({
+            status_pagamento: 'PAGO',
+            approved: true
+          })
+          .eq('id', userProfile.id);
+
+        if (error) {
+          throw error;
+        }
+
+        await recordLog('Ativação de Assinatura', 'user_profiles', userProfile.id, {
+          plano: userProfile.plano,
+          ciclo: checkoutCycle,
+          valor: finalBillAmount,
+          metodo: checkoutMethod
+        });
+
+        const { data: updatedProfile } = await supabase.from('user_profiles').select('*').eq('id', userProfile.id).single();
+        if (updatedProfile) {
+          setUserProfile(updatedProfile);
+        }
+      } catch (err: any) {
+        alert("Erro ao confirmar pagamento: " + err.message);
+      } finally {
+        setCheckoutLoading(false);
+      }
+    };
+
+    const handleDowngradeToFree = async () => {
+      try {
+        setCheckoutLoading(true);
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({
+            plano: 'Gratuito',
+            status_pagamento: 'PAGO',
+            approved: true
+          })
+          .eq('id', userProfile.id);
+
+        if (error) {
+          throw error;
+        }
+
+        await recordLog('Downgrade para Gratuito', 'user_profiles', userProfile.id, {});
+
+        const { data: updatedProfile } = await supabase.from('user_profiles').select('*').eq('id', userProfile.id).single();
+        if (updatedProfile) {
+          setUserProfile(updatedProfile);
+        }
+      } catch (e: any) {
+        alert("Erro ao alterar para plano gratuito: " + e.message);
+      } finally {
+        setCheckoutLoading(false);
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 md:p-8 font-sans">
+        <div className="w-full max-w-5xl bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden grid lg:grid-cols-12">
+          {/* Left Column: Plan Information */}
+          <div className="lg:col-span-5 bg-gradient-to-b from-blue-900 to-slate-900 text-white p-8 md:p-10 flex flex-col justify-between">
+            <div className="space-y-8">
+              <div className="flex items-center gap-2.5 text-blue-400">
+                <Home size={30} strokeWidth={2.5} />
+                <span className="text-xl font-black uppercase tracking-tight">REALIZZE</span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-black tracking-widest uppercase text-blue-300 bg-blue-500/20 px-3 py-1.5 rounded-full inline-block mb-3">
+                  Plano Selecionado
+                </span>
+                <h2 className="text-4xl font-extrabold tracking-tight">{userProfile.plano}</h2>
+                <p className="text-slate-350 text-xs mt-2 leading-relaxed">
+                  Gerencie com facilidade até <strong className="text-white">{plansLimits[userProfile.plano || 'Iniciante'] === Infinity ? 'Ilimitados' : plansLimits[userProfile.plano || 'Iniciante']} contratos ativos</strong> na nossa plataforma rica em IA.
+                </p>
+              </div>
+
+              {/* Toggle switch for custom billing in Checkout */}
+              <div className="space-y-3 bg-white/5 border border-white/10 p-5 rounded-2xl">
+                <p className="text-[10px] font-black tracking-widest uppercase text-slate-400">Periodicidade de Cobrança</p>
+                <div className="grid grid-cols-2 gap-2 bg-black/20 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutCycle('mensal')}
+                    className={`py-2 text-[10px] uppercase font-black tracking-widest rounded-lg transition-all ${
+                      checkoutCycle === 'mensal' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Mensal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCheckoutCycle('anual')}
+                    className={`py-2 text-[10px] uppercase font-black tracking-widest rounded-lg transition-all flex items-center justify-center gap-1 ${
+                      checkoutCycle === 'anual' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Anual
+                    <span className="bg-emerald-500 text-white text-[8px] font-black px-1.5 py-0.2 rounded">20% OFF</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Pricing overview details */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs font-bold text-slate-400">
+                  <span>Valor do plano:</span>
+                  <span>R$ {pricePerMonth.toFixed(2).replace('.', ',')} / mês</span>
+                </div>
+                {checkoutCycle === 'anual' && (
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-400">
+                    <span>Faturamento anual:</span>
+                    <span className="text-emerald-400">R$ {yearlyBillingAmount.toFixed(2).replace('.', ',')} / ano</span>
+                  </div>
+                )}
+                <div className="h-px bg-white/10 my-3" />
+                <div className="flex justify-between items-baseline">
+                  <span className="text-sm font-bold">Total a Pagar:</span>
+                  <div className="text-right">
+                    <span className="text-3xl font-black text-blue-400">
+                      R$ {finalBillAmount.toFixed(2).replace('.', ',')}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 tracking-wider uppercase block">
+                      {checkoutCycle === 'mensal' ? '/ primeiro mês' : '/ ano'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-white/10 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleDowngradeToFree}
+                disabled={checkoutLoading}
+                className="w-full py-3 hover:bg-white/10 text-white border border-white/20 rounded-xl text-xs font-black uppercase tracking-widest text-center transition-all cursor-pointer active:scale-98"
+              >
+                Voltar ao Plano Gratuito (1 Contrato)
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full py-2 text-slate-400 hover:text-red-400 text-[10px] uppercase font-bold tracking-widest text-center transition-colors"
+              >
+                Sair da Conta
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column: Checkout Form Integration */}
+          <div className="lg:col-span-7 p-8 md:p-10 flex flex-col justify-between">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-2xl font-black text-slate-800 tracking-tight uppercase italic">Integração Asaas</h3>
+                <p className="text-slate-500 text-xs mt-1">
+                  Ative sua assinatura de forma rápida e segura. Escolha o melhor método de pagamento abaixo.
+                </p>
+              </div>
+
+              {/* Selector */}
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => setCheckoutMethod('pix')}
+                  className={`p-4 rounded-2xl border-2 text-left flex flex-col justify-between h-24 transition-all ${
+                    checkoutMethod === 'pix' ? 'border-blue-600 bg-blue-50/50' : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Pagar via</span>
+                  <span className="text-lg font-black text-slate-800 flex items-center gap-1">⚡ PIX</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCheckoutMethod('cartao')}
+                  className={`p-4 rounded-2xl border-2 text-left flex flex-col justify-between h-24 transition-all ${
+                    checkoutMethod === 'cartao' ? 'border-blue-600 bg-blue-50/50' : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Pagar via</span>
+                  <span className="text-lg font-black text-slate-800 flex items-center gap-1">💳 Cartão</span>
+                </button>
+              </div>
+
+              {/* CPF / CNPJ required form for Asaas Customer generation */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-550 uppercase tracking-widest">
+                  CPF ou CNPJ do Titular da Assinatura *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  value={checkoutCpf}
+                  onChange={(e) => setCheckoutCpf(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl text-xs font-semibold placeholder:text-slate-300 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {checkoutMethod === 'pix' ? (
+                <div className="space-y-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-200 flex flex-col items-center">
+                  <div className="w-40 h-40 bg-white p-2 border border-slate-200 rounded-2xl flex items-center justify-center relative overflow-hidden group">
+                    {/* Simulated high fidelity QR Code vector representation */}
+                    <div className="w-full h-full bg-[radial-gradient(#000_15%,transparent_16%)] [background-size:8px_8px] opacity-80" />
+                    <div className="absolute top-2 left-2 w-8 h-8 border-t-4 border-l-4 border-slate-900" />
+                    <div className="absolute top-2 right-2 w-8 h-8 border-t-4 border-r-4 border-slate-900" />
+                    <div className="absolute bottom-2 left-2 w-8 h-8 border-b-4 border-l-4 border-slate-900" />
+                    <div className="absolute bottom-2 right-2 w-8 h-8 border-b-4 border-r-4 border-slate-900" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/90 font-black text-xs uppercase tracking-widest animate-pulse text-blue-600">
+                      PIX ASAAS
+                    </div>
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className="text-xs font-bold text-slate-700">QR Code Pix gerado com sucesso!</p>
+                    <p className="text-[10px] text-slate-400 font-semibold max-w-xs leading-normal">
+                      Escaneie o código acima no app do seu banco ou use a chave copia-cola abaixo.
+                    </p>
+                  </div>
+                  <div className="w-full flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value="00020126360014br.gov.bcb.pix0114asaas380a9e22db873b221d6f461"
+                      className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-[9px] font-mono text-slate-400 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => alert("Chave PIX copiada para a área de transferência!")}
+                      className="px-3 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg text-[9px] tracking-wider uppercase font-black"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 bg-slate-50 p-6 rounded-[2rem] border border-slate-200">
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Nome Impresso no Cartão</label>
+                      <input
+                        type="text"
+                        placeholder="NOME COMPLETO"
+                        value={checkoutCardName}
+                        onChange={(e) => setCheckoutCardName(e.target.value.toUpperCase())}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold placeholder:text-slate-300 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest font-mono">Número do Cartão</label>
+                      <input
+                        type="text"
+                        placeholder="0000 0000 0000 0000"
+                        value={checkoutCardNumber}
+                        onChange={(e) => setCheckoutCardNumber(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold placeholder:text-slate-300 focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Vencimento</label>
+                        <input
+                          type="text"
+                          placeholder="MM/AA"
+                          value={checkoutCardExpiry}
+                          onChange={(e) => setCheckoutCardExpiry(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold placeholder:text-slate-300 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest font-mono">CVV</label>
+                        <input
+                          type="text"
+                          placeholder="123"
+                          value={checkoutCardCvv}
+                          onChange={(e) => setCheckoutCardCvv(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold placeholder:text-slate-300 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8">
+              <button
+                type="button"
+                onClick={handleConfirmPayment}
+                disabled={checkoutLoading || !checkoutCpf}
+                className="w-full py-4.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black text-[11px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-200 active:scale-95 flex items-center justify-center gap-2"
+              >
+                {checkoutLoading ? 'Processando Assinatura Asaas...' : `Efetuar Pagamento & Ativar Plano (R$ ${finalBillAmount.toFixed(2).replace('.', ',')})`}
+              </button>
+              <p className="text-[9px] text-slate-400 font-semibold text-center mt-3 leading-normal max-w-sm mx-auto uppercase tracking-wide">
+                🔒 Ambiente de transação criptografado sob certificação PCI-DSS fornecido via gateway Asaas Sandbox.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -4312,12 +4643,6 @@ export default function DashboardPage() {
               <span>Workspace</span>
               <ChevronRight size={10} className="text-slate-300" />
               <span className="text-blue-500">{activeTab === 'configuracoes' ? 'Definições' : activeTab === 'dashboard' ? 'Início' : activeTab}</span>
-              {userProfile && !userProfile.approved && isTrialActive && (
-                <div className="ml-4 flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1 text-amber-600 shadow-sm animate-pulse">
-                  <BadgeDollarSign size={12} className="text-amber-500" />
-                  <span className="font-black italic">{trialDaysLeft} dias de teste</span>
-                </div>
-              )}
             </div>
             <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight italic leading-none flex items-center gap-4">
               {activeTab === 'dashboard' ? 'Overview' : 
@@ -5758,7 +6083,7 @@ export default function DashboardPage() {
                   <div>
                     <h4 className="font-bold text-slate-800 leading-tight">{userProfile.nome}</h4>
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">
-                      {userProfile.role} • {userProfile.trial_ends_at && new Date(userProfile.trial_ends_at) > new Date() && (userProfile.plano === 'Nenhum' || userProfile.plano === 'Trial' || !userProfile.plano) ? 'Teste Grátis (Profissional)' : (userProfile.plano || 'Sem Plano')}
+                      {userProfile.role} • {userProfile.plano || 'Sem Plano'}
                     </p>
                   </div>
                 </div>
@@ -5798,16 +6123,6 @@ export default function DashboardPage() {
                       <p className="text-xs font-bold text-slate-700 bg-slate-50/80 px-3 py-2 rounded-xl border border-slate-100 uppercase">{userProfile.status_pagamento || 'Sem Plano'}</p>
                     </div>
                   </div>
-
-                  {userProfile.trial_ends_at && (
-                    <div className="bg-purple-50 p-4 border border-purple-100/30 rounded-xl flex items-center gap-3">
-                      <Clock size={16} className="text-purple-600" />
-                      <div>
-                        <p className="text-[10px] font-black text-purple-700 uppercase tracking-widest">Período de Acesso Trial</p>
-                        <p className="text-xs text-purple-900 font-bold mt-0.5">Expira em: {new Date(userProfile.trial_ends_at).toLocaleDateString('pt-BR')}</p>
-                      </div>
-                    </div>
-                  )}
                 </form>
 
                 <div className="w-full h-px bg-slate-50" />

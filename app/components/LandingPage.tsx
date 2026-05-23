@@ -5,7 +5,7 @@ import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 interface LandingPageProps {
   onLogin: () => void;
-  onRegister: () => void;
+  onRegister: (plan?: 'Gratuito' | 'Iniciante' | 'Profissional' | 'Ilimitado', cycle?: 'mensal' | 'anual') => void;
 }
 
 const predictiveData = [
@@ -25,6 +25,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
   const y1 = useTransform(scrollY, [0, 1000], [0, 300]);
   
   const [mounted, setMounted] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<'mensal' | 'anual'>('mensal');
 
   useEffect(() => {
     setMounted(true);
@@ -54,10 +55,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               Acessar
             </button>
             <button 
-              onClick={onRegister}
+              onClick={() => onRegister('Gratuito', 'mensal')}
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-200 hover:shadow-xl transition-all active:scale-95"
             >
-              Teste Grátis
+              Começar Grátis
             </button>
           </div>
         </div>
@@ -82,7 +83,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
 
             <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mt-4">
               <button 
-                onClick={onRegister}
+                onClick={() => onRegister('Gratuito', 'mensal')}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-2xl shadow-blue-200 hover:shadow-blue-300 transition-all active:scale-95 flex items-center justify-center gap-3 group"
               >
                 Experimentar Sistema Grátis
@@ -197,13 +198,50 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
       {/* Pricing / Planos */}
       <section id="planos" className="py-24 bg-white border-b border-slate-100 relative">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16 space-y-4">
+          <div className="text-center max-w-2xl mx-auto mb-10 space-y-4">
             <h2 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tighter leading-tight">
               Planos Amigáveis que Crescem com Você
             </h2>
             <p className="text-slate-500 font-medium text-lg leading-relaxed">
               Precificação justa baseada no número de contratos ativos que você gerencia. Sem tarifas ocultas, cancele quando quiser.
             </p>
+          </div>
+
+          {/* Billing Cycle Switcher Toggle */}
+          <div className="flex flex-col items-center justify-center gap-4 mb-16">
+            <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setBillingCycle('mensal')}
+                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                  billingCycle === 'mensal'
+                    ? 'bg-white text-blue-600 shadow-md'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Faturamento Mensal
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingCycle('anual')}
+                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${
+                  billingCycle === 'anual'
+                    ? 'bg-white text-blue-600 shadow-md'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Faturamento Anual
+                <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
+                  -20% OFF
+                </span>
+              </button>
+            </div>
+            
+            {billingCycle === 'anual' && (
+              <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-widest animate-pulse">
+                🎉 Economia garantida de até R$ 600,00 reais por ano com ativação anual!
+              </p>
+            )}
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -217,7 +255,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   <span className="text-4xl font-black text-slate-800">R$ 0</span>
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ sempre</span>
                 </div>
-                <div className="h-[2px] bg-slate-100 mb-6"></div>
+                <div className="h-[2px] bg-slate-100 mb-6 font-semibold text-[10px] text-slate-450 italic">Plano livre sem cobranças</div>
                 <ul className="space-y-3 mb-8">
                   <li className="flex items-center gap-2 text-xs font-bold text-slate-600">
                     <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
@@ -233,7 +271,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   </li>
                 </ul>
               </div>
-              <button onClick={onRegister} className="w-full py-3.5 bg-slate-200 hover:bg-blue-600 hover:text-white text-slate-750 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all">
+              <button onClick={() => onRegister('Gratuito', 'mensal')} className="w-full py-3.5 bg-slate-200 hover:bg-blue-600 hover:text-white text-slate-750 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all">
                 Começar Grátis
               </button>
             </div>
@@ -244,9 +282,18 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <span className="text-[10px] font-black tracking-widest uppercase text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full inline-block mb-6">Autônomo</span>
                 <h3 className="text-2xl font-black text-slate-800 mb-2">Iniciante</h3>
                 <p className="text-xs text-slate-500 font-medium mb-6">Ideal para proprietários de bens ou imóveis autônomos.</p>
-                <div className="mb-6 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-800">R$ 49,90</span>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
+                <div className="mb-6 flex flex-col gap-1">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-slate-800">
+                      R$ {billingCycle === 'mensal' ? '49,90' : '39,90'}
+                    </span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
+                  </div>
+                  {billingCycle === 'anual' && (
+                    <span className="text-[10px] text-emerald-600 font-black uppercase italic">
+                      Cobrado R$ 478,80/ano (Economia R$ 120,00)
+                    </span>
+                  )}
                 </div>
                 <div className="h-[2px] bg-slate-100 mb-6"></div>
                 <ul className="space-y-3 mb-8">
@@ -264,7 +311,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   </li>
                 </ul>
               </div>
-              <button onClick={onRegister} className="w-full py-3.5 bg-blue-600 text-white hover:bg-blue-700 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-100">
+              <button onClick={() => onRegister('Iniciante', billingCycle)} className="w-full py-3.5 bg-blue-600 text-white hover:bg-blue-700 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-100">
                 Escolher Iniciante
               </button>
             </div>
@@ -276,9 +323,18 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <span className="text-[10px] font-black tracking-widest uppercase text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full inline-block mb-6 text-center w-full">Mais Vendido 🏆</span>
                 <h3 className="text-2xl font-black text-slate-800 mb-2">Profissional</h3>
                 <p className="text-xs text-slate-500 font-medium mb-6">Indicado para imobiliárias, corretores e locadoras em expansão.</p>
-                <div className="mb-6 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-800">R$ 99,90</span>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
+                <div className="mb-6 flex flex-col gap-1">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-slate-800">
+                      R$ {billingCycle === 'mensal' ? '99,90' : '79,90'}
+                    </span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
+                  </div>
+                  {billingCycle === 'anual' && (
+                    <span className="text-[10px] text-emerald-600 font-black uppercase italic">
+                      Cobrado R$ 958,80/ano (Economia R$ 240,00)
+                    </span>
+                  )}
                 </div>
                 <div className="h-[2px] bg-indigo-50 mb-6"></div>
                 <ul className="space-y-3 mb-8">
@@ -296,7 +352,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   </li>
                 </ul>
               </div>
-              <button onClick={onRegister} className="w-full py-3.5 bg-blue-600 text-white hover:bg-blue-700 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-200">
+              <button onClick={() => onRegister('Profissional', billingCycle)} className="w-full py-3.5 bg-blue-600 text-white hover:bg-blue-700 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-200">
                 Começar Profissional
               </button>
             </div>
@@ -307,9 +363,18 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <span className="text-[10px] font-black tracking-widest uppercase text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full inline-block mb-6">Corporativo</span>
                 <h3 className="text-2xl font-black text-slate-800 mb-2">Ilimitado</h3>
                 <p className="text-xs text-slate-500 font-medium mb-6">Para grandes locadoras de frotas e incorporadoras comerciais.</p>
-                <div className="mb-6 flex items-baseline gap-1">
-                  <span className="text-4xl font-black text-slate-800">R$ 199,90</span>
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
+                <div className="mb-6 flex flex-col gap-1">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-black text-slate-800">
+                      R$ {billingCycle === 'mensal' ? '199,90' : '149,90'}
+                    </span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
+                  </div>
+                  {billingCycle === 'anual' && (
+                    <span className="text-[10px] text-emerald-600 font-black uppercase italic">
+                      Cobrado R$ 1.798,80/ano (Economia R$ 600,00)
+                    </span>
+                  )}
                 </div>
                 <div className="h-[2px] bg-slate-100 mb-6"></div>
                 <ul className="space-y-3 mb-8">
@@ -327,7 +392,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   </li>
                 </ul>
               </div>
-              <button onClick={onRegister} className="w-full py-3.5 bg-slate-900 text-white hover:bg-slate-800 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all">
+              <button onClick={() => onRegister('Ilimitado', billingCycle)} className="w-full py-3.5 bg-slate-900 text-white hover:bg-slate-800 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all">
                 Falar c/ Especialista
               </button>
             </div>
@@ -350,7 +415,7 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                   Traga outros empreendedores e administradores para a plataforma REALIZZE. A cada novo assinante ativo, você recebe mensalidades grátis.
                 </p>
                 <button 
-                  onClick={onRegister}
+                  onClick={() => onRegister('Gratuito', 'mensal')}
                   className="bg-white text-blue-600 px-8 py-4 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95 shadow-xl inline-flex items-center gap-2"
                 >
                   Gerar Meu Link de Afiliado <ChevronRight size={18} />
@@ -424,10 +489,10 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
           </p>
           <div className="pt-6">
             <button 
-              onClick={onRegister}
+              onClick={() => onRegister('Gratuito', 'mensal')}
               className="bg-blue-500 hover:bg-blue-600 text-white px-10 py-5 rounded-2xl text-sm font-black uppercase tracking-widest shadow-[0_0_40px_rgba(59,130,246,0.3)] hover:shadow-[0_0_60px_rgba(59,130,246,0.5)] transition-all active:scale-95"
             >
-              Começar Teste de 7 Dias Grátis
+              Começar Sistema Grátis
             </button>
           </div>
         </div>
