@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getSupabase } from '@/lib/supabase';
 import { 
   Search, 
   Loader2, 
@@ -54,6 +55,22 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
   const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleResendConfirmationUser = async (id: string, email: string) => {
+    try {
+      const supabase = getSupabase();
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+      if (error) {
+        throw error;
+      }
+      showMessage("E-mail de confirmação reenviado com sucesso!");
+    } catch (err: any) {
+      showMessage("Erro ao reenviar e-mail: " + (err.message || err.toString()), 'error');
+    }
+  };
 
   const showMessage = (text: string, type: 'success' | 'error' = 'success') => {
     setLocalMessage({ text, type });
@@ -271,6 +288,9 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
                         <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
                           {p.role || 'USER'}
                         </span>
+                        {!p.approved && (
+                          <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 px-2 py-0.5 rounded block mt-1">Pendente</span>
+                        )}
                       </div>
                     </td>
                     {/* NOME COMPLETO */}
@@ -326,13 +346,22 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
                         </button>
                         {/* VALIDATE/APPROVE ACTION */}
                         {!p.approved && (
-                          <button 
-                            onClick={() => handleApproveUser(p.id)}
-                            className="text-amber-500 hover:text-emerald-600 p-1.5 hover:bg-emerald-50 rounded-lg transition-all"
-                            title="Aprovar Usuário"
-                          >
-                            <ShieldCheck size={15} />
-                          </button>
+                          <div className="flex gap-1">
+                            <button 
+                              onClick={() => handleApproveUser(p.id)}
+                              className="text-emerald-500 hover:text-emerald-700 p-1.5 hover:bg-emerald-50 rounded-lg transition-all"
+                              title="Aprovar Usuário Manualmente"
+                            >
+                              <ShieldCheck size={15} />
+                            </button>
+                            <button 
+                              onClick={() => handleResendConfirmationUser(p.id, p.email)}
+                              className="text-blue-500 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded-lg transition-all"
+                              title="Reenviar E-mail de Confirmação"
+                            >
+                              <Mail size={15} />
+                            </button>
+                          </div>
                         )}
                         {/* QUICK TRIAL CALENDAR */}
                         <button 

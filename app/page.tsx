@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import PlanSelectionModal from './components/PlanSelectionModal';
 import { 
   Building2, 
   Users, 
@@ -110,6 +111,7 @@ import { PagamentosTab } from '../components/tabs/PagamentosTab';
 import { LogsTab } from '../components/tabs/LogsTab';
 import { UsuariosTab } from '../components/tabs/UsuariosTab';
 import { ConfiguracoesTab } from '../components/tabs/ConfiguracoesTab';
+import { ModelosContratoTab } from '../components/tabs/ModelosContratoTab';
 import { LandingPage } from './components/LandingPage';
 
 export default function DashboardPage() {
@@ -558,6 +560,8 @@ export default function DashboardPage() {
   const can = (action: string, tab?: string) => {
     if (!userProfile) return false;
     if (userProfile.role === 'MASTER') return true;
+    if (tab === 'configuracoes') return false; // Somente MASTER passa direto no if acima
+    
     if (userProfile.role === 'ADMIN') {
       if (['logs', 'usuarios'].includes(tab || '')) return false; // Admin não gerencia usuários do sistema (só MASTER)
       return true;
@@ -571,7 +575,7 @@ export default function DashboardPage() {
 
     if (userProfile.role === 'PROPRIETARIO') {
       if (action === 'VIEW') {
-        return ['dashboard', 'imoveis', 'contratos', 'pagamentos'].includes(tab || '');
+        return ['dashboard', 'imoveis', 'contratos', 'pagamentos', 'modelos_contrato'].includes(tab || '');
       }
       return false; // Proprietários são apenas leitura
     }
@@ -753,7 +757,9 @@ export default function DashboardPage() {
     } catch (err: any) {
       console.error('Erro fetchProfile:', err);
       const msg = err.message?.toLowerCase() || '';
-      if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid')) {
+      const name = err.name?.toLowerCase() || '';
+      const isSpecificAuth = msg.includes('refresh_token') || msg.includes('refresh token') || msg.includes('session_not_found') || name.includes('autherror') || name.includes('authapierror') || err.__isAuthError;
+      if (isSpecificAuth) {
          // Se erro crítico de auth, tenta limpar
          try { await supabase.auth.signOut(); } catch(e) {}
          setSession(null);
@@ -765,53 +771,97 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    let isHandlingErrorLock = false;
+
     const handleAuthError = async () => {
-      console.log('handleAuthError: limpando sessão devido a erro técnico');
-      try {
-        await supabase.auth.signOut();
-      } catch (e) {
-        // Ignorar erro no logout se já estivermos deslogados
-      }
-      // Limpeza manual de tokens se o signOut falhar por causa do token inválido
+      if (isHandlingErrorLock) return;
+      isHandlingErrorLock = true;
+      console.log('handleAuthError: limpando sessão devido a erro técnico de token');
+      
       if (typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => {
-          if (key.includes('-auth-token')) {
-            localStorage.removeItem(key);
-          }
-        });
-        // Tenta limpar cookies também se possível (alguns browsers/configs usam cookies)
-        document.cookie.split(";").forEach(function(c) { 
-          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-        });
+        try {
+          // Set friendly expired session notice flag to show at login screen
+          sessionStorage.setItem('auth_expired_notice', 'true');
+        } catch (e) {}
       }
+
+      // Limpeza manual imediata dos tokens para parar qualquer refresh em background do cliente Supabase
+      if (typeof window !== 'undefined') {
+        try {
+          Object.keys(localStorage).forEach(key => {
+            const lowerKey = key.toLowerCase();
+            if (
+              lowerKey.includes('auth-token') || 
+              lowerKey.startsWith('sb-') || 
+              lowerKey.includes('supabase') || 
+              lowerKey.includes('auth') || 
+              lowerKey.includes('token')
+            ) {
+              localStorage.removeItem(key);
+            }
+          });
+          Object.keys(sessionStorage).forEach(key => {
+            const lowerKey = key.toLowerCase();
+            if (
+              lowerKey.includes('auth-token') || 
+              lowerKey.startsWith('sb-') || 
+              lowerKey.includes('supabase') || 
+              lowerKey.includes('auth') || 
+              lowerKey.includes('token')
+            ) {
+              sessionStorage.removeItem(key);
+            }
+          });
+          // Tenta limpar cookies também
+          document.cookie.split(";").forEach(function(c) { 
+            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+          });
+        } catch (e) {
+          console.error("Erro deletando cookies/localStorage:", e);
+        }
+      }
+
       setSession(null);
       setUserProfile(null);
       setAuthLoading(false);
-      
-      // Se estávamos num loop, um reload pode ajudar a resetar o estado do cliente Supabase
+
+      // Se estávamos num loop, um reload ajuda a recriar o cliente Supabase sem lixo em memória
       if (typeof window !== 'undefined') {
-        // Recarregar apenas se detectarmos que estamos presos
         const lastError = sessionStorage.getItem('last_auth_error_time');
         const now = Date.now();
         if (!lastError || (now - parseInt(lastError)) > 10000) {
           sessionStorage.setItem('last_auth_error_time', now.toString());
-          window.location.reload();
+          setTimeout(() => {
+            window.location.reload();
+          }, 150);
+        } else {
+          console.warn("Prevenido reload infinito de autenticação.");
         }
       }
+      isHandlingErrorLock = false;
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const err = event.reason;
-      const msg = err?.message?.toLowerCase() || '';
-      if (
+      if (!err) return;
+      
+      const msg = err.message?.toLowerCase() || '';
+      const name = err.name?.toLowerCase() || '';
+      const isSpecificAuth = (
+        msg.includes('refresh_token') || 
         msg.includes('refresh token') || 
-        msg.includes('not found') || 
-        msg.includes('invalid') || 
-        msg.includes('expired') ||
-        (err?.name === 'AuthApiError' && err?.status === 400)
-      ) {
+        msg.includes('gotrue') ||
+        msg.includes('session_not_found') ||
+        name.includes('authapierror') ||
+        name.includes('authretryableerror') ||
+        name.includes('autherror') ||
+        err.__isAuthError === true
+      );
+
+      if (isSpecificAuth) {
         console.warn('Capturado Unhandled Rejection de Auth no Supabase:', err);
         event.preventDefault();
+        event.stopPropagation();
         handleAuthError();
       }
     };
@@ -839,7 +889,9 @@ export default function DashboardPage() {
         if (error) {
           console.error('Erro ao buscar sessão inicial:', error);
           const msg = error.message?.toLowerCase() || '';
-          if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid') || msg.includes('expired')) {
+          const name = error.name?.toLowerCase() || '';
+          const isSpecificAuth = msg.includes('refresh_token') || msg.includes('refresh token') || msg.includes('session_not_found') || name.includes('autherror') || name.includes('authapierror') || (error as any).__isAuthError;
+          if (isSpecificAuth) {
             console.log('initAuth: erro de auth, tratando');
             await handleAuthError();
           } else {
@@ -861,7 +913,9 @@ export default function DashboardPage() {
         clearTimeout(fallbackTimer);
         console.error('Falha no carregamento da autenticação:', err);
         const msg = err?.message?.toLowerCase() || '';
-        if (msg.includes('refresh token') || msg.includes('not found') || msg.includes('invalid') || msg.includes('expired')) {
+        const name = err?.name?.toLowerCase() || '';
+        const isSpecificAuth = msg.includes('refresh_token') || msg.includes('refresh token') || msg.includes('session_not_found') || name.includes('autherror') || name.includes('authapierror') || err?.__isAuthError;
+        if (isSpecificAuth) {
           console.log('initAuth: exceção de auth, tratando');
           await handleAuthError();
         } else {
@@ -908,6 +962,16 @@ export default function DashboardPage() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginSuccess, setLoginSuccess] = useState<string | null>(null);
   const [registeredEmailWelcome, setRegisteredEmailWelcome] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const expired = sessionStorage.getItem('auth_expired_notice');
+      if (expired === 'true') {
+        sessionStorage.removeItem('auth_expired_notice');
+        setLoginError('Sua sessão expirou ou foi invalidada por segurança. Por favor, faça login novamente para continuar.');
+      }
+    }
+  }, []);
 
   const translateErrorMsg = (msg: string | null | undefined) => {
     if (!msg) return 'Ocorreu um erro desconhecido.';
@@ -1093,16 +1157,23 @@ export default function DashboardPage() {
       });
       
       if (signUpError) {
-        if (signUpError.message?.toLowerCase().includes('user already exists')) {
+        if (signUpError.message?.toLowerCase().includes('user already exists') || signUpError.message?.toLowerCase().includes('already registered')) {
           handleErrorModal(
-            `Erro de duplicidade: O e-mail (${email}) já está cadastrado no sistema. Por favor, use a opção de redefinição de senha.`
+            `Este usuário já está registrado no sistema de autenticação (Supabase Auth), embora o seu perfil na tabela publica tenha sido removido.
+
+Para resolver isso:
+1. Acesse o painel do seu Supabase.
+2. No menu lateral, clique em "Authentication" (Autenticação) -> "Users".
+3. Procure o e-mail "${email}".
+4. Clique nos três pontinhos "..." ao lado dele e selecione "Delete User" (Excluir Usuário).
+5. Após fazer isso, tente cadastrar novamente e o registro funcionará perfeitamente!`
           );
           setLoading(false);
           return;
         }
         if (signUpError.message?.toLowerCase().includes('rate limit')) {
           handleErrorModal(
-            `Limite de envios excedido por segurança. Por favor, aguarde cerca de 1 hora para cadastrar novos usuários ou ajuste o Rate Limit no painel Authentication do seu Supabase.`
+            `Limite de envios excedido por segurança. Por favor, aguarde cerca de 1 hora para cadastrar novos usuários ou envie sem confirmação de email ajustando o Rate Limit no painel do Supabase.`
           );
           setLoading(false);
           return;
@@ -1114,7 +1185,7 @@ export default function DashboardPage() {
         // Garantir que criamos o registro imediatamente na tabela user_profiles com o e-mail preenchido!
         try {
           const { count, error: countError } = await supabase.from('user_profiles').select('*', { count: 'exact', head: true });
-          const role = (count === 0 && !countError) ? 'MASTER' : 'CORRETOR';
+          const role = (count === 0 && !countError) ? 'MASTER' : 'ADMIN';
           const approved = role === 'MASTER';
           
           const isPlanPaid = selectedPlanSignUp !== 'Gratuito';
@@ -1144,9 +1215,16 @@ export default function DashboardPage() {
         setLoginSuccess('Cadastro de novo usuário realizado com sucesso! Enviamos um e-mail de confirmação para você. Por favor, confirme seu e-mail para poder acessar o sistema.');
       }
     } catch (err: any) {
-      if (err.message?.toLowerCase().includes('user already exists')) {
+      if (err.message?.toLowerCase().includes('user already exists') || err.message?.toLowerCase().includes('already registered')) {
         handleErrorModal(
-          `Erro de duplicidade: O e-mail (${email}) já está cadastrado no sistema. Por favor, use a opção de redefinição de senha.`
+          `Este usuário já está registrado no sistema de autenticação (Supabase Auth), embora o seu perfil na tabela publica tenha sido removido.
+
+Para resolver isso:
+1. Acesse o painel do seu Supabase.
+2. No menu lateral, clique em "Authentication" (Autenticação) -> "Users".
+3. Procure o e-mail "${email}".
+4. Clique nos três pontinhos "..." ao lado dele e selecione "Delete User" (Excluir Usuário).
+5. Após fazer isso, tente cadastrar novamente e o registro funcionará perfeitamente!`
         );
       } else {
         handleErrorModal(err.message || 'Erro ao realizar cadastro');
@@ -1556,9 +1634,59 @@ export default function DashboardPage() {
     loadData();
   }, [session, userProfile, fetchData, recordLog]);
 
+  const [isPlanSelectionModalOpen, setIsPlanSelectionModalOpen] = useState(false);
+  const [upgradeBillingCycle, setUpgradeBillingCycle] = useState<'mensal' | 'anual'>('mensal');
+  const [selectedUpgradePlan, setSelectedUpgradePlan] = useState<any | null>(null);
+  const [upgradeCpfCnpj, setUpgradeCpfCnpj] = useState('');
+  const [upgradePaymentMethod, setUpgradePaymentMethod] = useState<'pix' | 'cartao' | 'boleto'>('pix');
+  const [upgradeCheckoutStep, setUpgradeCheckoutStep] = useState<'select' | 'form' | 'success'>('select');
+  const [isUpgradeCheckoutLoading, setIsUpgradeCheckoutLoading] = useState(false);
+  const [upgradeCheckoutResult, setUpgradeCheckoutResult] = useState<any | null>(null);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [loadingCep, setLoadingCep] = useState(false);
+  const checkPlanLimit = (): string | null => {
+    const userPlanLimits: {[key: string]: number} = {
+      'Gratuito': 1,
+      'Nenhum': 1,
+      'Iniciante': 10,
+      'Profissional': 50,
+      'Ilimitado': Infinity
+    };
+    const userPlan = userProfile?.plano || 'Gratuito';
+    // ADMIN and other users are subject to their respective plan limits to preserve the safety locks
+    const limit = userPlanLimits[userPlan] || 1;
+    const planDisplayName = userPlan;
+
+    let count = 0;
+    let label = '';
+    if (activeTab === 'imoveis') {
+      count = imoveis.filter(i => !i.arquivado).length;
+      label = 'bens/itens';
+    } else if (activeTab === 'inquilinos') {
+      count = inquilinos.filter(i => !i.arquivado).length;
+      label = 'locatários/clientes';
+    } else if (activeTab === 'proprietarios') {
+      count = proprietarios.filter(p => !p.arquivado).length;
+      label = 'cedentes/proprietários';
+    } else if (activeTab === 'contratos') {
+      count = contratos.filter(c => !c.arquivado).length;
+      label = 'contratos';
+    }
+
+    if (count >= limit && limit !== Infinity) {
+      return `Você atingiu o limite de ${limit} ${label} ativos do seu plano (${planDisplayName}). Faça upgrade para continuar.`;
+    }
+    return null;
+  };
 
   const openCreateModal = (item: any = null) => {
+    if (!item) {
+      const limitError = checkPlanLimit();
+      if (limitError) {
+        setIsPlanSelectionModalOpen(true);
+        return;
+      }
+    }
     setEditingItem(item);
     setErrorMsg(null);
     setFormErrors({});
@@ -3104,9 +3232,8 @@ export default function DashboardPage() {
           'Ilimitado': Infinity
         };
         const userPlan = userProfile?.plano || 'Gratuito';
-        const isUnlimitedUser = userProfile?.role === 'ADMIN';
-        
-        const limit = isUnlimitedUser ? Infinity : (userPlanLimits[userPlan] || 1);
+        // ADMIN and other users are subject to their respective plan limits to preserve the safety locks
+        const limit = userPlanLimits[userPlan] || 1;
         const planDisplayName = userPlan;
 
         if (activeTab === 'imoveis') {
@@ -3288,8 +3415,8 @@ export default function DashboardPage() {
                   if (resultGen) {
                     try {
                       if (typeof window !== 'undefined') {
-                        const savedApiKey = localStorage.getItem('asaas_api_key');
-                        const savedEnv = localStorage.getItem('asaas_env') || 'sandbox';
+                        const savedApiKey = localStorage.getItem('asaas_api_key') || process.env.NEXT_PUBLIC_ASAAS_API_KEY || '';
+                        const savedEnv = localStorage.getItem('asaas_env') || process.env.NEXT_PUBLIC_ASAAS_ENV || 'sandbox';
                         const savedAutoBilling = localStorage.getItem('asaas_auto_billing') === 'true';
 
                         if (savedApiKey && savedAutoBilling) {
@@ -3596,10 +3723,14 @@ export default function DashboardPage() {
             SortHeader={SortHeader}
             loading={loading}
             handleApproveUser={async (id) => {
-               if (confirm(`Aprovar entrada?`)) {
                  const { error } = await supabase.from('user_profiles').update({ approved: true, status_pagamento: 'PAGO', plano: 'Pro' }).eq('id', id);
-                 if (!error) fetchData();
-               }
+                 if (error) {
+                   console.error("Erro ao aprovar usuário:", error);
+                   alert("Erro ao aprovar usuário: " + error.message);
+                 } else {
+                   alert("Usuário aprovado com sucesso!");
+                   fetchData();
+                 }
             }}
             handleChangeRole={async (id, newRole) => {
                if (confirm(`Alterar nível para ${newRole}?`)) {
@@ -3643,15 +3774,24 @@ export default function DashboardPage() {
         );
       }
       
+      case 'modelos_contrato': {
+        return (
+          <ModelosContratoTab 
+            contractTemplates={contractTemplates} 
+            setContractTemplates={setContractTemplates}
+            onSave={handleSaveTemplates}
+            onDeleteTemplate={handleDeleteTemplateDB}
+            notificationDays={notificationDays}
+            setNotificationDays={setNotificationDays}
+          />
+        );
+      }
+      
       case 'configuracoes': {
         return (
           <ConfiguracoesTab 
-            contractTemplates={contractTemplates} 
-            setContractTemplates={setContractTemplates}
-            notificationDays={notificationDays}
-            setNotificationDays={setNotificationDays}
-            onSave={handleSaveTemplates}
-            onDeleteTemplate={handleDeleteTemplateDB}
+            perfis={perfis}
+            logs={logs}
           />
         );
       }
@@ -4280,6 +4420,13 @@ export default function DashboardPage() {
             <div className="mt-8 pt-6 border-t border-white/10 flex flex-col gap-2">
               <button
                 type="button"
+                onClick={() => setIsPlanSelectionModalOpen(true)}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-750 text-white rounded-xl text-xs font-black uppercase tracking-widest text-center transition-all cursor-pointer active:scale-98 shadow-md shadow-blue-900/30"
+              >
+                Alterar Plano / Ver Outros Planos
+              </button>
+              <button
+                type="button"
                 onClick={handleDowngradeToFree}
                 disabled={checkoutLoading}
                 className="w-full py-3 hover:bg-white/10 text-white border border-white/20 rounded-xl text-xs font-black uppercase tracking-widest text-center transition-all cursor-pointer active:scale-98"
@@ -4445,6 +4592,15 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+        <PlanSelectionModal
+          isOpen={isPlanSelectionModalOpen}
+          onClose={() => setIsPlanSelectionModalOpen(false)}
+          userProfile={userProfile}
+          setUserProfile={setUserProfile}
+          fetchData={fetchData}
+          supabase={supabase}
+          recordLog={recordLog}
+        />
       </div>
     );
   }
@@ -4543,6 +4699,14 @@ export default function DashboardPage() {
               onClick={() => { setActiveTab('pagamentos'); setIsSidebarOpen(false); setShowArchived(false); }} 
             />
           )}
+          {can('VIEW', 'modelos_contrato') && (
+            <SidebarItem 
+              icon={FileText} 
+              label="Modelos de Contratos" 
+              active={activeTab === 'modelos_contrato'} 
+              onClick={() => { setActiveTab('modelos_contrato'); setIsSidebarOpen(false); setShowArchived(false); }} 
+            />
+          )}
           {can('VIEW', 'configuracoes') && (
             <SidebarItem 
               icon={Settings} 
@@ -4605,7 +4769,7 @@ export default function DashboardPage() {
           >
             Sair da Conta
           </button>
-          <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest text-center mt-2">v1.5.0</p>
+          <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest text-center mt-2">v1.6.0</p>
         </div>
       </aside>
 
@@ -4642,11 +4806,12 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
               <span>Workspace</span>
               <ChevronRight size={10} className="text-slate-300" />
-              <span className="text-blue-500">{activeTab === 'configuracoes' ? 'Definições' : activeTab === 'dashboard' ? 'Início' : activeTab}</span>
+              <span className="text-blue-500">{activeTab === 'configuracoes' ? 'Definições' : activeTab === 'modelos_contrato' ? 'Configurações' : activeTab === 'dashboard' ? 'Início' : activeTab}</span>
             </div>
             <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight italic leading-none flex items-center gap-4">
               {activeTab === 'dashboard' ? 'Overview' : 
                activeTab === 'logs' ? 'Auditoria' :
+               activeTab === 'modelos_contrato' ? 'Modelos de Contratos' :
                activeTab === 'configuracoes' ? 'Configurações' :
                activeTab.toUpperCase()}
               {userProfile?.role === 'MASTER' && activeTab === 'contratos' && (
@@ -4659,7 +4824,7 @@ export default function DashboardPage() {
           </div>
           
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            {activeTab !== 'dashboard' && activeTab !== 'logs' && activeTab !== 'configuracoes' && (
+            {activeTab !== 'dashboard' && activeTab !== 'logs' && activeTab !== 'configuracoes' && activeTab !== 'modelos_contrato' && (
               <>
                 <button 
                   onClick={() => {
@@ -5858,7 +6023,18 @@ export default function DashboardPage() {
           </div>
         )}
       </AnimatePresence>
-      
+
+      {/* Upgrade / Plan Selection Modal */}
+      <PlanSelectionModal
+        isOpen={isPlanSelectionModalOpen}
+        onClose={() => setIsPlanSelectionModalOpen(false)}
+        userProfile={userProfile}
+        setUserProfile={setUserProfile}
+        fetchData={fetchData}
+        supabase={supabase}
+        recordLog={recordLog}
+      />
+
       {/* Tag Guide Modal */}
       <AnimatePresence>
         {isTagGuideOpen && (

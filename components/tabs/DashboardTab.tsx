@@ -41,6 +41,7 @@ interface DashboardTabProps {
   setExistingGuarantorDocs: (docs: string[]) => void;
   setCreateModalOpen: (open: boolean) => void;
   handleSendEmailNotification: (co: any, type: 'VENCIMENTO' | 'ATRASO', nextDueDate?: Date) => void;
+  userProfile?: any;
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({
