@@ -3272,13 +3272,68 @@ export default function DashboardPage() {
                   .single();
                 
                 if (newContract) {
-                  await generateContractPayments(
+                  const resultGen = await generateContractPayments(
                     newContract, 
                     rawData.data_inicio as string, 
                     rawData.data_fim as string, 
                     parseFloat(rawData.valor_aluguel as string), 
                     parseInt(rawData.dia_vencimento as string)
                   );
+
+                  if (resultGen) {
+                    try {
+                      if (typeof window !== 'undefined') {
+                        const savedApiKey = localStorage.getItem('asaas_api_key');
+                        const savedEnv = localStorage.getItem('asaas_env') || 'sandbox';
+                        const savedAutoBilling = localStorage.getItem('asaas_auto_billing') === 'true';
+
+                        if (savedApiKey && savedAutoBilling) {
+                          // Obter dados do inquilino
+                          const tenantObj = inquilinos.find(i => i.id === rawData.inquilino_id);
+                          
+                          // Buscar as parcelas inseridas para este contrato
+                          const { data: generatedPayments } = await supabase
+                            .from('pagamentos')
+                            .select('*')
+                            .eq('contrato_id', newContract.id);
+
+                          if (tenantObj && generatedPayments && generatedPayments.length > 0) {
+                            const asaasResponse = await fetch('/api/asaas/create-billing', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                apiKey: savedApiKey,
+                                env: savedEnv,
+                                tenant: tenantObj,
+                                payments: generatedPayments,
+                                contractId: newContract.id
+                              }),
+                            });
+
+                            if (asaasResponse.ok) {
+                              const asaasData = await asaasResponse.json();
+                              if (asaasData.success && asaasData.results) {
+                                for (const resItem of asaasData.results) {
+                                  if (resItem.success && resItem.invoiceUrl) {
+                                    await supabase
+                                      .from('pagamentos')
+                                      .update({
+                                        observacoes: `Asaas|${resItem.invoiceUrl}|${resItem.bankSlipUrl || ''}|${resItem.asaasId}`
+                                      })
+                                      .eq('id', resItem.paymentId);
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    } catch (asaasErr) {
+                      console.error("Erro ao sincronizar cobranças com Asaas ao criar contrato:", asaasErr);
+                    }
+                  }
                 }
               } catch (pGenErr) {
                 console.error("Falha silenciosa na geração de parcelas:", pGenErr);

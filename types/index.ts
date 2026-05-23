@@ -108,6 +108,8 @@ export interface Pagamento {
   competencia_mes: number;
   competencia_ano: number;
   contratos?: any;
+  comprovante_aluguel?: string;
+  observacoes?: string;
 }
 
 export interface UserProfile {

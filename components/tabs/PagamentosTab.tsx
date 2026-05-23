@@ -259,14 +259,30 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
                             <Printer size={12} /> Recibo
                           </button>
                         ) : (
-                          <button 
-                             onClick={() => handleMarkAsPaid(p, p.valor_esperado || 0)}
-                             disabled={loading}
-                             className={`bg-green-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest hover:bg-green-700 transition-all shadow-md shadow-green-100 flex items-center gap-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                          >
-                            {loading ? <Loader2 size={12} className="animate-spin" /> : null}
-                            Baixar
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {p.observacoes && p.observacoes.startsWith('Asaas|') && (
+                              <button 
+                                onClick={() => {
+                                  const parts = p.observacoes.split('|');
+                                  const url = parts[1];
+                                  if (url) window.open(url, '_blank');
+                                }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest transition-all shadow-md shadow-blue-100 flex items-center gap-2 cursor-pointer"
+                                title="Abrir link de cobrança no Asaas (Pix, Boleto, Cartão)"
+                              >
+                                <CreditCard size={12} />
+                                Pagar (Asaas)
+                              </button>
+                            )}
+                            <button 
+                               onClick={() => handleMarkAsPaid(p, p.valor_esperado || 0)}
+                               disabled={loading}
+                               className={`bg-green-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest hover:bg-green-700 transition-[#1A1A1A] block transition-all shadow-md shadow-green-100 flex items-center gap-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              {loading ? <Loader2 size={12} className="animate-spin" /> : null}
+                              Baixar
+                            </button>
+                          </div>
                         )}
                         
                         {isAtrasado && p.status !== StatusPagamento.PAGO && (

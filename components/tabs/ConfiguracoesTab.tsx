@@ -17,7 +17,8 @@ import {
   ShieldAlert,
   Building,
   Loader2,
-  Sparkles
+  Sparkles,
+  BadgeDollarSign
 } from 'lucide-react';
 import { RichEditor } from '../RichEditor';
 import { TagItem } from '../TagItem';
@@ -52,6 +53,53 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
   const [contractRulesPrompt, setContractRulesPrompt] = useState('');
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
+
+  // States para Integração Asaas
+  const [asaasApiKey, setAsaasApiKey] = useState('');
+  const [asaasEnv, setAsaasEnv] = useState<'sandbox' | 'production'>('sandbox');
+  const [asaasAutoBilling, setAsaasAutoBilling] = useState(false);
+  const [isTestingAsaas, setIsTestingAsaas] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedKey = localStorage.getItem('asaas_api_key') || '';
+      const savedEnv = (localStorage.getItem('asaas_env') as 'sandbox' | 'production') || 'sandbox';
+      const savedAutoBilling = localStorage.getItem('asaas_auto_billing') === 'true';
+      setAsaasApiKey(savedKey);
+      setAsaasEnv(savedEnv);
+      setAsaasAutoBilling(savedAutoBilling);
+    }
+  }, []);
+
+  const testAsaasConnection = async () => {
+    if (!asaasApiKey) return;
+    setIsTestingAsaas(true);
+    setTestResult(null);
+    try {
+      const response = await fetch('/api/asaas/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          apiKey: asaasApiKey,
+          env: asaasEnv,
+        }),
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setTestResult({ success: true, message: 'Sucesso! Chave conectada com sucesso.' });
+      } else {
+        setTestResult({ success: false, message: data.error || 'Falha na conexão.' });
+      }
+    } catch (err) {
+      setTestResult({ success: false, message: 'Erro ao tentar se conectar ao Asaas.' });
+    } finally {
+      setIsTestingAsaas(false);
+    }
+  };
 
   const handleGenerateAiTemplate = async () => {
     const finalType = contractType === 'Outro' ? customType : contractType;
@@ -447,6 +495,153 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
             <div className="flex justify-between text-[8px] font-black text-slate-300 uppercase tracking-tighter">
               <span>15 Dias</span>
               <span>120 Dias</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Integração ASAAS */}
+      <section className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
+              <BadgeDollarSign size={24} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-slate-800 tracking-tight italic uppercase">Integração Asaas</h2>
+              <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Automatize a geração de cobranças (Boleto, Pix e Cartão) diretamente pelos contratos</p>
+            </div>
+          </div>
+          <span className="px-3 py-1 bg-green-100 text-green-700 text-[10px] font-black uppercase tracking-widest rounded-full animate-pulse">Recomendado</span>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          {/* Formulário de Configuração */}
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 block">API Key ASAAS</label>
+                <input 
+                  type="password" 
+                  value={asaasApiKey}
+                  onChange={(e) => {
+                    setAsaasApiKey(e.target.value);
+                    localStorage.setItem('asaas_api_key', e.target.value);
+                  }}
+                  placeholder="Ex: $aae.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  className="w-full bg-slate-50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl px-4 py-3 font-mono text-sm transition-all"
+                />
+                <span className="text-[9px] text-slate-400 font-medium block ml-1 leading-normal">
+                  Chave gerada no painel do Asaas em <strong>Minha Conta &gt; Integrações &gt; Gerar API Key</strong>.
+                </span>
+              </div>
+              
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 block">Ambiente</label>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <label className={`flex-1 flex items-center gap-3 p-4 bg-slate-50 border-2 rounded-2xl cursor-pointer hover:bg-slate-100/50 transition-all ${asaasEnv === 'sandbox' ? 'border-blue-500 bg-white ring-4 ring-blue-50' : 'border-slate-100'}`}>
+                    <input 
+                      type="radio" 
+                      name="asaas_env" 
+                      value="sandbox" 
+                      checked={asaasEnv === 'sandbox'} 
+                      onChange={() => {
+                        setAsaasEnv('sandbox');
+                        localStorage.setItem('asaas_env', 'sandbox');
+                      }}
+                      className="accent-blue-600"
+                    />
+                    <div>
+                      <p className="text-xs font-black text-slate-700 uppercase">Homologação (Sandbox)</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Ambiente de Testes</p>
+                    </div>
+                  </label>
+                  
+                  <label className={`flex-1 flex items-center gap-3 p-4 bg-slate-50 border-2 rounded-2xl cursor-pointer hover:bg-slate-100/50 transition-all ${asaasEnv === 'production' ? 'border-blue-500 bg-white ring-4 ring-blue-50' : 'border-slate-100'}`}>
+                    <input 
+                      type="radio" 
+                      name="asaas_env" 
+                      value="production" 
+                      checked={asaasEnv === 'production'} 
+                      onChange={() => {
+                        setAsaasEnv('production');
+                        localStorage.setItem('asaas_env', 'production');
+                      }}
+                      className="accent-blue-600"
+                    />
+                    <div>
+                      <p className="text-xs font-black text-slate-700 uppercase">Produção</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Transações Reais</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50">
+                <input 
+                  type="checkbox" 
+                  id="auto_billing" 
+                  checked={asaasAutoBilling} 
+                  onChange={(e) => {
+                    setAsaasAutoBilling(e.target.checked);
+                    localStorage.setItem('asaas_auto_billing', e.target.checked ? 'true' : 'false');
+                  }}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300" 
+                />
+                <label htmlFor="auto_billing" className="text-xs text-slate-600 font-bold select-none cursor-pointer">
+                  Habilitar Emissão Automática ao criar novo Contrato
+                </label>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={testAsaasConnection}
+                  disabled={isTestingAsaas || !asaasApiKey}
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 hover:bg-black disabled:opacity-40 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all active:scale-95 cursor-pointer"
+                >
+                  {isTestingAsaas ? <Loader2 className="animate-spin" size={14} /> : null}
+                  Testar Conexão
+                </button>
+                {testResult !== null && (
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${testResult.success ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {testResult.message}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Status e Fluxo de Integração */}
+          <div className="bg-slate-50/85 p-8 rounded-[2rem] border border-slate-200/50 flex flex-col justify-between">
+            <div className="space-y-4">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fluxo de Funcionamento Inteligente</p>
+              <div className="space-y-3.5">
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold mt-0.5 shrink-0">1</div>
+                  <p className="text-xs text-slate-500 font-bold leading-relaxed">
+                    Sempre que você criar um Contrato com vencimento e valor definidos, o sistema consulta se o Inquilino existe no seu Asaas pelo CPF/CNPJ. Se não existir, ele é cadastrado na hora.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold mt-0.5 shrink-0">2</div>
+                  <p className="text-xs text-slate-500 font-bold leading-relaxed">
+                    O sistema cria uma assinatura recorrente ou cobranças únicas no Asaas, gerando os boletos e QR Codes Pix automaticamente.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold mt-0.5 shrink-0">3</div>
+                  <p className="text-xs text-slate-500 font-bold leading-relaxed">
+                    Seu cliente receberá avisos automatizados do Asaas, e todo pagamento efetuado poderá ser consultado ou atualizado.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="border-t border-slate-200/60 pt-6 mt-6">
+              <p className="text-[10px] font-bold text-slate-400 leading-normal">
+                ⚠️ <strong className="text-slate-500">Nota sobre Produção:</strong> Ao mudar para Produção, certifique-se de que sua conta Asaas esteja aprovada para emissão. No ambiente Sandbox, você pode simular transações sem risco.
+              </p>
             </div>
           </div>
         </div>
