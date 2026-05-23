@@ -12,11 +12,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Dados do inquilino insuficientes para integração." }, { status: 400 });
     }
 
-    const baseUrl = env === "production" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/v3";
+    const baseUrl = env === "production" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3";
     const headers = {
       "access_token": apiKey,
       "Content-Type": "application/json",
-      "User-Agent": "realizzeapp-integration"
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     };
 
     // 1. Procurar inquilino por CPF/CNPJ no Asaas para evitar duplicidade

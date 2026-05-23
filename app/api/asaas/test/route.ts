@@ -8,14 +8,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Chave de API não informada." }, { status: 400 });
     }
 
-    const baseUrl = env === "production" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/v3";
+    const baseUrl = env === "production" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3";
 
-    // O endpoint correto do Asaas v3 para obter os dados da conta/empresa é /myAccount (ou /customers como teste simples)
+    // O endpoint correto do Asaas v3 para obter os dados da conta/empresa é /myAccount
     const response = await fetch(`${baseUrl}/myAccount`, {
       method: "GET",
       headers: {
         "access_token": apiKey,
-        "User-Agent": "realizzeapp-integration"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       }
     });
 
@@ -30,9 +30,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isJson) {
+      console.log("Resposta asaas não-JSON:", responseText.substring(0, 500));
       return NextResponse.json({ 
         success: false, 
-        error: `Resposta inesperada do servidor do Asaas (HTML/Texto recebido). Por favor, verifique se a chave de API ($aae...) é realmente do ambiente selecionado (${env === 'production' ? 'Produção' : 'Homologação/Sandbox'}) ou tente novamente.` 
+        error: `Resposta inesperada do servidor do Asaas (HTML: ${responseText.substring(0, 200)}...). Verifique se a chave de API ($aae...) é do ambiente correto (${env === 'production' ? 'Produção' : 'Homologação/Sandbox'}).` 
       }, { status: 400 });
     }
 
