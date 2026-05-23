@@ -725,6 +725,18 @@ export default function DashboardPage() {
       } else {
         // Usuário existe, atualizar last_access e setar estado
         let finalData = { ...data };
+        
+        // Auto-approve if email is confirmed in auth.users
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!finalData.approved && user?.email_confirmed_at) {
+            await supabase.from('user_profiles').update({ approved: true }).eq('id', userId);
+            finalData.approved = true;
+          }
+        } catch (e) {
+          console.warn('Falha ao auto-aprovar usuário:', e);
+        }
+
         try {
           await supabase.from('user_profiles').update({ last_access: new Date().toISOString() }).eq('id', userId);
         } catch (err) {
