@@ -29,15 +29,25 @@ export async function POST(req: NextRequest) {
           supabase = createClient(supabaseUrl, supabaseAnonKey!);
         }
 
-        const { data: masterProf } = await supabase
+        const { data: masterProf, error: selectError } = await supabase
           .from('user_profiles')
-          .select('asaas_key, asaas_env')
+          .select('id, email, asaas_key, asaas_env, role')
           .eq('role', 'MASTER')
           .not('asaas_key', 'is', null)
           .neq('asaas_key', '')
           .order('created_at', { ascending: true })
           .limit(1)
           .maybeSingle();
+
+        console.log("DEBUG: create-billing - Master profile from DB:", {
+          found: !!masterProf,
+          email: masterProf?.email,
+          role: masterProf?.role,
+          hasAsaasKey: !!masterProf?.asaas_key,
+          asaasKeyLength: masterProf?.asaas_key?.length || 0,
+          asaasEnv: masterProf?.asaas_env,
+          selectError: selectError ? { code: selectError.code, message: selectError.message } : null
+        });
 
         if (masterProf) {
           dbKey = masterProf.asaas_key || "";
@@ -48,18 +58,48 @@ export async function POST(req: NextRequest) {
       console.warn("Erro ao buscar configurações Asaas do MASTER no banco (create-billing):", supabaseErr);
     }
 
-    const activeApiKey = apiKey || dbKey || 
-      process.env.ASAAS_API_KEY || 
-      process.env.NEXT_PUBLIC_ASAAS_API_KEY || 
-      process.env.NEXT_PUBLIC_ASAAS_API_KE || 
-      process.env.ASAAS_API_KE;
+    // Resolvendo de forma robusta e inteligente:
+    // 1. Se dbKey foi encontrado e está preenchido, priorizamos dbKey e a dbEnv correspondente,
+    //    pois as configurações salvas pelo MASTER no banco devem herdar globalmente para todos os usuários.
+    // 2. Se não, usamos o apiKey do body.
+    // 3. Caso contrário, usamos variáveis de ambiente como fallback.
+    let activeApiKey = "";
+    let activeEnv = "sandbox";
 
-    const activeEnv = env || dbEnv || 
-      process.env.ASAAS_ENV || 
-      process.env.NEXT_PUBLIC_ASAAS_ENV || 
-      process.env.NEXT_PUBLIC_ASAAS_EN || 
-      process.env.ASAAS_EN || 
-      "sandbox";
+    if (dbKey) {
+      activeApiKey = dbKey;
+      activeEnv = dbEnv || "sandbox";
+      console.log("DEBUG (create-billing): Usando configurações do MASTER salvas no Banco de Dados:", {
+        env: activeEnv,
+        keyLength: activeApiKey.length,
+        keyFirst5: activeApiKey.substring(0, 5)
+      });
+    } else if (apiKey) {
+      activeApiKey = apiKey;
+      activeEnv = env || "sandbox";
+      console.log("DEBUG (create-billing): Usando configurações enviadas na requisição (Master Inline):", {
+        env: activeEnv,
+        keyLength: activeApiKey.length,
+        keyFirst5: activeApiKey.substring(0, 5)
+      });
+    } else {
+      activeApiKey = process.env.ASAAS_API_KEY || 
+        process.env.NEXT_PUBLIC_ASAAS_API_KEY || 
+        process.env.NEXT_PUBLIC_ASAAS_API_KE || 
+        process.env.ASAAS_API_KE || "";
+        
+      activeEnv = process.env.ASAAS_ENV || 
+        process.env.NEXT_PUBLIC_ASAAS_ENV || 
+        process.env.NEXT_PUBLIC_ASAAS_EN || 
+        process.env.ASAAS_EN || 
+        "sandbox";
+        
+      console.log("DEBUG (create-billing): Usando chaves de Fallback das Variáveis de Ambiente (Vercel/CloudRun):", {
+        env: activeEnv,
+        keyLength: activeApiKey.length,
+        keyFirst5: activeApiKey ? activeApiKey.substring(0, 5) : ""
+      });
+    }
 
     if (!activeApiKey) {
       return NextResponse.json({ error: "Chave de API do Asaas não configurada no painel Master para faturamento." }, { status: 400 });
