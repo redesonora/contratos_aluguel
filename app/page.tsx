@@ -3522,8 +3522,8 @@ Para resolver isso:
                     if (resultGen) {
                       try {
                         if (typeof window !== 'undefined') {
-                          const savedApiKey = localStorage.getItem('asaas_api_key') || process.env.NEXT_PUBLIC_ASAAS_API_KEY || '';
-                          const savedEnv = localStorage.getItem('asaas_env') || process.env.NEXT_PUBLIC_ASAAS_ENV || 'sandbox';
+                          const savedApiKey = localStorage.getItem('asaas_api_key') || '';
+                          const savedEnv = localStorage.getItem('asaas_env') || 'sandbox';
                           const savedAutoBilling = localStorage.getItem('asaas_auto_billing') === 'true';
 
                           let finalApiKey = savedApiKey;
@@ -4390,7 +4390,7 @@ Para resolver isso:
             >
               Sair da Conta
             </button>
-            <p className="text-[10px] font-black text-blue-500/50 uppercase tracking-widest text-center mt-1">v1.7.0</p>
+            <p className="text-[10px] font-black text-blue-500/50 uppercase tracking-widest text-center mt-1">v1.7.1</p>
           </div>
         </motion.div>
       </div>
@@ -4574,7 +4574,7 @@ Para resolver isso:
               >
                 Sair da Conta
               </button>
-              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.7.0</p>
+              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.7.1</p>
             </div>
           </div>
 
@@ -4904,7 +4904,7 @@ Para resolver isso:
           >
             Sair da Conta
           </button>
-          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.7.0</p>
+          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.7.1</p>
         </div>
       </aside>
 

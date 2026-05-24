@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Determinar a Chave de API e Ambiente (priorizando a do banco de dados configurada pelo Master)
-    const activeApiKey = apiKey || dbKey || process.env.NEXT_PUBLIC_ASAAS_API_KEY || process.env.ASAAS_API_KEY;
-    const activeEnv = env || dbEnv || process.env.NEXT_PUBLIC_ASAAS_ENV || "sandbox";
+    const activeApiKey = apiKey || dbKey || process.env.ASAAS_API_KEY;
+    const activeEnv = env || dbEnv || process.env.ASAAS_ENV || "sandbox";
 
     if (!activeApiKey) {
       return NextResponse.json({ 

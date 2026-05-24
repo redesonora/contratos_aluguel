@@ -38,8 +38,8 @@ export default function PlanSelectionModal({
 
   useEffect(() => {
     if (isOpen && typeof window !== 'undefined') {
-      const savedKey = localStorage.getItem('asaas_api_key') || process.env.NEXT_PUBLIC_ASAAS_API_KEY || '';
-      const savedEnv = (localStorage.getItem('asaas_env') as 'sandbox' | 'production') || (process.env.NEXT_PUBLIC_ASAAS_ENV as 'sandbox' | 'production') || 'sandbox';
+      const savedKey = localStorage.getItem('asaas_api_key') || '';
+      const savedEnv = (localStorage.getItem('asaas_env') as 'sandbox' | 'production') || 'sandbox';
       setInlineApiKey(savedKey);
       setInlineEnv(savedEnv);
     }

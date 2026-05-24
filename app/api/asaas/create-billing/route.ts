@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
       console.warn("Erro ao buscar configurações Asaas do MASTER no banco (create-billing):", supabaseErr);
     }
 
-    const activeApiKey = apiKey || dbKey || process.env.NEXT_PUBLIC_ASAAS_API_KEY || process.env.ASAAS_API_KEY;
-    const activeEnv = env || dbEnv || process.env.NEXT_PUBLIC_ASAAS_ENV || "sandbox";
+    const activeApiKey = apiKey || dbKey || process.env.ASAAS_API_KEY;
+    const activeEnv = env || dbEnv || process.env.ASAAS_ENV || "sandbox";
 
     if (!activeApiKey) {
       return NextResponse.json({ error: "Chave de API do Asaas não configurada no painel Master para faturamento." }, { status: 400 });
