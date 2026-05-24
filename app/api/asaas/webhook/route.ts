@@ -49,13 +49,25 @@ export async function POST(req: NextRequest) {
 
         // O pagamento de plano foi confirmado/recebido com sucesso?
         if (event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED") {
+          const now = new Date();
+          const expirationDate = new Date();
+          const isAnual = cycle === "anual";
+          if (isAnual) {
+            expirationDate.setFullYear(now.getFullYear() + 1);
+          } else {
+            expirationDate.setMonth(now.getMonth() + 1);
+          }
+
+          const planNameWithCycle = isAnual ? `${planName} Anual` : `${planName} Mensal`;
+
           // Atualiza o perfil do usuário para o novo plano e o sinaliza como pago/aprovado
           const { error: updateProfileError } = await supabase
             .from("user_profiles")
             .update({
-              plano: planName,
+              plano: planNameWithCycle,
               status_pagamento: "PAGO",
-              approved: true
+              approved: true,
+              trial_ends_at: expirationDate.toISOString()
             })
             .eq("id", userId);
 

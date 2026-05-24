@@ -18,7 +18,8 @@ import {
   ShieldAlert,
   ChevronRight,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  DollarSign
 } from 'lucide-react';
 
 interface UsuariosTabProps {
@@ -43,7 +44,9 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
   onSyncData
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [planFilter, setPlanFilter] = useState<'ALL' | 'INICIANTE' | 'PROFISSIONAL' | 'ILIMITADO' | 'GRATUITO'>('ALL');
   const [syncLoading, setSyncLoading] = useState(false);
+  const [userSyncLoading, setUserSyncLoading] = useState<string | null>(null);
   const [viewingUser, setViewingUser] = useState<any>(null);
   const [quickTrialUser, setQuickTrialUser] = useState<any>(null);
   const [quickTrialDays, setQuickTrialDays] = useState('7');
@@ -55,6 +58,38 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
   const [deleteConfirmationName, setDeleteConfirmationName] = useState('');
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleSyncUserWithAsaas = async (userId: string) => {
+    setUserSyncLoading(userId);
+    try {
+      const supabase = getSupabase();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userToken = sessionData?.session?.access_token || '';
+
+      const res = await fetch('/api/asaas/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, supabaseToken: userToken }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro desconhecido na sincronização.');
+      }
+
+      if (data.success) {
+        showMessage(data.message || 'Usuário sincronizado com sucesso!');
+        if (onSyncData) await onSyncData(); // Atualiza a tabela chamando o callback do pai (fetchData)
+      } else {
+        showMessage(data.message || 'Não foi possível sincronizar o usuário.', 'error');
+      }
+    } catch (err: any) {
+      console.error('Erro de sync individual:', err);
+      showMessage('Falha ao sincronizar: ' + (err.message || err.toString()), 'error');
+    } finally {
+      setUserSyncLoading(null);
+    }
+  };
 
   const handleResendConfirmationUser = async (id: string, email: string) => {
     try {
@@ -159,16 +194,79 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
 
   // Filtragem de dados
   const filteredPerfis = perfis.filter(p => {
-    const search = searchTerm.toLowerCase();
+    // 1. Aplicar filtro de plano se ativo
+    if (planFilter !== 'ALL') {
+      const pName = (p.plano || '').trim().toLowerCase();
+      const isFree = pName === '' || pName === 'nenhum' || pName === 'gratuito';
+      if (planFilter === 'INICIANTE' && !pName.includes('iniciante')) return false;
+      if (planFilter === 'PROFISSIONAL' && !pName.includes('profissional') && !pName.includes('pro')) return false;
+      if (planFilter === 'ILIMITADO' && !pName.includes('ilimitado')) return false;
+      if (planFilter === 'GRATUITO' && !isFree) return false;
+    }
+
+    // 2. Aplicar termo de busca
+    const search = searchTerm.toLowerCase().trim();
+    if (!search) return true;
+
     const nome = (p.nome || '').toLowerCase();
     const email = (p.email || '').toLowerCase();
     const cpf = (p.cpf || '').toLowerCase();
     const role = (p.role || '').toLowerCase();
-    return nome.includes(search) || email.includes(search) || cpf.includes(search) || role.includes(search);
+    const plano = (p.plano || '').toLowerCase();
+    return nome.includes(search) || email.includes(search) || cpf.includes(search) || role.includes(search) || plano.includes(search);
   });
 
-  const assinantesCount = perfis.filter(p => p.status_pagamento === 'PAGO').length;
-  const trialCount = perfis.filter(p => p.trial_ends_at && new Date(p.trial_ends_at) > new Date() && p.status_pagamento !== 'PAGO').length;
+  const getPlanPrice = (planName: string) => {
+    const cleanName = (planName || '').trim().toLowerCase();
+    const isAnual = cleanName.includes('anual');
+    if (cleanName.includes('iniciante')) return isAnual ? 39.90 : 49.90;
+    if (cleanName.includes('profissional') || cleanName.includes('pro')) return isAnual ? 79.90 : 99.90;
+    if (cleanName.includes('ilimitado')) return isAnual ? 149.90 : 199.90;
+    return 0;
+  };
+
+  const getPlanNameFormatted = (planName: string) => {
+    const cleanName = (planName || '').trim().toLowerCase();
+    const isAnual = cleanName.includes('anual');
+    if (cleanName.includes('iniciante')) return isAnual ? 'Iniciante Anual (R$ 39,90/mês)' : 'Iniciante Mensal (R$ 49,90/mês)';
+    if (cleanName.includes('profissional') || cleanName.includes('pro')) return isAnual ? 'Profissional Anual (R$ 79,90/mês)' : 'Profissional Mensal (R$ 99,90/mês)';
+    if (cleanName.includes('ilimitado')) return isAnual ? 'Ilimitado Anual (R$ 149,90/mês)' : 'Ilimitado Mensal (R$ 199,90/mês)';
+    return 'Nenhum / Gratuito';
+  };
+
+  const isTrialActive = (trialEnds: string | null) => {
+    if (!trialEnds) return false;
+    return new Date(trialEnds) > new Date();
+  };
+
+  const filterSubscribers = (perfList: any[], status: 'paid' | 'overdue' | 'trial' | 'pending') => {
+    return perfList.filter(p => {
+      const isPaid = p.status_pagamento === 'PAGO';
+      const isLate = p.status_pagamento === 'ATRASADO' || p.status_pagamento === 'VENCIDO';
+      const trial = p.status_pagamento === 'TRIAL' || isTrialActive(p.trial_ends_at);
+      
+      if (status === 'paid') return isPaid;
+      if (status === 'overdue') return isLate;
+      if (status === 'trial') return trial && !isPaid;
+      if (status === 'pending') return !isPaid && !isLate && !trial;
+      return false;
+    });
+  };
+
+  const assinantesPagos = filterSubscribers(perfis, 'paid');
+  const assinantesAtrasados = filterSubscribers(perfis, 'overdue');
+  const assinantesTrial = filterSubscribers(perfis, 'trial');
+  const assinantesPendentes = filterSubscribers(perfis, 'pending');
+
+  const totalMRR = assinantesPagos.reduce((sum, p) => sum + getPlanPrice(p.plano), 0);
+
+  const countIniciante = perfis.filter(p => (p.plano || '').toLowerCase().includes('iniciante')).length;
+  const countProfissional = perfis.filter(p => (p.plano || '').toLowerCase().includes('profissional') || (p.plano || '').toLowerCase().includes('pro')).length;
+  const countIlimitado = perfis.filter(p => (p.plano || '').toLowerCase().includes('ilimitado')).length;
+  const countGratuito = perfis.filter(p => {
+    const pl = (p.plano || '').toLowerCase().trim();
+    return pl === '' || pl === 'nenhum' || pl === 'gratuito';
+  }).length;
 
   const formatDate = (isoStr: string | null) => {
     if (!isoStr) return 'Nunca';
@@ -179,11 +277,6 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
     } catch (e) {
       return 'Nenhum';
     }
-  };
-
-  const isTrialActive = (trialEnds: string | null) => {
-    if (!trialEnds) return false;
-    return new Date(trialEnds) > new Date();
   };
 
   return (
@@ -209,8 +302,8 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
             <UserPlus2 size={32} />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3.5xl font-black text-slate-800 tracking-tight uppercase">Painel Administrativo</h1>
-            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gerenciamento de Usuários e Sistema</p>
+            <h1 className="text-2xl sm:text-3.5xl font-black text-slate-800 tracking-tight uppercase">Painel de Usuários & Assinantes</h1>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-1">Status de Faturamento Synced com Asaas</p>
           </div>
         </div>
         <button 
@@ -219,24 +312,214 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
           className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all text-white font-black uppercase text-xs tracking-widest px-8 py-4 rounded-2xl flex items-center gap-3 shadow-lg shadow-blue-100 active:scale-95 shrink-0"
         >
           <RefreshCw size={16} className={`${syncLoading ? 'animate-spin' : ''}`} />
-          Sincronizar Dados
+          Sincronizar Geral (Cadastro)
         </button>
       </div>
 
-      {/* USUÁRIOS ATIVOS HEADER (ESTILO PRINT) */}
+      {/* BENTO DASHBOARD DE ASSINATURAS (ASAAS CONTROL) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* MRR Card */}
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl p-6 text-white shadow-xl shadow-emerald-100 border border-emerald-500/10">
+          <p className="text-[10px] font-black uppercase tracking-widest text-emerald-100/80 mb-2">MRR Estimado (Recorrente)</p>
+          <p className="text-2xl sm:text-3xl font-black tracking-tight mb-2">
+            R$ {totalMRR.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <p className="text-[10px] text-emerald-100 font-semibold uppercase tracking-wide">
+            Soma dos planos pagos ativos
+          </p>
+        </div>
+
+        {/* Paid Users Card */}
+        <div className="bg-white rounded-3xl p-6 border-2 border-slate-50 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Assinaturas Pagas</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <p className="text-2.5xl font-black text-slate-800 tracking-tight leading-none mb-2">
+              {assinantesPagos.length} Clientes
+            </p>
+          </div>
+          <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider flex items-center gap-1">
+            ✓ Acesso Total Seguro
+          </p>
+        </div>
+
+        {/* Due/Overdue Card */}
+        <div className="bg-white rounded-3xl p-6 border-2 border-slate-50 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Clientes em Débito</span>
+              <span className={`w-2.5 h-2.5 rounded-full ${assinantesAtrasados.length > 0 ? 'bg-red-500 animate-bounce' : 'bg-slate-300'}`} />
+            </div>
+            <p className="text-2.5xl font-black text-slate-800 tracking-tight leading-none mb-2">
+              {assinantesAtrasados.length} Pendentes
+            </p>
+          </div>
+          <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${assinantesAtrasados.length > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+            ⚠️ {assinantesAtrasados.length > 0 ? 'Inadimplência ou Atrasados' : 'Nenhum atraso crítico'}
+          </p>
+        </div>
+
+        {/* Pending / Trial Card */}
+        <div className="bg-white rounded-3xl p-6 border-2 border-slate-50 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Trial / Sem Limite</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+            </div>
+            <p className="text-2.5xl font-black text-slate-800 tracking-tight leading-none mb-2">
+              {assinantesTrial.length + assinantesPendentes.length} Cadastros
+            </p>
+          </div>
+          <p className="text-[10px] text-amber-600 font-bold uppercase tracking-wider flex items-center gap-1">
+            ⌛ {assinantesTrial.length} em trial, {assinantesPendentes.length} sem plano
+          </p>
+        </div>
+      </div>
+
+      {/* CARD DE FILTROS POR PLANO COM QTD DE CLIENTES */}
+      <div className="bg-white p-6 rounded-[2rem] border-2 border-slate-50 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Controle de Assinantes por Plano</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1.5">Clique nos cartões de plano para filtrar a tabela de usuários imediatamente</p>
+          </div>
+          {/* Badge indicator if any filter is active */}
+          {planFilter !== 'ALL' && (
+            <button 
+              type="button"
+              onClick={() => setPlanFilter('ALL')}
+              className="text-[10px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest flex items-center gap-1 bg-blue-50 px-3.5 py-2 rounded-xl transition-colors active:scale-95"
+            >
+              × Limpar Filtro de Planos
+            </button>
+          )}
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {/* Option 1: Todos */}
+          <button
+            type="button"
+            id="filter-btn-all"
+            onClick={() => setPlanFilter('ALL')}
+            className={`p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden group cursor-pointer active:scale-[0.98] ${
+              planFilter === 'ALL'
+                ? 'border-blue-600 bg-blue-50/30 shadow-md shadow-blue-50/50'
+                : 'border-slate-100 bg-slate-50/30 hover:border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <span className={`text-[9px] font-black uppercase tracking-wider ${planFilter === 'ALL' ? 'text-blue-700' : 'text-slate-400'}`}>
+                Todos
+              </span>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${planFilter === 'ALL' ? 'bg-blue-600 text-white' : 'bg-slate-200/80 text-slate-600'}`}>
+                {perfis.length}
+              </span>
+            </div>
+            <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Geral</p>
+            <p className="text-[9px] text-slate-450 font-bold uppercase mt-0.5 tracking-wide">Todos usuários</p>
+          </button>
+
+          {/* Option 2: Gratuito */}
+          <button
+            type="button"
+            id="filter-btn-gratuito"
+            onClick={() => setPlanFilter('GRATUITO')}
+            className={`p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden group cursor-pointer active:scale-[0.98] ${
+              planFilter === 'GRATUITO'
+                ? 'border-slate-600 bg-slate-100 shadow-md shadow-slate-100/50'
+                : 'border-slate-100 bg-slate-50/30 hover:border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <span className={`text-[9px] font-black uppercase tracking-wider ${planFilter === 'GRATUITO' ? 'text-slate-700' : 'text-slate-400'}`}>
+                Gratuito
+              </span>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${planFilter === 'GRATUITO' ? 'bg-slate-600 text-white' : 'bg-slate-200/80 text-slate-600'}`}>
+                {countGratuito}
+              </span>
+            </div>
+            <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Gratuito / Nenhum</p>
+            <p className="text-[9px] text-slate-450 font-bold uppercase mt-0.5 tracking-wide">Limite de 1</p>
+          </button>
+
+          {/* Option 3: Iniciante */}
+          <button
+            type="button"
+            id="filter-btn-iniciante"
+            onClick={() => setPlanFilter('INICIANTE')}
+            className={`p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden group cursor-pointer active:scale-[0.98] ${
+              planFilter === 'INICIANTE'
+                ? 'border-indigo-600 bg-indigo-50/30 shadow-md shadow-indigo-50/50'
+                : 'border-slate-100 bg-slate-50/30 hover:border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <span className={`text-[9px] font-black uppercase tracking-wider ${planFilter === 'INICIANTE' ? 'text-indigo-700' : 'text-slate-400'}`}>
+                Iniciante
+              </span>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${planFilter === 'INICIANTE' ? 'bg-indigo-650 text-white' : 'bg-slate-200/80 text-slate-600'}`}>
+                {countIniciante}
+              </span>
+            </div>
+            <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Iniciante</p>
+            <p className="text-[9px] text-indigo-505 font-bold uppercase mt-0.5 tracking-wide">Até 10 ativos</p>
+          </button>
+
+          {/* Option 4: Profissional */}
+          <button
+            type="button"
+            id="filter-btn-profissional"
+            onClick={() => setPlanFilter('PROFISSIONAL')}
+            className={`p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden group cursor-pointer active:scale-[0.98] ${
+              planFilter === 'PROFISSIONAL'
+                ? 'border-emerald-600 bg-emerald-50/30 shadow-md shadow-emerald-50/50'
+                : 'border-slate-100 bg-slate-50/30 hover:border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <span className={`text-[9px] font-black uppercase tracking-wider ${planFilter === 'PROFISSIONAL' ? 'text-emerald-700' : 'text-slate-400'}`}>
+                Profissional
+              </span>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${planFilter === 'PROFISSIONAL' ? 'bg-emerald-600 text-white' : 'bg-slate-200/80 text-slate-600'}`}>
+                {countProfissional}
+              </span>
+            </div>
+            <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Profissional</p>
+            <p className="text-[9px] text-emerald-600 font-bold uppercase mt-0.5 tracking-wide">Até 50 ativos</p>
+          </button>
+
+          {/* Option 5: Premium */}
+          <button
+            type="button"
+            id="filter-btn-ilimitado"
+            onClick={() => setPlanFilter('ILIMITADO')}
+            className={`p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden group cursor-pointer active:scale-[0.98] col-span-2 md:col-span-1 ${
+              planFilter === 'ILIMITADO'
+                ? 'border-purple-600 bg-purple-50/30 shadow-md shadow-purple-50/50'
+                : 'border-slate-100 bg-slate-50/30 hover:border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <div className="flex justify-between items-start">
+              <span className={`text-[9px] font-black uppercase tracking-wider ${planFilter === 'ILIMITADO' ? 'text-purple-700' : 'text-slate-400'}`}>
+                Premium
+              </span>
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${planFilter === 'ILIMITADO' ? 'bg-purple-600 text-white' : 'bg-slate-200/80 text-slate-600'}`}>
+                {countIlimitado}
+              </span>
+            </div>
+            <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Premium Ilimitado</p>
+            <p className="text-[9px] text-purple-600 font-bold uppercase mt-0.5 tracking-wide">Sem restrições</p>
+          </button>
+        </div>
+      </div>
+
+      {/* FILTRAGEM E BUSCA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest">Usuários Ativos</h2>
-          <div className="flex items-center gap-2 mt-2">
-            <div className="bg-emerald-50 text-emerald-700 border border-emerald-100/50 px-4 py-2 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              {assinantesCount} Assinantes
-            </div>
-            <div className="bg-amber-50 text-amber-700 border border-amber-100/50 px-4 py-2 rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-sm">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              {trialCount} Em Trial
-            </div>
-          </div>
+          <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest">Lista de Usuários no Sistema</h2>
+          <p className="text-[11px] text-slate-400 font-medium tracking-wide mt-1">Busque colaboradores, corretores e proprietários administrados</p>
         </div>
         <div className="relative w-full md:w-96 group">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
@@ -265,7 +548,7 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
                 <th className="px-6 py-5">CPF</th>
                 <th className="px-6 py-5">E-Mail</th>
                 <th className="px-6 py-5 text-center">Status Pagamento</th>
-                <th className="px-6 py-5 text-center">Plano</th>
+                <th className="px-6 py-5 text-center">Plano & Valor</th>
                 <th className="px-6 py-5 text-center">Início</th>
                 <th className="px-6 py-5 text-center">Expiração</th>
                 <th className="px-6 py-5 text-center">Último Acesso</th>
@@ -275,7 +558,9 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
             <tbody className="divide-y divide-slate-50 text-xs font-semibold">
               {filteredPerfis.map((p) => {
                 const isTrialActiveUser = isTrialActive(p.trial_ends_at);
-                const isPaid = p.status_pagamento === 'PAGO';
+                const isPaid = p.status_pagamento === 'PAGO' && (p.trial_ends_at && new Date(p.trial_ends_at) > new Date());
+                const isLate = (p.status_pagamento === 'ATRASADO' || p.status_pagamento === 'VENCIDO') || (p.status_pagamento === 'PAGO' && p.trial_ends_at && new Date(p.trial_ends_at) <= new Date());
+                const isTrial = p.status_pagamento === 'TRIAL' || (!isPaid && !isLate && isTrialActiveUser);
 
                 return (
                   <tr key={p.id} className="hover:bg-slate-50/50 transition-all group">
@@ -291,6 +576,9 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
                         {!p.approved && (
                           <span className="text-[9px] font-black uppercase tracking-widest text-amber-600 bg-amber-50 px-2 py-0.5 rounded block mt-1">Pendente</span>
                         )}
+                        {isLate && (
+                          <span className="text-[9px] font-black uppercase tracking-widest text-red-600 bg-red-55 px-2 py-0.5 rounded block mt-1">Devendo</span>
+                        )}
                       </div>
                     </td>
                     {/* NOME COMPLETO */}
@@ -303,22 +591,34 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
                     <td className="px-6 py-4.5 text-center">
                       <span className={`inline-block px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border text-center ${
                         isPaid ? 'bg-emerald-50 text-emerald-700 border-emerald-100/50' :
-                        p.status_pagamento === 'TRIAL' ? 'bg-amber-50 text-amber-700 border-amber-100/50' :
-                        p.status_pagamento === 'ATRASADO' ? 'bg-red-50 text-red-700 border-red-100/50' :
+                        isLate ? 'bg-red-50 text-red-700 border-red-100/50 animate-pulse' :
+                        isTrial ? 'bg-amber-50 text-amber-700 border-amber-100/50' :
+                        p.status_pagamento === 'PENDENTE' ? 'bg-purple-50 text-purple-700 border-purple-100/50' :
                         'bg-slate-100 text-slate-500 border-slate-200/50'
                       }`}>
-                        {p.status_pagamento || 'SEM ASSINATURA'}
+                        {isPaid ? 'PAGO (Em dia) ✅' :
+                         isLate ? 'ATRASADO ⚠️' :
+                         isTrial ? 'TRIAL (Testes) ⏳' :
+                         p.status_pagamento === 'PENDENTE' ? 'COBRANÇA PENDENTE ⏳' :
+                         p.status_pagamento || 'SEM ASSINATURA ❌'}
                       </span>
                     </td>
-                    {/* PLANO */}
+                    {/* PLANO & VALOR */}
                     <td className="px-6 py-4.5 text-center">
-                      <span className={`inline-block px-2.5 py-1 rounded-lg text-[9px] font-bold text-center border uppercase tracking-wider ${
-                        p.plano && p.plano.toUpperCase() !== 'NENHUM'
-                          ? 'bg-blue-50 text-blue-600 border-blue-100'
-                          : 'bg-slate-50 text-slate-400 border-slate-100'
-                      }`}>
-                        {p.plano || 'NENHUM'}
-                      </span>
+                      <div className="flex flex-col items-center justify-center">
+                        <span className={`inline-block px-2.5 py-1 rounded-lg text-[9px] font-bold text-center border uppercase tracking-wider ${
+                          p.plano && p.plano.toUpperCase() !== 'NENHUM'
+                            ? 'bg-blue-50 text-blue-600 border-blue-100'
+                            : 'bg-slate-50 text-slate-400 border-slate-100'
+                        }`}>
+                          {p.plano || 'NENHUM'}
+                        </span>
+                        {p.plano && p.plano.toUpperCase() !== 'NENHUM' && (
+                          <span className="text-[9px] text-slate-400 font-bold mt-1">
+                            R$ {getPlanPrice(p.plano).toFixed(2)}/mês
+                          </span>
+                        )}
+                      </div>
                     </td>
                     {/* INÍCIO */}
                     <td className="px-6 py-4.5 text-center text-slate-500">{formatDate(p.created_at)}</td>
@@ -326,7 +626,7 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
                     <td className="px-6 py-4.5 text-center">
                       <div>
                         <p className="text-slate-500 leading-none">{formatDate(p.trial_ends_at)}</p>
-                        {isTrialActiveUser && p.status_pagamento !== 'PAGO' && (
+                        {isTrialActiveUser && !isPaid && (
                           <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest block mt-0.5 animate-pulse">ATIVO</span>
                         )}
                       </div>
@@ -336,6 +636,19 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
                     {/* AÇÕES COMPLETO */}
                     <td className="px-6 py-4.5">
                       <div className="flex justify-center items-center gap-1">
+                        {/* LIVE ASAAS SYNC */}
+                        <button 
+                          onClick={() => handleSyncUserWithAsaas(p.id)}
+                          disabled={userSyncLoading === p.id}
+                          className="text-slate-400 hover:text-emerald-600 p-1.5 hover:bg-emerald-50 rounded-lg transition-all disabled:opacity-55"
+                          title="Sincronizar com Asaas"
+                        >
+                          {userSyncLoading === p.id ? (
+                            <Loader2 size={15} className="animate-spin text-emerald-600" />
+                          ) : (
+                            <RefreshCw size={15} />
+                          )}
+                        </button>
                         {/* VIEW ACTION */}
                         <button 
                           onClick={() => setViewingUser(p)}
@@ -457,19 +770,30 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
                   </span>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Status Pagamento</label>
-                  <span className="text-sm font-bold text-slate-700">{viewingUser.status_pagamento || 'SEM ASSINATURA'}</span>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Status Pagamento (Asaas)</label>
+                  <span className={`inline-block px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                    viewingUser.status_pagamento === 'PAGO' ? 'bg-emerald-50 text-emerald-700' :
+                    (viewingUser.status_pagamento === 'ATRASADO' || viewingUser.status_pagamento === 'VENCIDO') ? 'bg-red-50 text-red-700' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>
+                    {viewingUser.status_pagamento || 'SEM ASSINATURA'}
+                  </span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Data de Expiração</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Data de Expiração / Trial</label>
                   <p className="text-sm font-bold text-slate-700">{formatDate(viewingUser.trial_ends_at)}</p>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Plano Atual</label>
-                  <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">{viewingUser.plano || 'Nenhum'}</span>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Plano & Mensalidade</label>
+                  <div>
+                    <span className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest inline-block">{viewingUser.plano || 'Nenhum'}</span>
+                    {viewingUser.plano && viewingUser.plano.toUpperCase() !== 'NENHUM' && (
+                      <p className="text-xs text-slate-500 font-bold mt-1">R$ {getPlanPrice(viewingUser.plano).toFixed(2)}/mês</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

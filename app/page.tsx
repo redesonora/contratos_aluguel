@@ -1746,6 +1746,16 @@ Para resolver isso:
   const [upgradeCheckoutResult, setUpgradeCheckoutResult] = useState<any | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [loadingCep, setLoadingCep] = useState(false);
+  const getCleanPlanName = (plan: string | null | undefined): string => {
+    if (!plan) return 'Gratuito';
+    return plan
+      .replace(' Anual', '')
+      .replace(' Mensal', '')
+      .replace(' (Anual)', '')
+      .replace(' (Mensal)', '')
+      .trim();
+  };
+
   const checkPlanLimit = (): string | null => {
     // Override bypass limt for the dev
     if (userProfile?.email && isGleisonMaster(userProfile.email)) {
@@ -1759,10 +1769,10 @@ Para resolver isso:
       'Profissional': 50,
       'Ilimitado': Infinity
     };
-    const userPlan = userProfile?.plano || 'Gratuito';
+    const userPlan = getCleanPlanName(userProfile?.plano);
     // ADMIN and other users are subject to their respective plan limits to preserve the safety locks
     const limit = userPlanLimits[userPlan] || 1;
-    const planDisplayName = userPlan;
+    const planDisplayName = userProfile?.plano || 'Gratuito';
 
     let count = 0;
     let label = '';
@@ -3338,10 +3348,10 @@ Para resolver isso:
           'Profissional': 50,
           'Ilimitado': Infinity
         };
-        const userPlan = userProfile?.plano || 'Gratuito';
+        const userPlan = getCleanPlanName(userProfile?.plano);
         // ADMIN and other users are subject to their respective plan limits to preserve the safety locks
         const limit = userPlanLimits[userPlan] || 1;
-        const planDisplayName = userPlan;
+        const planDisplayName = userProfile?.plano || 'Gratuito';
 
         if (activeTab === 'imoveis') {
           const activeImoveisCount = imoveis.filter(i => !i.arquivado).length;
@@ -4399,7 +4409,7 @@ Para resolver isso:
             >
               Sair da Conta
             </button>
-            <p className="text-[10px] font-black text-blue-500/50 uppercase tracking-widest text-center mt-1">v1.7.2</p>
+            <p className="text-[10px] font-black text-blue-500/50 uppercase tracking-widest text-center mt-1">v1.8.0</p>
           </div>
         </motion.div>
       </div>
@@ -4407,7 +4417,10 @@ Para resolver isso:
   }
 
   const isPaymentPending = userProfile && userProfile.role === 'MASTER' && 
-    (userProfile.plano === 'Iniciante' || userProfile.plano === 'Profissional' || userProfile.plano === 'Ilimitado') && 
+    (() => {
+      const clean = getCleanPlanName(userProfile.plano);
+      return clean === 'Iniciante' || clean === 'Profissional' || clean === 'Ilimitado';
+    })() && 
     userProfile.status_pagamento !== 'PAGO' && 
     !(userProfile.email && isGleisonMaster(userProfile.email)); // Bypass the payment lock for this email
 
@@ -4419,7 +4432,8 @@ Para resolver isso:
       'Profissional': { mensal: 99.90, anual: 79.90 },
       'Ilimitado': { mensal: 199.90, anual: 149.90 }
     };
-    const currentPrices = prices[userProfile.plano || 'Iniciante'] || { mensal: 49.90, anual: 39.90 };
+    const cleanPlanForPrice = getCleanPlanName(userProfile.plano);
+    const currentPrices = prices[cleanPlanForPrice || 'Iniciante'] || { mensal: 49.90, anual: 39.90 };
     const pricePerMonth = checkoutCycle === 'mensal' ? currentPrices.mensal : currentPrices.anual;
     const yearlyBillingAmount = currentPrices.anual * 12;
     const finalBillAmount = checkoutCycle === 'mensal' ? pricePerMonth : yearlyBillingAmount;
@@ -4427,11 +4441,23 @@ Para resolver isso:
     const handleConfirmPayment = async () => {
       try {
         setCheckoutLoading(true);
+        const now = new Date();
+        const expirationDate = new Date();
+        const isAnual = checkoutCycle === 'anual';
+        if (isAnual) {
+          expirationDate.setFullYear(now.getFullYear() + 1);
+        } else {
+          expirationDate.setMonth(now.getMonth() + 1);
+        }
+        const planNameWithCycle = isAnual ? `${cleanPlanForPrice} Anual` : `${cleanPlanForPrice} Mensal`;
+
         const { error } = await supabase
           .from('user_profiles')
           .update({
+            plano: planNameWithCycle,
             status_pagamento: 'PAGO',
-            approved: true
+            approved: true,
+            trial_ends_at: expirationDate.toISOString()
           })
           .eq('id', userProfile.id);
 
@@ -4503,7 +4529,7 @@ Para resolver isso:
                 </span>
                 <h2 className="text-4xl font-extrabold tracking-tight">{userProfile.plano}</h2>
                 <p className="text-slate-350 text-xs mt-2 leading-relaxed">
-                  Gerencie com facilidade até <strong className="text-white">{plansLimits[userProfile.plano || 'Iniciante'] === Infinity ? 'Ilimitados' : plansLimits[userProfile.plano || 'Iniciante']} contratos ativos</strong> na nossa plataforma rica em IA.
+                  Gerencie com facilidade até <strong className="text-white">{plansLimits[getCleanPlanName(userProfile.plano) || 'Iniciante'] === Infinity ? 'Ilimitados' : plansLimits[getCleanPlanName(userProfile.plano) || 'Iniciante']} contratos ativos</strong> na nossa plataforma rica em IA.
                 </p>
               </div>
 
@@ -4583,7 +4609,7 @@ Para resolver isso:
               >
                 Sair da Conta
               </button>
-              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.7.2</p>
+              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.8.0</p>
             </div>
           </div>
 
@@ -4913,7 +4939,7 @@ Para resolver isso:
           >
             Sair da Conta
           </button>
-          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.7.2</p>
+          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.8.0</p>
         </div>
       </aside>
 

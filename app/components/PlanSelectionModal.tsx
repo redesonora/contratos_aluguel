@@ -128,7 +128,7 @@ export default function PlanSelectionModal({
                   },
                   { 
                     name: 'Profissional', 
-                    price: billingCycle === 'mensal' ? '99,90' : '79,95',
+                    price: billingCycle === 'mensal' ? '99,90' : '79,90',
                     contractors: 'Até 50 contratos ativos',
                     desc: 'Indicado para imobiliárias, corretores e locadoras em expansão.',
                     features: ['Assistente IA de Contratos 🤖', 'Notificações automáticas WhatsApp', 'Contratos ilimitados extras'],
@@ -355,12 +355,23 @@ export default function PlanSelectionModal({
                       onClick={async () => {
                         setIsLoading(true);
                         try {
+                          const now = new Date();
+                          const expirationDate = new Date();
+                          const isAnual = billingCycle === 'anual';
+                          if (isAnual) {
+                            expirationDate.setDate(now.getDate() + 365);
+                          } else {
+                            expirationDate.setDate(now.getDate() + 30);
+                          }
+                          const planNameWithCycle = isAnual ? `${selectedPlan.name} Anual` : `${selectedPlan.name} Mensal`;
+
                           const { error: dbError } = await supabase
                             .from('user_profiles')
                             .update({
-                              plano: selectedPlan.name,
+                              plano: planNameWithCycle,
                               status_pagamento: 'PAGO',
-                              approved: true
+                              approved: true,
+                              trial_ends_at: expirationDate.toISOString()
                             })
                             .eq('id', userProfile?.id);
 
@@ -587,12 +598,23 @@ export default function PlanSelectionModal({
                   onClick={async () => {
                     setIsLoading(true);
                     try {
+                      const now = new Date();
+                      const expirationDate = new Date();
+                      const isAnual = billingCycle === 'anual';
+                      if (isAnual) {
+                        expirationDate.setDate(now.getDate() + 365);
+                      } else {
+                        expirationDate.setDate(now.getDate() + 30);
+                      }
+                      const planNameWithCycle = isAnual ? `${selectedPlan.name} Anual` : `${selectedPlan.name} Mensal`;
+
                       const { error: dbError } = await supabase
                         .from('user_profiles')
                         .update({
-                          plano: selectedPlan.name,
+                          plano: planNameWithCycle,
                           status_pagamento: 'PAGO',
-                          approved: true
+                          approved: true,
+                          trial_ends_at: expirationDate.toISOString()
                         })
                         .eq('id', userProfile?.id);
 
