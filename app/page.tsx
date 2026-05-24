@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import PlanSelectionModal from './components/PlanSelectionModal';
+import SidebarHelp from './components/SidebarHelp';
 import { 
   Building2, 
   Users, 
@@ -695,7 +696,7 @@ export default function DashboardPage() {
             email: userEmail || null,
             plano: 'Gratuito',
             status_pagamento: 'TRIAL',
-            trial_ends_at: null
+            trial_ends_at: new Date('2099-01-01').toISOString()
           };
           
           // Tentar inserir/upsertar com todos os campos
@@ -752,7 +753,7 @@ export default function DashboardPage() {
                 approved: true, 
                 plano: 'Gratuito',
                 status_pagamento: 'TRIAL',
-                trial_ends_at: null,
+                trial_ends_at: new Date('2099-01-01').toISOString(),
                 last_access: new Date().toISOString(),
                 proprietario_id: null 
               };
@@ -4409,7 +4410,7 @@ Para resolver isso:
             >
               Sair da Conta
             </button>
-            <p className="text-[10px] font-black text-blue-500/50 uppercase tracking-widest text-center mt-1">v1.8.0</p>
+            <p className="text-[10px] font-black text-blue-500/50 uppercase tracking-widest text-center mt-1">v1.9.0</p>
           </div>
         </motion.div>
       </div>
@@ -4609,7 +4610,7 @@ Para resolver isso:
               >
                 Sair da Conta
               </button>
-              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.8.0</p>
+              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.9.0</p>
             </div>
           </div>
 
@@ -4933,13 +4934,14 @@ Para resolver isso:
           >
             Alterar Senha
           </button>
+          <SidebarHelp />
           <button 
             onClick={handleLogout}
             className="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-widest p-2 transition-colors text-left"
           >
             Sair da Conta
           </button>
-          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.8.0</p>
+          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.9.0</p>
         </div>
       </aside>
 

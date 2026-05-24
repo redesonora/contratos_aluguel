@@ -359,9 +359,9 @@ export default function PlanSelectionModal({
                           const expirationDate = new Date();
                           const isAnual = billingCycle === 'anual';
                           if (isAnual) {
-                            expirationDate.setDate(now.getDate() + 365);
+                            expirationDate.setFullYear(now.getFullYear() + 1);
                           } else {
-                            expirationDate.setDate(now.getDate() + 30);
+                            expirationDate.setMonth(now.getMonth() + 1);
                           }
                           const planNameWithCycle = isAnual ? `${selectedPlan.name} Anual` : `${selectedPlan.name} Mensal`;
 
@@ -602,9 +602,9 @@ export default function PlanSelectionModal({
                       const expirationDate = new Date();
                       const isAnual = billingCycle === 'anual';
                       if (isAnual) {
-                        expirationDate.setDate(now.getDate() + 365);
+                        expirationDate.setFullYear(now.getFullYear() + 1);
                       } else {
-                        expirationDate.setDate(now.getDate() + 30);
+                        expirationDate.setMonth(now.getMonth() + 1);
                       }
                       const planNameWithCycle = isAnual ? `${selectedPlan.name} Anual` : `${selectedPlan.name} Mensal`;
 
