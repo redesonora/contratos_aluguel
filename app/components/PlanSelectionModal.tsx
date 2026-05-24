@@ -34,6 +34,7 @@ export default function PlanSelectionModal({
 
   const [inlineApiKey, setInlineApiKey] = useState('');
   const [inlineEnv, setInlineEnv] = useState<'sandbox' | 'production'>('sandbox');
+  const [simulateClientView, setSimulateClientView] = useState(false);
 
   useEffect(() => {
     if (isOpen && typeof window !== 'undefined') {
@@ -219,8 +220,27 @@ export default function PlanSelectionModal({
               </div>
 
               <div className="space-y-4">
-                {/* Inline Asaas Configuration Setup (Highly convenient and prevents validation/lost state issues) */}
+                {/* Master Inspector controls */}
                 {userProfile?.role === 'MASTER' && (
+                  <div className="flex items-center justify-between p-4 bg-yellow-50 border border-yellow-150 rounded-2xl text-xs text-slate-705">
+                    <span className="font-extrabold flex items-center gap-1.5 uppercase text-[9px] text-yellow-800 tracking-wider">
+                      🛠️ MODO DE ADMINISTRAÇÃO & TESTES (MASTER)
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer"
+                        checked={simulateClientView}
+                        onChange={(e) => setSimulateClientView(e.target.checked)}
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                      <span className="ml-2 text-[9px] font-black uppercase text-slate-500 tracking-wider">Simular Visão do Cliente</span>
+                    </label>
+                  </div>
+                )}
+
+                {/* Inline Asaas Configuration Setup (Highly convenient and prevents validation/lost state issues) */}
+                {userProfile?.role === 'MASTER' && !simulateClientView && (
                   <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3.5 text-left">
                     <div className="flex justify-between items-center bg-slate-100/50 p-2 rounded-xl border border-slate-200/50">
                       <label className="text-[10px] font-black text-slate-700 uppercase tracking-widest ml-1 block">
@@ -397,6 +417,7 @@ export default function PlanSelectionModal({
                     setIsLoading(true);
                     setError(null);
                     try {
+                      const systemApiKey = process.env.NEXT_PUBLIC_ASAAS_API_KEY || '';
                       const finalApiKey = inlineApiKey.trim() || localStorage.getItem('asaas_api_key') || '';
                       const finalEnv = inlineEnv || localStorage.getItem('asaas_env') || 'sandbox';
 
@@ -405,8 +426,8 @@ export default function PlanSelectionModal({
                       }
                       localStorage.setItem('asaas_env', finalEnv);
 
-                      if (!finalApiKey) {
-                        throw new Error('Chave de API do Asaas não configurada. Por favor, insira-a no formulário.');
+                      if (!finalApiKey && !systemApiKey) {
+                        throw new Error('Chave de API do Asaas não configurada. Por favor, insira-a no formulário ou configure-a no servidor.');
                       }
 
                       const response = await fetch('/api/asaas/create-plan-checkout', {
@@ -415,7 +436,7 @@ export default function PlanSelectionModal({
                           'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                          apiKey: finalApiKey,
+                          apiKey: finalApiKey || undefined,
                           env: finalEnv,
                           planName: selectedPlan.name,
                           cycle: billingCycle,

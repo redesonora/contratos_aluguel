@@ -116,6 +116,11 @@ import { LandingPage } from './components/LandingPage';
 import { PendingActivation } from '../components/PendingActivation';
 
 export default function DashboardPage() {
+  const isGleisonMaster = (email: string) => {
+    const e = (email || '').toLowerCase().trim();
+    return e === 'gleisonisaias@gmail.com' || e === 'gleisonisaia@gmail.com' || e === 'gleisonisias@gmail.com';
+  };
+
   const [activeTab, setActiveTab] = useState('dashboard');
   const [session, setSession] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -581,6 +586,11 @@ export default function DashboardPage() {
       return true;
     }
 
+    // Se as abas forem configurações, auditoria/logs ou usuários, apenas MASTER tem acesso!
+    if (tab && ['configuracoes', 'logs', 'usuarios'].includes(tab)) {
+      return false;
+    }
+
     // Se não estiver aprovado, não pode acessar, a não ser que seja MASTER
     if (!userProfile.approved) {
       console.log('Permission Check: NOT APPROVED');
@@ -588,13 +598,11 @@ export default function DashboardPage() {
     }
     
     if (userProfile.role === 'ADMIN') {
-      if (['logs', 'usuarios'].includes(tab || '')) return false; // Admin não gerencia usuários do sistema (só MASTER)
       return true;
     }
 
     if (userProfile.role === 'CORRETOR') {
       if (action === 'DELETE') return false; // Corretores não excluem nada
-      if (['logs', 'usuarios'].includes(tab || '')) return false; // Corretores não veem logs ou usuários
       return true;
     }
 
@@ -661,7 +669,7 @@ export default function DashboardPage() {
 
       if (!data) {
         // Perfil não existe
-        // Criar perfil padrão para novos usuários (MASTER se for o primeiro, senão CORRETOR)
+        // Criar perfil padrão para novos usuários (MASTER se for o primeiro, senão ADMIN)
         try {
           const { count, error: countError } = await supabase.from('user_profiles').select('*', { count: 'exact', head: true });
           
@@ -669,7 +677,7 @@ export default function DashboardPage() {
             console.error('Erro ao contar perfis:', JSON.stringify(countError));
           }
 
-          const role = (userEmail === 'gleisonisaias@gmail.com') ? 'MASTER' : ((count === 0 && !countError) ? 'MASTER' : 'CORRETOR');
+          const role = (userEmail && isGleisonMaster(userEmail)) ? 'MASTER' : ((count === 0 && !countError) ? 'MASTER' : 'ADMIN');
           const approved = role === 'MASTER';
           
           // Buscar metadados do Auth User se estiver disponível
@@ -769,7 +777,7 @@ export default function DashboardPage() {
           const { data: { user } } = await supabase.auth.getUser();
           
           // Force MASTER role for specific user
-          if (user?.email === 'gleisonisaias@gmail.com' && finalData.role !== 'MASTER') {
+          if (user?.email && isGleisonMaster(user.email) && finalData.role !== 'MASTER') {
             await supabase.from('user_profiles').update({ role: 'MASTER' }).eq('id', userId);
             finalData.role = 'MASTER';
           }
@@ -1046,6 +1054,15 @@ export default function DashboardPage() {
       }
     }
   }, []);
+
+  // Garante re-direcionamento seguro se o usuário perder permissão ou tentar acessar abas de Configurações, Auditoria ou Usuários
+  useEffect(() => {
+    if (activeTab !== 'dashboard' && userProfile) {
+      if (!can('VIEW', activeTab)) {
+        setActiveTab('dashboard');
+      }
+    }
+  }, [activeTab, userProfile]);
 
   const translateErrorMsg = (msg: string | null | undefined) => {
     if (!msg) return 'Ocorreu um erro desconhecido.';
@@ -1731,7 +1748,7 @@ Para resolver isso:
   const [loadingCep, setLoadingCep] = useState(false);
   const checkPlanLimit = (): string | null => {
     // Override bypass limt for the dev
-    if (userProfile?.email === 'gleisonisaias@gmail.com') {
+    if (userProfile?.email && isGleisonMaster(userProfile.email)) {
       return null;
     }
     
@@ -4358,7 +4375,7 @@ Para resolver isso:
   const isPaymentPending = userProfile && userProfile.role === 'MASTER' && 
     (userProfile.plano === 'Iniciante' || userProfile.plano === 'Profissional' || userProfile.plano === 'Ilimitado') && 
     userProfile.status_pagamento !== 'PAGO' && 
-    userProfile.email !== 'gleisonisaias@gmail.com'; // Bypass the payment lock for this email
+    !(userProfile.email && isGleisonMaster(userProfile.email)); // Bypass the payment lock for this email
 
 
   if (isPaymentPending) {
@@ -4815,7 +4832,7 @@ Para resolver isso:
               onClick={() => { setActiveTab('logs'); setIsSidebarOpen(false); setShowArchived(false); }} 
             />
           )}
-          {userProfile?.role === 'MASTER' && (
+          {can('VIEW', 'usuarios') && (
             <SidebarItem 
               icon={Users} 
               label="Usuários" 
