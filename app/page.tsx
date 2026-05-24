@@ -694,7 +694,8 @@ export default function DashboardPage() {
             ...newProfileBase,
             email: userEmail || null,
             plano: 'Gratuito',
-            status_pagamento: 'PAGO'
+            status_pagamento: 'TRIAL',
+            trial_ends_at: null
           };
           
           // Tentar inserir/upsertar com todos os campos
@@ -750,8 +751,7 @@ export default function DashboardPage() {
                 nome: meta.full_name || userEmail?.split('@')[0] || 'Usuário (Modo Seguro)', 
                 approved: true, 
                 plano: 'Gratuito',
-                status_pagamento: 'PAGO',
-                data_inicio: new Date().toISOString(),
+                status_pagamento: 'TRIAL',
                 trial_ends_at: null,
                 last_access: new Date().toISOString(),
                 proprietario_id: null 
