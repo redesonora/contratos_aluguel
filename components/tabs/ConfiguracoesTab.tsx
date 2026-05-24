@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getSupabase } from '@/lib/supabase';
 import { 
   Settings, 
   Shield, 
@@ -24,6 +25,9 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({ perfis = [],
   const [asaasAutoBilling, setAsaasAutoBilling] = useState(false);
   const [isTestingAsaas, setIsTestingAsaas] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<{ success: boolean; message: string; showSql?: boolean } | null>(null);
 
   // Procura no log por última sincronização do webhook do Asaas
   const lastAsaasWebhookLog = React.useMemo(() => {
@@ -54,7 +58,83 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({ perfis = [],
       setAsaasEnv(savedEnv);
       setAsaasAutoBilling(savedAutoBilling);
     }
+
+    const loadProfileFromDb = async () => {
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profile) {
+          if (profile.asaas_key) {
+            setAsaasApiKey(profile.asaas_key);
+            localStorage.setItem('asaas_api_key', profile.asaas_key);
+          }
+          if (profile.asaas_env) {
+            setAsaasEnv(profile.asaas_env as 'sandbox' | 'production');
+            localStorage.setItem('asaas_env', profile.asaas_env);
+          }
+          if (profile.asaas_auto_billing !== undefined && profile.asaas_auto_billing !== null) {
+            setAsaasAutoBilling(profile.asaas_auto_billing);
+            localStorage.setItem('asaas_auto_billing', profile.asaas_auto_billing ? 'true' : 'false');
+          }
+        }
+      } catch (e) {
+        console.warn("Erro ao ler credenciais do banco:", e);
+      }
+    };
+    loadProfileFromDb();
   }, []);
+
+  const saveSettingsToDb = async () => {
+    setIsSaving(true);
+    setSaveStatus(null);
+    try {
+      const supabase = getSupabase();
+      if (!supabase) throw new Error("Supabase não pôde ser carregado.");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado.");
+
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          asaas_key: asaasApiKey,
+          asaas_env: asaasEnv,
+          asaas_auto_billing: asaasAutoBilling
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error("Erro ao salvar no banco:", error);
+        // Se erro for de coluna inexistente (code 42703)
+        if (error.code === '42703' || error.message?.includes('asaas_key') || error.message?.includes('column')) {
+          setSaveStatus({
+            success: false,
+            message: "Atenção: A tabela 'user_profiles' não possui os campos de integração do Asaas. Por favor, execute as instruções SQL abaixo no 'SQL Editor' do seu painel Supabase para habilitar o salvamento persistente.",
+            showSql: true
+          });
+          return;
+        }
+        throw error;
+      }
+
+      setSaveStatus({ success: true, message: "Todas as configurações do Asaas foram salvas com sucesso e estão disponíveis globalmente para todos os usuários!" });
+      setTimeout(() => setSaveStatus(null), 8000);
+    } catch (err: any) {
+      setSaveStatus({ success: false, message: err.message || "Erro ao salvar as configurações." });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const testAsaasConnection = async () => {
     if (!asaasApiKey) return;
@@ -290,20 +370,47 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({ perfis = [],
                 </label>
               </div>
 
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={testAsaasConnection}
-                  disabled={isTestingAsaas || !asaasApiKey}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 hover:bg-black disabled:opacity-40 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all active:scale-95 cursor-pointer"
-                >
-                  {isTestingAsaas ? <Loader2 className="animate-spin" size={14} /> : null}
-                  Testar Conexão
-                </button>
-                {testResult !== null && (
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${testResult.success ? 'text-emerald-600' : 'text-red-500'}`}>
-                    {testResult.message}
-                  </span>
+              <div className="flex flex-col gap-3 pt-2">
+                <div className="flex flex-wrap items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={testAsaasConnection}
+                    disabled={isTestingAsaas || !asaasApiKey}
+                    className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 hover:bg-black disabled:opacity-40 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all active:scale-95 cursor-pointer"
+                  >
+                    {isTestingAsaas ? <Loader2 className="animate-spin" size={14} /> : null}
+                    Testar Conexão
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={saveSettingsToDb}
+                    disabled={isSaving || !asaasApiKey}
+                    className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all active:scale-95 cursor-pointer"
+                  >
+                    {isSaving ? <Loader2 className="animate-spin" size={14} /> : null}
+                    Salvar no Banco (Disponibilizar Globalmente)
+                  </button>
+                  
+                  {testResult !== null && (
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${testResult.success ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {testResult.message}
+                    </span>
+                  )}
+                </div>
+
+                {saveStatus !== null && (
+                  <div className={`p-4 rounded-2xl text-[11px] leading-relaxed font-bold border-2 ${saveStatus.success ? 'bg-emerald-50 text-emerald-800 border-emerald-100' : 'bg-red-50 text-red-900 border-red-200'}`}>
+                    <p>{saveStatus.message}</p>
+                    {saveStatus.showSql && (
+                      <div className="mt-3 bg-slate-950 text-slate-100 p-4 rounded-xl font-mono text-[10px] space-y-2 select-all whitespace-pre-wrap">
+                        <p className="text-yellow-400 font-extrabold uppercase">Instrução SQL - Execute no Supabase:</p>
+                        <code>{`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_key text;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_env text DEFAULT 'sandbox';
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_auto_billing boolean DEFAULT false;`}</code>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

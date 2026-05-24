@@ -3519,37 +3519,61 @@ Para resolver isso:
                     parseInt(rawData.dia_vencimento as string)
                   );
 
-                  if (resultGen) {
-                    try {
-                      if (typeof window !== 'undefined') {
-                        const savedApiKey = localStorage.getItem('asaas_api_key') || process.env.NEXT_PUBLIC_ASAAS_API_KEY || '';
-                        const savedEnv = localStorage.getItem('asaas_env') || process.env.NEXT_PUBLIC_ASAAS_ENV || 'sandbox';
-                        const savedAutoBilling = localStorage.getItem('asaas_auto_billing') === 'true';
+                    if (resultGen) {
+                      try {
+                        if (typeof window !== 'undefined') {
+                          const savedApiKey = localStorage.getItem('asaas_api_key') || process.env.NEXT_PUBLIC_ASAAS_API_KEY || '';
+                          const savedEnv = localStorage.getItem('asaas_env') || process.env.NEXT_PUBLIC_ASAAS_ENV || 'sandbox';
+                          const savedAutoBilling = localStorage.getItem('asaas_auto_billing') === 'true';
 
-                        if (savedApiKey && savedAutoBilling) {
-                          // Obter dados do inquilino
-                          const tenantObj = inquilinos.find(i => i.id === rawData.inquilino_id);
-                          
-                          // Buscar as parcelas inseridas para este contrato
-                          const { data: generatedPayments } = await supabase
-                            .from('pagamentos')
-                            .select('*')
-                            .eq('contrato_id', newContract.id);
+                          let finalApiKey = savedApiKey;
+                          let finalEnv = savedEnv;
+                          let finalAutoBilling = savedAutoBilling;
 
-                          if (tenantObj && generatedPayments && generatedPayments.length > 0) {
-                            const asaasResponse = await fetch('/api/asaas/create-billing', {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                apiKey: savedApiKey,
-                                env: savedEnv,
-                                tenant: tenantObj,
-                                payments: generatedPayments,
-                                contractId: newContract.id
-                              }),
-                            });
+                          try {
+                            const { data: dbMaster } = await supabase
+                              .from('user_profiles')
+                              .select('asaas_key, asaas_env, asaas_auto_billing')
+                              .eq('role', 'MASTER')
+                              .order('created_at', { ascending: true })
+                              .limit(1)
+                              .maybeSingle();
+
+                            if (dbMaster) {
+                              if (dbMaster.asaas_key) finalApiKey = dbMaster.asaas_key;
+                              if (dbMaster.asaas_env) finalEnv = dbMaster.asaas_env;
+                              if (dbMaster.asaas_auto_billing !== undefined && dbMaster.asaas_auto_billing !== null) {
+                                finalAutoBilling = dbMaster.asaas_auto_billing;
+                              }
+                            }
+                          } catch (dbErr) {
+                            console.warn("Erro ao ler credenciais do MASTER para faturamento:", dbErr);
+                          }
+
+                          if (finalApiKey && finalAutoBilling) {
+                            // Obter dados do inquilino
+                            const tenantObj = inquilinos.find(i => i.id === rawData.inquilino_id);
+                            
+                            // Buscar as parcelas inseridas para este contrato
+                            const { data: generatedPayments } = await supabase
+                              .from('pagamentos')
+                              .select('*')
+                              .eq('contrato_id', newContract.id);
+
+                            if (tenantObj && generatedPayments && generatedPayments.length > 0) {
+                              const asaasResponse = await fetch('/api/asaas/create-billing', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  apiKey: finalApiKey,
+                                  env: finalEnv,
+                                  tenant: tenantObj,
+                                  payments: generatedPayments,
+                                  contractId: newContract.id
+                                }),
+                              });
 
                             if (asaasResponse.ok) {
                               const asaasData = await asaasResponse.json();
@@ -4366,6 +4390,7 @@ Para resolver isso:
             >
               Sair da Conta
             </button>
+            <p className="text-[10px] font-black text-blue-500/50 uppercase tracking-widest text-center mt-1">v1.7.0</p>
           </div>
         </motion.div>
       </div>
@@ -4549,6 +4574,7 @@ Para resolver isso:
               >
                 Sair da Conta
               </button>
+              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.7.0</p>
             </div>
           </div>
 
@@ -4878,7 +4904,7 @@ Para resolver isso:
           >
             Sair da Conta
           </button>
-          <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest text-center mt-2">v1.6.0</p>
+          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.7.0</p>
         </div>
       </aside>
 

@@ -1,20 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: NextRequest) {
   try {
     const { apiKey, env, tenant, payments, contractId } = await req.json();
 
-    if (!apiKey) {
-      return NextResponse.json({ error: "Chave de API do Asaas não informada." }, { status: 400 });
+    // Tentar obter as chaves do perfil de MASTER no banco de dados primeiro
+    let dbKey = "";
+    let dbEnv = "";
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (supabaseUrl && supabaseAnonKey) {
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        const { data: masterProf } = await supabase
+          .from('user_profiles')
+          .select('asaas_key, asaas_env')
+          .eq('role', 'MASTER')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (masterProf) {
+          dbKey = masterProf.asaas_key || "";
+          dbEnv = masterProf.asaas_env || "";
+        }
+      }
+    } catch (supabaseErr) {
+      console.warn("Erro ao buscar configurações Asaas do MASTER no banco (create-billing):", supabaseErr);
+    }
+
+    const activeApiKey = apiKey || dbKey || process.env.NEXT_PUBLIC_ASAAS_API_KEY || process.env.ASAAS_API_KEY;
+    const activeEnv = env || dbEnv || process.env.NEXT_PUBLIC_ASAAS_ENV || "sandbox";
+
+    if (!activeApiKey) {
+      return NextResponse.json({ error: "Chave de API do Asaas não configurada no painel Master para faturamento." }, { status: 400 });
     }
 
     if (!tenant || !tenant.nome || !tenant.cpf_cnpj) {
-      return NextResponse.json({ error: "Dados do inquilino insuficientes para integração." }, { status: 400 });
+      return NextResponse.json({ error: "Dados do inquilino insuficientes para faturamento." }, { status: 400 });
     }
 
-    const baseUrl = env === "production" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3";
+    const baseUrl = activeEnv === "production" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3";
     const headers = {
-      "access_token": apiKey,
+      "access_token": activeApiKey,
       "Content-Type": "application/json",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     };

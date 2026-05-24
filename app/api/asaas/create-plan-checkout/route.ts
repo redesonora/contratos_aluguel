@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 function parseAsaasError(errText: string, fallback: string): string {
   try {
@@ -22,9 +23,34 @@ export async function POST(req: NextRequest) {
   try {
     const { apiKey, env, planName, cycle, cpfCnpj, userProfile, paymentMethod } = await req.json();
 
-    // Determinar a Chave de API e Ambiente
-    const activeApiKey = apiKey || process.env.NEXT_PUBLIC_ASAAS_API_KEY || process.env.ASAAS_API_KEY;
-    const activeEnv = env || process.env.NEXT_PUBLIC_ASAAS_ENV || "sandbox";
+    // Tentar obter as chaves do perfil de MASTER no banco de dados primeiro
+    let dbKey = "";
+    let dbEnv = "";
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (supabaseUrl && supabaseAnonKey) {
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        const { data: masterProf } = await supabase
+          .from('user_profiles')
+          .select('asaas_key, asaas_env')
+          .eq('role', 'MASTER')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (masterProf) {
+          dbKey = masterProf.asaas_key || "";
+          dbEnv = masterProf.asaas_env || "";
+        }
+      }
+    } catch (supabaseErr) {
+      console.warn("Erro ao buscar configurações Asaas do MASTER no banco (tratando com fallbacks):", supabaseErr);
+    }
+
+    // Determinar a Chave de API e Ambiente (priorizando a do banco de dados configurada pelo Master)
+    const activeApiKey = apiKey || dbKey || process.env.NEXT_PUBLIC_ASAAS_API_KEY || process.env.ASAAS_API_KEY;
+    const activeEnv = env || dbEnv || process.env.NEXT_PUBLIC_ASAAS_ENV || "sandbox";
 
     if (!activeApiKey) {
       return NextResponse.json({ 

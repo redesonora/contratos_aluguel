@@ -417,7 +417,6 @@ export default function PlanSelectionModal({
                     setIsLoading(true);
                     setError(null);
                     try {
-                      const systemApiKey = process.env.NEXT_PUBLIC_ASAAS_API_KEY || '';
                       const finalApiKey = inlineApiKey.trim() || localStorage.getItem('asaas_api_key') || '';
                       const finalEnv = inlineEnv || localStorage.getItem('asaas_env') || 'sandbox';
 
@@ -425,10 +424,6 @@ export default function PlanSelectionModal({
                         localStorage.setItem('asaas_api_key', finalApiKey);
                       }
                       localStorage.setItem('asaas_env', finalEnv);
-
-                      if (!finalApiKey && !systemApiKey) {
-                        throw new Error('Chave de API do Asaas não configurada. Por favor, insira-a no formulário ou configure-a no servidor.');
-                      }
 
                       const response = await fetch('/api/asaas/create-plan-checkout', {
                         method: 'POST',

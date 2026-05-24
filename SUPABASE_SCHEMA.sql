@@ -16,6 +16,9 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS plano text DEFAULT 'Nenhum';
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS status_pagamento text DEFAULT 'Sem Assinatura';
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_login timestamptz;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_key text;
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_env text DEFAULT 'sandbox';
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_auto_billing boolean DEFAULT false;
 
 -- Adicionalmente, você pode atualizar os e-mails dos usuários que já existem
 -- vinculando-os com base nos metadados ou inserções da sessão. O sistema
