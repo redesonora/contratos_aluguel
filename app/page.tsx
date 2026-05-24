@@ -1198,16 +1198,21 @@ Para resolver isso:
         try {
           const { count, error: countError } = await supabase.from('user_profiles').select('*', { count: 'exact', head: true });
           const role = (count === 0 && !countError) ? 'MASTER' : 'ADMIN';
-          const approved = role === 'MASTER';
+          
+          // Detectar se é Social Login (Google)
+          const isSocialLogin = user.app_metadata?.provider === 'google' || user.app_metadata?.providers?.includes('google');
           
           const isPlanPaid = selectedPlanSignUp !== 'Gratuito';
+          // Aprovado se for MASTER, Social Login ou Plano Gratuito (ajustável conforme política)
+          const approved = role === 'MASTER' || isSocialLogin;
+          
           const newProfileFull = {
             id: user.id,
             role,
             nome,
             cpf,
-            email, // <-- setting the email correctly!
-            approved: !isPlanPaid || approved,
+            email,
+            approved,
             plano: selectedPlanSignUp,
             status_pagamento: isPlanPaid ? 'Pendente' : 'PAGO',
             trial_ends_at: null
