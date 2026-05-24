@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: NextRequest) {
   try {
-    const { apiKey, env, tenant, payments, contractId } = await req.json();
+    const { apiKey, env, tenant, payments, contractId, supabaseToken } = await req.json();
 
     // Tentar obter as chaves do perfil de MASTER no banco de dados primeiro
     let dbKey = "";
@@ -11,12 +11,30 @@ export async function POST(req: NextRequest) {
     try {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (supabaseUrl && supabaseAnonKey) {
-        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+      if (supabaseUrl && (supabaseAnonKey || serviceRoleKey)) {
+        let supabase;
+        if (serviceRoleKey) {
+          supabase = createClient(supabaseUrl, serviceRoleKey);
+        } else if (supabaseToken) {
+          supabase = createClient(supabaseUrl, supabaseAnonKey!, {
+            global: {
+              headers: {
+                Authorization: `Bearer ${supabaseToken}`
+              }
+            }
+          });
+        } else {
+          supabase = createClient(supabaseUrl, supabaseAnonKey!);
+        }
+
         const { data: masterProf } = await supabase
           .from('user_profiles')
           .select('asaas_key, asaas_env')
           .eq('role', 'MASTER')
+          .not('asaas_key', 'is', null)
+          .neq('asaas_key', '')
           .order('created_at', { ascending: true })
           .limit(1)
           .maybeSingle();
@@ -30,8 +48,18 @@ export async function POST(req: NextRequest) {
       console.warn("Erro ao buscar configurações Asaas do MASTER no banco (create-billing):", supabaseErr);
     }
 
-    const activeApiKey = apiKey || dbKey || process.env.ASAAS_API_KEY;
-    const activeEnv = env || dbEnv || process.env.ASAAS_ENV || "sandbox";
+    const activeApiKey = apiKey || dbKey || 
+      process.env.ASAAS_API_KEY || 
+      process.env.NEXT_PUBLIC_ASAAS_API_KEY || 
+      process.env.NEXT_PUBLIC_ASAAS_API_KE || 
+      process.env.ASAAS_API_KE;
+
+    const activeEnv = env || dbEnv || 
+      process.env.ASAAS_ENV || 
+      process.env.NEXT_PUBLIC_ASAAS_ENV || 
+      process.env.NEXT_PUBLIC_ASAAS_EN || 
+      process.env.ASAAS_EN || 
+      "sandbox";
 
     if (!activeApiKey) {
       return NextResponse.json({ error: "Chave de API do Asaas não configurada no painel Master para faturamento." }, { status: 400 });

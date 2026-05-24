@@ -3561,6 +3561,14 @@ Para resolver isso:
                               .eq('contrato_id', newContract.id);
 
                             if (tenantObj && generatedPayments && generatedPayments.length > 0) {
+                              let userToken = "";
+                              try {
+                                const { data: sessionData } = await supabase.auth.getSession();
+                                userToken = sessionData?.session?.access_token || "";
+                              } catch (tokErr) {
+                                console.warn("Failed to get session token for create-billing auth:", tokErr);
+                              }
+
                               const asaasResponse = await fetch('/api/asaas/create-billing', {
                                 method: 'POST',
                                 headers: {
@@ -3571,7 +3579,8 @@ Para resolver isso:
                                   env: finalEnv,
                                   tenant: tenantObj,
                                   payments: generatedPayments,
-                                  contractId: newContract.id
+                                  contractId: newContract.id,
+                                  supabaseToken: userToken
                                 }),
                               });
 
@@ -4390,7 +4399,7 @@ Para resolver isso:
             >
               Sair da Conta
             </button>
-            <p className="text-[10px] font-black text-blue-500/50 uppercase tracking-widest text-center mt-1">v1.7.1</p>
+            <p className="text-[10px] font-black text-blue-500/50 uppercase tracking-widest text-center mt-1">v1.7.2</p>
           </div>
         </motion.div>
       </div>
@@ -4574,7 +4583,7 @@ Para resolver isso:
               >
                 Sair da Conta
               </button>
-              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.7.1</p>
+              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.7.2</p>
             </div>
           </div>
 
@@ -4904,7 +4913,7 @@ Para resolver isso:
           >
             Sair da Conta
           </button>
-          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.7.1</p>
+          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.7.2</p>
         </div>
       </aside>
 

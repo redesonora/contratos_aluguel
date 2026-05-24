@@ -425,6 +425,14 @@ export default function PlanSelectionModal({
                       }
                       localStorage.setItem('asaas_env', finalEnv);
 
+                      let userToken = '';
+                      try {
+                        const { data: sessionData } = await supabase.auth.getSession();
+                        userToken = sessionData?.session?.access_token || '';
+                      } catch (tokErr) {
+                        console.warn("Failed to retrieve token for checkout request auth context:", tokErr);
+                      }
+
                       const response = await fetch('/api/asaas/create-plan-checkout', {
                         method: 'POST',
                         headers: {
@@ -442,7 +450,8 @@ export default function PlanSelectionModal({
                             email: userProfile?.email,
                             telefone: userProfile?.telefone || ''
                           },
-                          paymentMethod
+                          paymentMethod,
+                          supabaseToken: userToken
                         }),
                       }).catch(err => {
                         console.error('DEBUG: fetch failed:', err);
