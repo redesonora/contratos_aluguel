@@ -113,6 +113,7 @@ import { UsuariosTab } from '../components/tabs/UsuariosTab';
 import { ConfiguracoesTab } from '../components/tabs/ConfiguracoesTab';
 import { ModelosContratoTab } from '../components/tabs/ModelosContratoTab';
 import { LandingPage } from './components/LandingPage';
+import { PendingActivation } from '../components/PendingActivation';
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -559,6 +560,9 @@ export default function DashboardPage() {
   // Percursor check permissions helper
   const can = (action: string, tab?: string) => {
     if (!userProfile) return false;
+    // Se não estiver aprovado, não pode acessar, a não ser que seja MASTER
+    if (userProfile.role !== 'MASTER' && !userProfile.approved) return false;
+    
     if (userProfile.role === 'MASTER') return true;
     if (tab === 'configuracoes') return false; // Somente MASTER passa direto no if acima
     
@@ -632,6 +636,9 @@ export default function DashboardPage() {
         }
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+      const meta = user?.user_metadata || {};
+
       if (!data) {
         // Perfil não existe
         // Criar perfil padrão para novos usuários (MASTER se for o primeiro, senão CORRETOR)
@@ -642,12 +649,10 @@ export default function DashboardPage() {
             console.error('Erro ao contar perfis:', JSON.stringify(countError));
           }
 
-          const role = (count === 0 && !countError) ? 'MASTER' : 'CORRETOR';
+          const role = (userEmail === 'gleisonisaias@gmail.com') ? 'MASTER' : ((count === 0 && !countError) ? 'MASTER' : 'CORRETOR');
           const approved = role === 'MASTER';
           
           // Buscar metadados do Auth User se estiver disponível
-          const { data: { user } } = await supabase.auth.getUser();
-          const meta = user?.user_metadata || {};
           
           const newProfileBase = { 
             id: userId, 
@@ -728,8 +733,21 @@ export default function DashboardPage() {
         
         // Auto-approve if email is confirmed in auth.users
         try {
+          await supabase.auth.refreshSession();
           const { data: { user } } = await supabase.auth.getUser();
+          
+          // Force MASTER role for specific user
+          if (user?.email === 'gleisonisaias@gmail.com' && finalData.role !== 'MASTER') {
+            await supabase.from('user_profiles').update({ role: 'MASTER' }).eq('id', userId);
+            finalData.role = 'MASTER';
+          }
+
+          console.log('DEBUG: fetchProfile - checando confirmação de email', { 
+            approved: finalData.approved, 
+            email_confirmed_at: user?.email_confirmed_at 
+          });
           if (!finalData.approved && user?.email_confirmed_at) {
+            console.log('DEBUG: fetchProfile - auto-aprovando usuário');
             await supabase.from('user_profiles').update({ approved: true }).eq('id', userId);
             finalData.approved = true;
           }

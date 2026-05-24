@@ -392,7 +392,7 @@ export default function PlanSelectionModal({
                 </button>
                 <button
                   type="button"
-                  disabled={isLoading || cpfCnpj.replace(/\D/g, '').length < 11 || !inlineApiKey}
+                  disabled={isLoading || cpfCnpj.replace(/\D/g, '').length < 11}
                   onClick={async () => {
                     setIsLoading(true);
                     setError(null);
@@ -430,7 +430,10 @@ export default function PlanSelectionModal({
                         }),
                       });
 
-                      const data = await response.json();
+                      console.log('DEBUG: response status:', response.status);
+                      const data = await response.json().catch(() => ({}));
+                      console.log('DEBUG: response data:', data);
+                      
                       if (!response.ok) {
                         throw new Error(data.error || 'Erro ao gerar cobrança no Asaas.');
                       }
