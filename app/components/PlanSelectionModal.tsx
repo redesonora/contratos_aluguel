@@ -428,14 +428,23 @@ export default function PlanSelectionModal({
                           },
                           paymentMethod
                         }),
+                      }).catch(err => {
+                        console.error('DEBUG: fetch failed:', err);
+                        throw new Error(`Erro de rede ao conectar com servidor: ${err.message}`);
                       });
 
                       console.log('DEBUG: response status:', response.status);
-                      const data = await response.json().catch(() => ({}));
+                      const dataText = await response.text();
+                      let data;
+                      try {
+                        data = JSON.parse(dataText);
+                      } catch (e) {
+                        data = { error: 'Formato de resposta inválido' };
+                      }
                       console.log('DEBUG: response data:', data);
                       
                       if (!response.ok) {
-                        throw new Error(data.error || 'Erro ao gerar cobrança no Asaas.');
+                        throw new Error(data.error || `Erro ao gerar cobrança no Asaas (Status: ${response.status}).`);
                       }
 
                       setCheckoutResult(data);
