@@ -140,6 +140,9 @@ export default function DashboardPage() {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isMyProfileOpen, setIsMyProfileOpen] = useState(false);
   const [pwdForm, setPwdForm] = useState({ current: '', new: '', confirm: '' });
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdErrorMsg, setPwdErrorMsg] = useState<string | null>(null);
+  const [pwdSuccess, setPwdSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [myProfileName, setMyProfileName] = useState('');
@@ -268,27 +271,38 @@ export default function DashboardPage() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pwdForm.new !== pwdForm.confirm) {
-      setErrorMsg('As senhas não coincidem.');
+      setPwdErrorMsg('As senhas não coincidem.');
       return;
     }
     if (pwdForm.new.length < 6) {
-      setErrorMsg('A senha deve ter pelo menos 6 caracteres.');
+      setPwdErrorMsg('A senha deve ter pelo menos 6 caracteres.');
       return;
     }
-    setLoading(true);
-    setErrorMsg(null);
+    setPwdLoading(true);
+    setPwdErrorMsg(null);
+    setPwdSuccess(false);
     try {
       const { error } = await supabase.auth.updateUser({ password: pwdForm.new });
-      if (error) throw error;
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-      setIsChangePasswordOpen(false);
+      if (error) {
+        let msg = error.message;
+        if (msg.toLowerCase().includes('same_password') || msg.toLowerCase().includes('same password')) {
+          msg = 'A nova senha deve ser diferente de sua senha anterior.';
+        } else if (msg.toLowerCase().includes('password should be') || msg.toLowerCase().includes('weak_password')) {
+          msg = 'A senha deve conter pelo menos 6 caracteres.';
+        }
+        throw new Error(msg);
+      }
+      setPwdSuccess(true);
       setPwdForm({ current: '', new: '', confirm: '' });
+      setTimeout(() => {
+        setPwdSuccess(false);
+        setIsChangePasswordOpen(false);
+      }, 2500);
     } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || 'Erro ao alterar a senha.');
+      console.error('Erro ao atualizar senha:', err);
+      setPwdErrorMsg(err.message || 'Erro ao alterar a senha. Por favor tente novamente.');
     } finally {
-      setLoading(false);
+      setPwdLoading(false);
     }
   };
 
@@ -971,10 +985,17 @@ export default function DashboardPage() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
       console.log('Auth event change:', event);
-      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
          setSession(session);
          if (session) {
            fetchProfile(session.user.id, session.user.email);
+         }
+         if (event === 'PASSWORD_RECOVERY') {
+           console.log('PASSWORD_RECOVERY detectado! Abrindo modal de alteração de senha.');
+           setPwdForm({ current: '', new: '', confirm: '' });
+           setPwdErrorMsg(null);
+           setPwdSuccess(false);
+           setIsChangePasswordOpen(true);
          }
       } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         setSession(null);
@@ -1011,6 +1032,17 @@ export default function DashboardPage() {
       if (expired === 'true') {
         sessionStorage.removeItem('auth_expired_notice');
         setLoginError('Sua sessão expirou ou foi invalidada por segurança. Por favor, faça login novamente para continuar.');
+      }
+      
+      // Detecção de link de redefinição de senha na URL (hash ou query params)
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (hash.includes('type=recovery') || hash.includes('recovery') || search.includes('type=recovery')) {
+        console.log('Detecção de link de redefinição na URL! Abrindo modal de senha.');
+        setPwdForm({ current: '', new: '', confirm: '' });
+        setPwdErrorMsg(null);
+        setPwdSuccess(false);
+        setIsChangePasswordOpen(true);
       }
     }
   }, []);
@@ -1581,6 +1613,8 @@ Para resolver isso:
       setTemplatesLoaded(true);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
+    } finally {
+      setLoading(false);
     }
   }, [session, userProfile, notificationDays, setImoveis, setInquilinos, setProprietarios, setContratos, setPagamentos, setLogs, setNotifications, setTemplatesLoaded]);
 
@@ -6266,6 +6300,17 @@ Para resolver isso:
                     />
                   </div>
                 </form>
+
+                {pwdErrorMsg && (
+                  <div className="p-3 bg-red-50 border border-red-100 text-red-600 font-bold text-xs rounded-xl text-center">
+                    {pwdErrorMsg}
+                  </div>
+                )}
+                {pwdSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 font-bold text-xs rounded-xl text-center">
+                    Senha alterada com sucesso!
+                  </div>
+                )}
               </div>
 
               <div className="p-8 bg-slate-50 flex items-center justify-end gap-3 rounded-b-[2.5rem]">
@@ -6279,10 +6324,10 @@ Para resolver isso:
                 <button 
                   type="submit"
                   form="change-pwd-form"
-                  disabled={loading}
+                  disabled={pwdLoading}
                   className="bg-blue-600 border border-blue-700 text-white px-6 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200/50 flex items-center justify-center gap-2 flex-1 max-w-[160px]"
                 >
-                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Salvar'}
+                  {pwdLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Salvar'}
                 </button>
               </div>
             </motion.div>
