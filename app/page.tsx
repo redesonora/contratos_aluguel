@@ -4416,7 +4416,7 @@ Para resolver isso:
     );
   }
 
-  const isPaymentPending = userProfile && userProfile.role === 'MASTER' && 
+  const isPaymentPending = userProfile && userProfile.role !== 'MASTER' && 
     (() => {
       const clean = getCleanPlanName(userProfile.plano);
       return clean === 'Iniciante' || clean === 'Profissional' || clean === 'Ilimitado';

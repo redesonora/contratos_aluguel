@@ -558,9 +558,10 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
             <tbody className="divide-y divide-slate-50 text-xs font-semibold">
               {filteredPerfis.map((p) => {
                 const isTrialActiveUser = isTrialActive(p.trial_ends_at);
-                const isPaid = p.status_pagamento === 'PAGO' && (p.trial_ends_at && new Date(p.trial_ends_at) > new Date());
-                const isLate = (p.status_pagamento === 'ATRASADO' || p.status_pagamento === 'VENCIDO') || (p.status_pagamento === 'PAGO' && p.trial_ends_at && new Date(p.trial_ends_at) <= new Date());
-                const isTrial = p.status_pagamento === 'TRIAL' || (!isPaid && !isLate && isTrialActiveUser);
+                const isMaster = p.role === 'MASTER';
+                const isPaid = isMaster || (p.status_pagamento === 'PAGO' && (p.trial_ends_at && new Date(p.trial_ends_at) > new Date()));
+                const isLate = !isMaster && ((p.status_pagamento === 'ATRASADO' || p.status_pagamento === 'VENCIDO') || (p.status_pagamento === 'PAGO' && p.trial_ends_at && new Date(p.trial_ends_at) <= new Date()));
+                const isTrial = !isMaster && (p.status_pagamento === 'TRIAL' || (!isPaid && !isLate && isTrialActiveUser));
 
                 return (
                   <tr key={p.id} className="hover:bg-slate-50/50 transition-all group">
