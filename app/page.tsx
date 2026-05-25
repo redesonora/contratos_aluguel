@@ -811,6 +811,21 @@ export default function DashboardPage() {
             console.warn('Falha silenciosa ao sincronizar e-mail no user_profiles (provavelmente a coluna email ainda não existe no DB):', updateErr);
           }
         }
+        
+        // Sincronizar plano escolhido no cadastro
+        if (finalData.plano === 'Nenhum' && meta.plano) {
+          try {
+            const isPlanPaid = meta.plano !== 'Gratuito';
+            await supabase.from('user_profiles').update({ 
+               plano: meta.plano,
+               status_pagamento: isPlanPaid ? 'Pendente' : 'TRIAL',
+               trial_ends_at: isPlanPaid ? new Date(new Date().setDate(new Date().getDate() + 7)).toISOString() : new Date('2099-01-01').toISOString()
+            }).eq('id', userId);
+            
+            finalData.plano = meta.plano;
+            finalData.status_pagamento = isPlanPaid ? 'Pendente' : 'TRIAL';
+          } catch(e) {}
+        }
 
         // Auto-upgrade o pioneiro para MASTER
         try {
@@ -1243,7 +1258,8 @@ export default function DashboardPage() {
           data: {
             full_name: nome,
             username: username,
-            cpf: cpf
+            cpf: cpf,
+            plano: selectedPlanSignUp
           }
         }
       });
@@ -1271,6 +1287,23 @@ Para resolver isso:
           return;
         }
         throw signUpError;
+      }
+      
+      // Detecção de "Fake User" do Supabase (Ocorre quando Email Enumeration Protection está ativo
+      // e o e-mail já existe na tabela auth.users, mesmo não existindo na user_profiles)
+      if (user && user.identities && user.identities.length === 0) {
+        handleErrorModal(
+          `Este e-mail (${email}) já possui uma conta no sistema de autenticação. 
+          
+Como você provavelmente apagou o cadastro da tabela de perfis para testar, o Supabase bloqueou o reenvio de e-mails para evitar spam.
+
+Para criar novamente:
+1. Vá no painel do Supabase -> Authentication -> Users
+2. Exclua o e-mail "${email}" de lá.
+3. Tente o cadastro novamente aqui.`
+        );
+        setLoading(false);
+        return;
       }
       
       if (!signUpError) {
