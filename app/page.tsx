@@ -1273,21 +1273,24 @@ Para resolver isso:
         throw signUpError;
       }
       
-      if (user) {
+      if (!signUpError) {
+        // Obter o usuário retornado (pode estar ausente em alguns casos de confirmação de e-mail)
+        const createdUser = user || { id: 'pending', app_metadata: {} };
+        
         // Garantir que criamos o registro imediatamente na tabela user_profiles com o e-mail preenchido!
         try {
           const { count, error: countError } = await supabase.from('user_profiles').select('*', { count: 'exact', head: true });
           const role = (count === 0 && !countError) ? 'MASTER' : 'ADMIN';
           
           // Detectar se é Social Login (Google)
-          const isSocialLogin = user.app_metadata?.provider === 'google' || user.app_metadata?.providers?.includes('google');
+          const isSocialLogin = createdUser.app_metadata?.provider === 'google' || createdUser.app_metadata?.providers?.includes('google');
           
           const isPlanPaid = selectedPlanSignUp !== 'Gratuito';
           // Aprovado se for MASTER, Social Login ou Plano Gratuito (ajustável conforme política)
           const approved = role === 'MASTER' || isSocialLogin;
           
           const newProfileFull = {
-            id: user.id,
+            id: createdUser.id !== 'pending' ? createdUser.id : null,
             role,
             nome,
             cpf,
@@ -1298,18 +1301,20 @@ Para resolver isso:
             trial_ends_at: null
           };
           
-          const { error: insertError } = await supabase.from('user_profiles').upsert(newProfileFull);
-          if (insertError && (insertError.code === 'PGRST204' || insertError.code === '42703' || insertError.message?.toLowerCase().includes('email'))) {
-            // Tentar novamente excluindo a coluna email
-            const { email: ignoredEmail, ...newProfileBase } = newProfileFull;
-            await supabase.from('user_profiles').upsert(newProfileBase);
+          if (createdUser.id !== 'pending') {
+            const { error: insertError } = await supabase.from('user_profiles').upsert(newProfileFull);
+            if (insertError && (insertError.code === 'PGRST204' || insertError.code === '42703' || insertError.message?.toLowerCase().includes('email'))) {
+              // Tentar novamente excluindo a coluna email
+              const { email: ignoredEmail, ...newProfileBase } = newProfileFull;
+              await supabase.from('user_profiles').upsert(newProfileBase);
+            }
           }
         } catch(ex_profile) {
           console.error("Erro ao pré-criar perfil:", ex_profile);
         }
 
         setRegisteredEmailWelcome(email);
-        setLoginSuccess('Cadastro de novo usuário realizado com sucesso! Enviamos um e-mail de confirmação para você. Por favor, confirme seu e-mail para poder acessar o sistema.');
+        // Não usar setLoginSuccess aqui para não sobrepor o modal amigável do registeredEmailWelcome
       }
     } catch (err: any) {
       if (err.message?.toLowerCase().includes('user already exists') || err.message?.toLowerCase().includes('already registered')) {
