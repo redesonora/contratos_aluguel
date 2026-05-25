@@ -811,21 +811,6 @@ export default function DashboardPage() {
             console.warn('Falha silenciosa ao sincronizar e-mail no user_profiles (provavelmente a coluna email ainda não existe no DB):', updateErr);
           }
         }
-        
-        // Sincronizar plano escolhido no cadastro
-        if (finalData.plano === 'Nenhum' && meta.plano) {
-          try {
-            const isPlanPaid = meta.plano !== 'Gratuito';
-            await supabase.from('user_profiles').update({ 
-               plano: meta.plano,
-               status_pagamento: isPlanPaid ? 'Pendente' : 'TRIAL',
-               trial_ends_at: isPlanPaid ? new Date(new Date().setDate(new Date().getDate() + 7)).toISOString() : new Date('2099-01-01').toISOString()
-            }).eq('id', userId);
-            
-            finalData.plano = meta.plano;
-            finalData.status_pagamento = isPlanPaid ? 'Pendente' : 'TRIAL';
-          } catch(e) {}
-        }
 
         // Auto-upgrade o pioneiro para MASTER
         try {
@@ -1258,8 +1243,7 @@ export default function DashboardPage() {
           data: {
             full_name: nome,
             username: username,
-            cpf: cpf,
-            plano: selectedPlanSignUp
+            cpf: cpf
           }
         }
       });
@@ -1289,23 +1273,6 @@ Para resolver isso:
         throw signUpError;
       }
       
-      // Detecção de "Fake User" do Supabase (Ocorre quando Email Enumeration Protection está ativo
-      // e o e-mail já existe na tabela auth.users, mesmo não existindo na user_profiles)
-      if (user && user.identities && user.identities.length === 0) {
-        handleErrorModal(
-          `Este e-mail (${email}) já possui uma conta no sistema de autenticação. 
-          
-Como você provavelmente apagou o cadastro da tabela de perfis para testar, o Supabase bloqueou o reenvio de e-mails para evitar spam.
-
-Para criar novamente:
-1. Vá no painel do Supabase -> Authentication -> Users
-2. Exclua o e-mail "${email}" de lá.
-3. Tente o cadastro novamente aqui.`
-        );
-        setLoading(false);
-        return;
-      }
-      
       if (!signUpError) {
         // Obter o usuário retornado (pode estar ausente em alguns casos de confirmação de e-mail)
         const createdUser = user || { id: 'pending', app_metadata: {} };
@@ -1319,8 +1286,8 @@ Para criar novamente:
           const isSocialLogin = createdUser.app_metadata?.provider === 'google' || createdUser.app_metadata?.providers?.includes('google');
           
           const isPlanPaid = selectedPlanSignUp !== 'Gratuito';
-          // Aprovado se for MASTER, Social Login ou Plano Gratuito (ajustável conforme política)
-          const approved = role === 'MASTER' || isSocialLogin;
+          // Aprovado automaticamente sem necessidade de avaliação
+          const approved = true;
           
           const newProfileFull = {
             id: createdUser.id !== 'pending' ? createdUser.id : null,
@@ -4417,44 +4384,6 @@ Para resolver isso:
   const isTrialActive = false;
   const trialDaysLeft = 0;
 
-  const isAccessBlocked = userProfile && userProfile.role !== 'MASTER' && !userProfile.approved;
-
-  if (isAccessBlocked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-10 rounded-3xl shadow-xl w-full max-w-lg border border-slate-200 text-center flex flex-col items-center gap-6"
-        >
-          <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mb-2">
-            <Clock size={40} />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-black text-slate-800 tracking-tight uppercase italic leading-tight">Acesso Pendente</h1>
-            <p className="text-slate-500 font-medium leading-relaxed italic">
-              Olá, <span className="font-bold text-slate-800">{userProfile.nome}</span>. Seu cadastro foi recebido e está <span className="text-amber-600 font-black">AGUARDANDO APROVAÇÃO</span> de um administrador.
-            </p>
-          </div>
-          <div className="w-full h-px bg-slate-100" />
-          <div className="space-y-4 w-full">
-            <div className="flex items-center gap-3 bg-amber-50 p-4 rounded-2xl text-amber-700 text-xs font-bold border border-amber-100 text-left">
-              <Info size={18} className="shrink-0" />
-              <p>Você receberá acesso aos módulos autorizados assim que o administrador liberar o seu perfil.</p>
-            </div>
-            <button 
-              onClick={handleLogout}
-              className="w-full py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-red-500 transition-colors"
-            >
-              Sair da Conta
-            </button>
-            <p className="text-[10px] font-black text-blue-500/50 uppercase tracking-widest text-center mt-1">v1.9.0</p>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
   const isPaymentPending = userProfile && userProfile.role !== 'MASTER' && 
     (() => {
       const clean = getCleanPlanName(userProfile.plano);
@@ -4648,7 +4577,7 @@ Para resolver isso:
               >
                 Sair da Conta
               </button>
-              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.9.0</p>
+              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.9.1</p>
             </div>
           </div>
 
@@ -4979,7 +4908,7 @@ Para resolver isso:
           >
             Sair da Conta
           </button>
-          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.9.0</p>
+          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.9.1</p>
         </div>
       </aside>
 
