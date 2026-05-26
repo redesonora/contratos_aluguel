@@ -920,6 +920,7 @@ export default function DashboardPage() {
       const name = err.name?.toLowerCase() || '';
       const isSpecificAuth = (
         msg.includes('refresh_token_not_found') || 
+        msg.includes('refresh token') ||
         msg.includes('session_not_found')
       );
 
@@ -955,7 +956,7 @@ export default function DashboardPage() {
           console.error('Erro ao buscar sessão inicial:', error);
           const msg = error.message?.toLowerCase() || '';
           const name = error.name?.toLowerCase() || '';
-          const isSpecificAuth = msg.includes('refresh_token_not_found') || msg.includes('session_not_found');
+          const isSpecificAuth = msg.includes('refresh_token_not_found') || msg.includes('refresh token') || msg.includes('session_not_found');
           if (isSpecificAuth) {
             console.log('initAuth: erro de auth, tratando');
             await handleAuthError();
@@ -979,7 +980,7 @@ export default function DashboardPage() {
         console.error('Falha no carregamento da autenticação:', err);
         const msg = err?.message?.toLowerCase() || '';
         const name = err?.name?.toLowerCase() || '';
-        const isSpecificAuth = msg.includes('refresh_token_not_found') || msg.includes('session_not_found');
+        const isSpecificAuth = msg.includes('refresh_token_not_found') || msg.includes('refresh token') || msg.includes('session_not_found');
         if (isSpecificAuth) {
           console.log('initAuth: exceção de auth, tratando');
           await handleAuthError();
