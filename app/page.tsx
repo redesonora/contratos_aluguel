@@ -4745,7 +4745,7 @@ Para resolver isso:
   }
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-[#FDFDFD] font-sans selection:bg-blue-100 overflow-hidden">
+    <div className="flex flex-col md:flex-row min-h-screen bg-[#F8FAFC] font-sans selection:bg-blue-100 overflow-hidden">
       {/* Mobile Header */}
       <header className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 z-50 sticky top-0">
         <div className="flex items-center gap-2 text-blue-600">
@@ -4930,13 +4930,13 @@ Para resolver isso:
           )}
           {errorMsg && (
             <motion.div
-              initial={{ opacity: 0, y: -50, x: '-50%' }}
-              animate={{ opacity: 1, y: 20, x: '-50%' }}
-              exit={{ opacity: 0, y: -50, x: '-50%' }}
-              className="fixed top-0 left-1/2 z-[100] bg-red-600 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 font-black uppercase text-xs tracking-widest"
+              initial={{ opacity: 0, y: 50, x: 0 }}
+              animate={{ opacity: 1, y: 0, x: 0 }}
+              exit={{ opacity: 0, y: 50, x: 0 }}
+              className="fixed bottom-6 left-6 z-[100] bg-[#FEF2F2] text-[#991B1B] border border-[#FCA5A5] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 font-medium text-xs tracking-tight"
             >
-              <AlertCircle size={20} />
-              {errorMsg}
+              <AlertCircle size={20} className="text-[#991B1B]" />
+              <span>{errorMsg}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -4948,7 +4948,9 @@ Para resolver isso:
               <ChevronRight size={10} className="text-slate-300" />
               <span className="text-blue-500">{activeTab === 'configuracoes' ? 'Definições' : activeTab === 'modelos_contrato' ? 'Configurações' : activeTab === 'dashboard' ? 'Início' : activeTab}</span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight italic leading-none flex items-center gap-4">
+            <h2 className={`text-4xl md:text-5xl tracking-tight leading-none flex items-center gap-4 ${
+              activeTab === 'dashboard' ? 'font-semibold text-[#0F172A] not-italic' : 'font-black text-slate-900 italic'
+            }`}>
               {activeTab === 'dashboard' ? 'Overview' : 
                activeTab === 'logs' ? 'Auditoria' :
                activeTab === 'modelos_contrato' ? 'Modelos de Contratos' :

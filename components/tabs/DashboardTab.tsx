@@ -72,71 +72,71 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       className="space-y-8"
     >
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md group">
+        <motion.div variants={itemVariants} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E2E8F0] shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+            <div className="p-2 bg-[#EFF6FF] text-[#1D4ED8] rounded-lg">
               <DollarSign size={20} />
             </div>
-            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase tracking-wider">A Receber</span>
+            <span className="text-[10px] font-bold text-[#1D4ED8] bg-[#EFF6FF] px-2.5 py-1 rounded-full uppercase tracking-wider">A Receber</span>
           </div>
-          <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Previsão Mensal</h3>
-          <p className="text-2xl font-black text-slate-800 tracking-tight">{formatarMoeda(stats.aReceber)}</p>
+          <h3 className="text-[#64748B] text-[10px] font-semibold uppercase tracking-widest mb-1">Previsão Mensal</h3>
+          <p className="text-2xl font-black text-[#0F172A] tracking-tight">{formatarMoeda(stats.aReceber)}</p>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md group">
+        <motion.div variants={itemVariants} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E2E8F0] shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-green-50 text-green-600 rounded-lg group-hover:bg-green-600 group-hover:text-white transition-all duration-300">
+            <div className="p-2 bg-[#DCFCE7] text-[#15803D] rounded-lg">
               <TrendingUp size={20} />
             </div>
-            <span className="text-[10px] font-black text-green-600 bg-green-50 px-2 py-1 rounded uppercase tracking-wider">Recebido</span>
+            <span className="text-[10px] font-bold text-[#15803D] bg-[#DCFCE7] px-2.5 py-1 rounded-full uppercase tracking-wider">Recebido</span>
           </div>
-          <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Realizado no Mês</h3>
-          <p className="text-2xl font-black text-slate-800 tracking-tight">{formatarMoeda(stats.recebido)}</p>
+          <h3 className="text-[#64748B] text-[10px] font-semibold uppercase tracking-widest mb-1">Realizado no Mês</h3>
+          <p className="text-2xl font-black text-[#0F172A] tracking-tight">{formatarMoeda(stats.recebido)}</p>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md group">
+        <motion.div variants={itemVariants} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E2E8F0] shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-red-50 text-red-600 rounded-lg group-hover:bg-red-600 group-hover:text-white transition-all duration-300">
+            <div className="p-2 bg-[#FEE2E2] text-[#B91C1C] rounded-lg">
               <AlertCircle size={20} />
             </div>
-            <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-1 rounded uppercase tracking-wider">Inadimplência</span>
+            <span className="text-[10px] font-bold text-[#B91C1C] bg-[#FEE2E2] px-2.5 py-1 rounded-full uppercase tracking-wider">Inadimplência</span>
           </div>
-          <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Vencidos / No Mês</h3>
-          <p className="text-2xl font-black text-slate-800 tracking-tight">{stats.inadimplenciaCount}</p>
+          <h3 className="text-[#64748B] text-[10px] font-semibold uppercase tracking-widest mb-1">Vencidos / No Mês</h3>
+          <p className="text-2xl font-black text-[#0F172A] tracking-tight">{stats.inadimplenciaCount}</p>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md group">
+        <motion.div variants={itemVariants} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E2E8F0] shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
+            <div className="p-2 bg-indigo-50 text-indigo-650 rounded-lg">
               <Building2 size={20} />
             </div>
             <div className="flex flex-col items-end">
-              <span className="text-xl font-black text-indigo-600">{Math.round(stats.alugadosPercent)}%</span>
+              <span className="text-xl font-black text-[#1D4ED8]">{Math.round(stats.alugadosPercent)}%</span>
             </div>
           </div>
-          <h3 className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Locações Ativas / Em Uso</h3>
+          <h3 className="text-[#64748B] text-[10px] font-semibold uppercase tracking-widest mb-1">Locações Ativas / Em Uso</h3>
           <div className="flex items-end gap-1">
-            <p className="text-2xl font-black text-slate-800 tracking-tight">{stats.alugadosCount}</p>
-            <p className="text-[10px] font-bold text-slate-400 mb-1">/ {stats.totalImoveis} bens/itens</p>
+            <p className="text-2xl font-black text-[#0F172A] tracking-tight">{stats.alugadosCount}</p>
+            <p className="text-[10px] font-bold text-[#64748B] mb-1">/ {stats.totalImoveis} bens/itens</p>
           </div>
         </motion.div>
       </section>
       
       {/* Fluxo de Caixa Chart */}
-      <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-[#E2E8F0] shadow-sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
             <div>
               <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight italic">Fluxo de Caixa Mensal</h3>
-              <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Gestão inteligente de recebimentos ({new Date().getFullYear()})</p>
+              <p className="text-[10px] text-[#64748B] font-semibold uppercase tracking-widest mt-1">Gestão inteligente de recebimentos ({new Date().getFullYear()})</p>
             </div>
             <div className="flex gap-6">
               <div className="flex items-center gap-2">
-                 <div className="w-3 h-3 bg-blue-600 rounded-sm"></div>
-                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Recebido</span>
+                 <div className="w-3 h-3 bg-[#2563EB] rounded-sm"></div>
+                 <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest">Recebido</span>
               </div>
               <div className="flex items-center gap-2">
-                 <div className="w-3 h-3 bg-red-400 rounded-sm"></div>
-                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pendente</span>
+                 <div className="w-3 h-3 bg-[#F43F5E] rounded-sm"></div>
+                 <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest">Pendente</span>
               </div>
             </div>
           </div>
@@ -168,8 +168,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   }}
                   formatter={(value: any) => formatarMoeda(value)}
                 />
-                <Bar dataKey="recebido" fill="#2563eb" radius={[6, 6, 0, 0]} barSize={32} />
-                <Bar dataKey="pendente" fill="#f87171" radius={[6, 6, 0, 0]} barSize={32} />
+                <Bar dataKey="recebido" fill="#2563EB" radius={[6, 6, 0, 0]} barSize={32} />
+                <Bar dataKey="pendente" fill="#F43F5E" radius={[6, 6, 0, 0]} barSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </div>

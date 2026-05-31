@@ -12,10 +12,10 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, act
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-300 ${
+      className={`w-full flex items-center gap-3 p-3 transition-all duration-300 ${
         active 
-          ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' 
-          : 'text-slate-500 hover:bg-slate-50'
+          ? 'bg-[#2563EB] text-[#FFFFFF] rounded-[8px]' 
+          : 'text-[#64748B] hover:text-[#0F172A] hover:bg-slate-50 rounded-[8px]'
       }`}
     >
       <div className="flex-shrink-0">
