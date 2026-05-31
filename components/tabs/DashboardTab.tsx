@@ -99,7 +99,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             <div className="p-2 bg-[#FEE2E2] text-[#B91C1C] rounded-lg">
               <AlertCircle size={20} />
             </div>
-            <span className="text-[10px] font-bold text-[#B91C1C] bg-[#FEE2E2] px-2.5 py-1 rounded-full uppercase tracking-wider">Inadimplência</span>
+            <span className={`text-[10px] font-bold text-[#B91C1C] bg-[#FEE2E2] px-2.5 py-1 rounded-full uppercase tracking-wider ${stats.inadimplenciaCount > 0 ? 'animate-pulse' : ''}`}>Inadimplência</span>
           </div>
           <h3 className="text-[#64748B] text-[10px] font-semibold uppercase tracking-widest mb-1">Vencidos / No Mês</h3>
           <p className="text-2xl font-black text-[#0F172A] tracking-tight">{stats.inadimplenciaCount}</p>
@@ -223,7 +223,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     <p className="font-bold text-slate-800 uppercase text-xs tracking-tight flex items-center gap-2">
                       {co.inquilinos?.nome || 'Sem Nome'} 
                       <span className={`text-[8px] px-1.5 py-0.5 rounded-full ${
-                        isOverdue ? 'bg-red-200 text-red-800' :
+                        isOverdue ? 'bg-red-200 text-red-800 animate-pulse' :
                         isRentDue ? 'bg-amber-200 text-amber-800' : 'bg-orange-200 text-orange-800'
                       }`}>
                         {isOverdue ? 'EM ATRASO' : isRentDue ? 'ALUGUEL' : 'CONTRATO'}

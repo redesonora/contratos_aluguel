@@ -237,7 +237,7 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
                       <div className="flex items-center gap-2">
                         <span className={`flex items-center gap-1.5 text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-tighter shadow-sm border ${
                           p.status === StatusPagamento.PAGO ? 'bg-green-50 text-green-600 border-green-100' : 
-                          isAtrasado ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-50 text-slate-400 border-slate-100'
+                          isAtrasado ? 'bg-red-50 text-red-600 border-red-100 animate-pulse' : 'bg-slate-50 text-slate-400 border-slate-100'
                         }`}>
                           {p.status === StatusPagamento.PAGO ? (
                             <><CheckCircle2 size={10} /> Pago</>
