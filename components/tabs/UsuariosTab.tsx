@@ -219,18 +219,18 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
   const getPlanPrice = (planName: string) => {
     const cleanName = (planName || '').trim().toLowerCase();
     const isAnual = cleanName.includes('anual');
-    if (cleanName.includes('iniciante')) return isAnual ? 39.90 : 49.90;
-    if (cleanName.includes('profissional') || cleanName.includes('pro')) return isAnual ? 79.90 : 99.90;
-    if (cleanName.includes('ilimitado')) return isAnual ? 149.90 : 199.90;
+    if (cleanName.includes('iniciante')) return isAnual ? 15.90 : 19.90;
+    if (cleanName.includes('profissional') || cleanName.includes('pro')) return isAnual ? 15.90 : 19.90;
+    if (cleanName.includes('ilimitado')) return isAnual ? 15.90 : 19.90;
     return 0;
   };
 
   const getPlanNameFormatted = (planName: string) => {
     const cleanName = (planName || '').trim().toLowerCase();
     const isAnual = cleanName.includes('anual');
-    if (cleanName.includes('iniciante')) return isAnual ? 'Iniciante Anual (R$ 39,90/mês)' : 'Iniciante Mensal (R$ 49,90/mês)';
-    if (cleanName.includes('profissional') || cleanName.includes('pro')) return isAnual ? 'Profissional Anual (R$ 79,90/mês)' : 'Profissional Mensal (R$ 99,90/mês)';
-    if (cleanName.includes('ilimitado')) return isAnual ? 'Ilimitado Anual (R$ 149,90/mês)' : 'Ilimitado Mensal (R$ 199,90/mês)';
+    if (cleanName.includes('iniciante')) return isAnual ? 'Iniciante Anual [Upgrade] (R$ 15,90/mês)' : 'Iniciante Mensal [Upgrade] (R$ 19,90/mês)';
+    if (cleanName.includes('profissional') || cleanName.includes('pro')) return isAnual ? 'Profissional Anual [Upgrade] (R$ 15,90/mês)' : 'Profissional Mensal [Upgrade] (R$ 19,90/mês)';
+    if (cleanName.includes('ilimitado')) return isAnual ? 'Ilimitado Anual (R$ 15,90/mês)' : 'Ilimitado Mensal (R$ 19,90/mês)';
     return 'Nenhum / Gratuito';
   };
 
@@ -397,7 +397,7 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
           )}
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl">
           {/* Option 1: Todos */}
           <button
             type="button"
@@ -418,7 +418,7 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
               </span>
             </div>
             <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Geral</p>
-            <p className="text-[9px] text-slate-450 font-bold uppercase mt-0.5 tracking-wide">Todos usuários</p>
+            <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5 tracking-wide">Todos usuários</p>
           </button>
 
           {/* Option 2: Gratuito */}
@@ -441,61 +441,15 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
               </span>
             </div>
             <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Gratuito / Nenhum</p>
-            <p className="text-[9px] text-slate-450 font-bold uppercase mt-0.5 tracking-wide">Limite de 1</p>
+            <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5 tracking-wide">Limite de 1 imóvel</p>
           </button>
 
-          {/* Option 3: Iniciante */}
-          <button
-            type="button"
-            id="filter-btn-iniciante"
-            onClick={() => setPlanFilter('INICIANTE')}
-            className={`p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden group cursor-pointer active:scale-[0.98] ${
-              planFilter === 'INICIANTE'
-                ? 'border-indigo-600 bg-indigo-50/30 shadow-md shadow-indigo-50/50'
-                : 'border-slate-100 bg-slate-50/30 hover:border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <div className="flex justify-between items-start">
-              <span className={`text-[9px] font-black uppercase tracking-wider ${planFilter === 'INICIANTE' ? 'text-indigo-700' : 'text-slate-400'}`}>
-                Iniciante
-              </span>
-              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${planFilter === 'INICIANTE' ? 'bg-indigo-650 text-white' : 'bg-slate-200/80 text-slate-600'}`}>
-                {countIniciante}
-              </span>
-            </div>
-            <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Iniciante</p>
-            <p className="text-[9px] text-indigo-505 font-bold uppercase mt-0.5 tracking-wide">Até 10 ativos</p>
-          </button>
-
-          {/* Option 4: Profissional */}
-          <button
-            type="button"
-            id="filter-btn-profissional"
-            onClick={() => setPlanFilter('PROFISSIONAL')}
-            className={`p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden group cursor-pointer active:scale-[0.98] ${
-              planFilter === 'PROFISSIONAL'
-                ? 'border-emerald-600 bg-emerald-50/30 shadow-md shadow-emerald-50/50'
-                : 'border-slate-100 bg-slate-50/30 hover:border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <div className="flex justify-between items-start">
-              <span className={`text-[9px] font-black uppercase tracking-wider ${planFilter === 'PROFISSIONAL' ? 'text-emerald-700' : 'text-slate-400'}`}>
-                Profissional
-              </span>
-              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${planFilter === 'PROFISSIONAL' ? 'bg-emerald-600 text-white' : 'bg-slate-200/80 text-slate-600'}`}>
-                {countProfissional}
-              </span>
-            </div>
-            <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Profissional</p>
-            <p className="text-[9px] text-emerald-600 font-bold uppercase mt-0.5 tracking-wide">Até 50 ativos</p>
-          </button>
-
-          {/* Option 5: Premium */}
+          {/* Option 3: Ilimitado */}
           <button
             type="button"
             id="filter-btn-ilimitado"
             onClick={() => setPlanFilter('ILIMITADO')}
-            className={`p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden group cursor-pointer active:scale-[0.98] col-span-2 md:col-span-1 ${
+            className={`p-4 rounded-2xl border-2 text-left transition-all relative overflow-hidden group cursor-pointer active:scale-[0.98] ${
               planFilter === 'ILIMITADO'
                 ? 'border-purple-600 bg-purple-50/30 shadow-md shadow-purple-50/50'
                 : 'border-slate-100 bg-slate-50/30 hover:border-slate-200 hover:bg-slate-50'
@@ -503,13 +457,16 @@ export const UsuariosTab: React.FC<UsuariosTabProps> = ({
           >
             <div className="flex justify-between items-start">
               <span className={`text-[9px] font-black uppercase tracking-wider ${planFilter === 'ILIMITADO' ? 'text-purple-700' : 'text-slate-400'}`}>
-                Premium
+                Ilimitado
               </span>
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${planFilter === 'ILIMITADO' ? 'bg-purple-600 text-white' : 'bg-slate-200/80 text-slate-600'}`}>
-                {countIlimitado}
+                {perfis.filter(p => {
+                  const pl = (p.plano || '').toLowerCase();
+                  return pl.includes('ilimitado') || pl.includes('iniciante') || pl.includes('profissional') || pl.includes('pro');
+                }).length}
               </span>
             </div>
-            <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Premium Ilimitado</p>
+            <p className="text-sm font-black text-slate-700 mt-2 tracking-tight">Ilimitado (R$ 19,90)</p>
             <p className="text-[9px] text-purple-600 font-bold uppercase mt-0.5 tracking-wide">Sem restrições</p>
           </button>
         </div>

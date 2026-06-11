@@ -117,29 +117,22 @@ export default function PlanSelectionModal({
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid md:grid-cols-2 gap-6 max-w-2xl mx-auto">
                 {[
                   { 
-                    name: 'Iniciante', 
-                    price: billingCycle === 'mensal' ? '49,90' : '39,90',
-                    contractors: 'Até 10 contratos ativos',
-                    desc: 'Ideal para proprietários de bens ou imóveis autônomos.',
-                    features: ['Contratos e Recibos Extras', 'Gestão Geral de Ativos', 'Notificações Avançadas']
-                  },
-                  { 
-                    name: 'Profissional', 
-                    price: billingCycle === 'mensal' ? '99,90' : '79,90',
-                    contractors: 'Até 50 contratos ativos',
-                    desc: 'Indicado para imobiliárias, corretores e locadoras em expansão.',
-                    features: ['Assistente IA de Contratos 🤖', 'Notificações automáticas WhatsApp', 'Contratos ilimitados extras'],
-                    popular: true
+                    name: 'Gratuito', 
+                    price: '0,00',
+                    contractors: 'Até 1 imóvel / contrato ativo',
+                    desc: 'Seu plano de início rápido para testes.',
+                    features: ['Gestão Geral de Ativos', 'Envio de Recibos Básicos']
                   },
                   { 
                     name: 'Ilimitado', 
-                    price: billingCycle === 'mensal' ? '199,90' : '149,90',
+                    price: billingCycle === 'mensal' ? '19,90' : '15,90',
                     contractors: 'Contratos ilimitados',
-                    desc: 'Para grandes locadoras de frotas e incorporadoras.',
-                    features: ['Painel Multi-Usuários Ilimitados', 'Suporte e Implantação VIP', 'Apoio de integração total']
+                    desc: 'Liberdade total para gerenciar sua carteira de imóveis e contratos sem limites.',
+                    features: ['Assistente IA de Contratos 🤖', 'Notificações automáticas WhatsApp', 'Contratos ilimitados extras', 'Suporte VIP 24h'],
+                    popular: true
                   },
                 ].map(plan => (
                   <div 
@@ -164,7 +157,7 @@ export default function PlanSelectionModal({
                         <span className="text-xs text-slate-400 font-medium">/mês</span>
                       </div>
                       
-                      {billingCycle === 'anual' && (
+                      {billingCycle === 'anual' && plan.name === 'Ilimitado' && (
                         <p className="text-[9px] text-emerald-600 font-bold uppercase mt-1">
                           Faturado anualmente com desconto
                         </p>

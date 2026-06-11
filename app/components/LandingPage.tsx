@@ -277,26 +277,26 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
             )}
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
             {/* Gratuito */}
             <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] flex flex-col justify-between hover:border-slate-300 transition-all duration-300 group hover:shadow-2xl hover:shadow-slate-200/50 hover:-translate-y-1">
               <div>
                 <span className="text-[10px] font-black tracking-widest uppercase text-slate-500 bg-slate-100 group-hover:bg-slate-200 px-3 py-1.5 rounded-full inline-block mb-6 transition-colors">Freemium</span>
                 <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Gratuito</h3>
-                <p className="text-xs text-slate-500 font-medium mb-6">Perfeito para iniciantes testarem o sistema sem burocracia.</p>
+                <p className="text-xs text-slate-500 font-medium mb-6">Perfeito para proprietários iniciantes testarem o sistema sem burocracia.</p>
                 <div className="mb-6 flex items-baseline gap-1">
                   <span className="text-4xl font-black text-slate-900">R$ 0</span>
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ sempre</span>
                 </div>
-                <div className="h-[2px] bg-slate-100 mb-6 font-semibold text-[10px] text-slate-400 italic">Plano livre sem cobranças</div>
+                <div className="h-[2px] bg-slate-100 mb-6 font-semibold text-[10px] text-slate-400 italic">Ideal para experimentar o ecossistema</div>
                 <ul className="space-y-4 mb-8">
                   <li className="flex items-center gap-3 text-xs font-bold text-slate-600">
                     <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
-                    Até <strong>1 contrato ativo</strong>
+                    Até <strong>1 imóvel / contrato ativo</strong>
                   </li>
                   <li className="flex items-center gap-3 text-xs font-semibold text-slate-500">
                     <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
-                    Gestão Geral de Ativos
+                    Gestão Geral de Ativos e Clientes
                   </li>
                   <li className="flex items-center gap-3 text-xs font-semibold text-slate-500">
                     <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
@@ -309,63 +309,23 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
               </button>
             </div>
 
-            {/* Iniciante */}
-            <div className="bg-white border border-blue-100 p-8 rounded-[2.5rem] flex flex-col justify-between transition-all duration-300 group hover:shadow-2xl hover:shadow-blue-100 hover:-translate-y-1">
-              <div>
-                <span className="text-[10px] font-black tracking-widest uppercase text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full inline-block mb-6">Autônomo</span>
-                <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Iniciante</h3>
-                <p className="text-xs text-slate-500 font-medium mb-6">Ideal para proprietários de bens ou imóveis autônomos.</p>
-                <div className="mb-6 flex flex-col gap-1">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-black text-slate-900">
-                      R$ {billingCycle === 'mensal' ? '49,90' : '39,90'}
-                    </span>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
-                  </div>
-                  {billingCycle === 'anual' && (
-                    <span className="text-[10px] text-emerald-600 font-black uppercase italic">
-                      Cobrado R$ 478,80/ano (Economia R$ 120,00)
-                    </span>
-                  )}
-                </div>
-                <div className="h-[2px] bg-slate-100 mb-6"></div>
-                <ul className="space-y-4 mb-8">
-                  <li className="flex items-center gap-3 text-xs font-bold text-slate-600">
-                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
-                    Até <strong>10 contratos ativos</strong>
-                  </li>
-                  <li className="flex items-center gap-3 text-xs font-bold text-slate-600">
-                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
-                    Contratos e Recibos Extras
-                  </li>
-                  <li className="flex items-center gap-3 text-xs font-semibold text-slate-500">
-                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
-                    Notificações Avançadas
-                  </li>
-                </ul>
-              </div>
-              <button onClick={() => onRegister('Iniciante', billingCycle)} className="w-full py-4 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all">
-                Escolher Iniciante
-              </button>
-            </div>
-
-            {/* Profissional (Destaque) */}
+            {/* Ilimitado - Destaque */}
             <div className="bg-slate-900 border border-slate-800 relative p-8 rounded-[2.5rem] flex flex-col justify-between transition-all duration-300 shadow-2xl shadow-blue-900/20 hover:-translate-y-2">
-              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg border border-white/20 whitespace-nowrap">Melhor Custo-Benefício</div>
+              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-[9px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg border border-white/20 whitespace-nowrap">Melhor Escolha 🚀</div>
               <div>
-                <span className="text-[10px] font-black tracking-widest uppercase text-indigo-300 bg-indigo-500/20 border border-indigo-500/30 px-3 py-1.5 rounded-full inline-block mb-6 text-center w-full">Mais Vendido 🏆</span>
-                <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Profissional</h3>
-                <p className="text-xs text-slate-400 font-medium mb-6">Indicado para imobiliárias, corretores e locadoras em expansão.</p>
+                <span className="text-[10px] font-black tracking-widest uppercase text-indigo-300 bg-indigo-500/20 border border-indigo-500/30 px-3 py-1.5 rounded-full inline-block mb-6 text-center w-full">Plano Recomendado 🔥</span>
+                <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Ilimitado</h3>
+                <p className="text-xs text-slate-400 font-medium mb-6">Liberdade total para gerenciar sua carteira de imóveis e contratos sem limites.</p>
                 <div className="mb-6 flex flex-col gap-1">
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-black text-white">
-                      R$ {billingCycle === 'mensal' ? '99,90' : '79,90'}
+                      R$ {billingCycle === 'mensal' ? '19,90' : '15,90'}
                     </span>
                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">/ mês</span>
                   </div>
                   {billingCycle === 'anual' && (
                     <span className="text-[10px] text-emerald-400 font-black uppercase italic">
-                      Cobrado R$ 958,80/ano (Economia R$ 240,00)
+                      Cobrado R$ 190,80/ano (Economia R$ 48,00)
                     </span>
                   )}
                 </div>
@@ -373,60 +333,24 @@ export function LandingPage({ onLogin, onRegister }: LandingPageProps) {
                 <ul className="space-y-4 mb-8">
                   <li className="flex items-center gap-3 text-xs font-bold text-slate-200">
                     <CheckCircle2 size={16} className="text-blue-400 shrink-0" />
-                    Até <strong>50 contratos ativos</strong>
+                    Bens e Contratos <strong>Ilimitados</strong>
                   </li>
                   <li className="flex items-center gap-3 text-xs font-bold text-slate-200">
                     <CheckCircle2 size={16} className="text-blue-400 shrink-0" />
-                    Assistente IA de Contratos <span title="Inteligência Artificial">🤖</span>
+                    Assistente IA de Contratos 🤖
                   </li>
                   <li className="flex items-center gap-3 text-xs font-bold text-slate-200">
                     <CheckCircle2 size={16} className="text-blue-400 shrink-0" />
-                    Notificações no WhatsApp
+                    Notificações automáticas no WhatsApp / E-mail
+                  </li>
+                  <li className="flex items-center gap-3 text-xs font-bold text-slate-200">
+                    <CheckCircle2 size={16} className="text-blue-400 shrink-0" />
+                    Suporte e Implantação VIP 24h
                   </li>
                 </ul>
               </div>
-              <button onClick={() => onRegister('Profissional', billingCycle)} className="w-full py-4 bg-blue-600 text-white hover:bg-blue-500 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:shadow-[0_0_30px_rgba(37,99,235,0.6)]">
-                Começar Profissional
-              </button>
-            </div>
-
-            {/* Ilimitado */}
-            <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] flex flex-col justify-between hover:border-slate-300 transition-all duration-300 group hover:shadow-2xl hover:shadow-slate-200/50 hover:-translate-y-1">
-              <div>
-                <span className="text-[10px] font-black tracking-widest uppercase text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full inline-block mb-6">Corporativo</span>
-                <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Ilimitado</h3>
-                <p className="text-xs text-slate-500 font-medium mb-6">Para locadoras de frotas e incorporadoras comerciais de alto volume.</p>
-                <div className="mb-6 flex flex-col gap-1">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-black text-slate-900">
-                      R$ {billingCycle === 'mensal' ? '199,90' : '149,90'}
-                    </span>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">/ mês</span>
-                  </div>
-                  {billingCycle === 'anual' && (
-                    <span className="text-[10px] text-emerald-600 font-black uppercase italic">
-                      Cobrado R$ 1.798,80/ano (Economia R$ 600,00)
-                    </span>
-                  )}
-                </div>
-                <div className="h-[2px] bg-slate-100 mb-6"></div>
-                <ul className="space-y-4 mb-8">
-                  <li className="flex items-center gap-3 text-xs font-bold text-slate-600">
-                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
-                    Contratos <strong>Ilimitados</strong>
-                  </li>
-                  <li className="flex items-center gap-3 text-xs font-bold text-slate-600">
-                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
-                    Painel Multi-Usuários Ilimitados
-                  </li>
-                  <li className="flex items-center gap-3 text-xs font-bold text-slate-600">
-                    <CheckCircle2 size={16} className="text-blue-500 shrink-0" />
-                    Suporte VIP e Implantação
-                  </li>
-                </ul>
-              </div>
-              <button onClick={() => onRegister('Ilimitado', billingCycle)} className="w-full py-4 bg-slate-900 text-white hover:bg-slate-800 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all">
-                Falar c/ Especialista
+              <button onClick={() => onRegister('Ilimitado', billingCycle)} className="w-full py-4 bg-blue-600 text-white hover:bg-blue-500 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:shadow-[0_0_30px_rgba(37,99,235,0.6)]">
+                Assinar Plano Ilimitado
               </button>
             </div>
           </div>

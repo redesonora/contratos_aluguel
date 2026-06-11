@@ -1772,8 +1772,8 @@ Para resolver isso:
     const userPlanLimits: {[key: string]: number} = {
       'Gratuito': 1,
       'Nenhum': 1,
-      'Iniciante': 10,
-      'Profissional': 50,
+      'Iniciante': Infinity,
+      'Profissional': Infinity,
       'Ilimitado': Infinity
     };
     const userPlan = getCleanPlanName(userProfile?.plano);
@@ -3351,8 +3351,8 @@ Para resolver isso:
         const userPlanLimits: {[key: string]: number} = {
           'Gratuito': 1,
           'Nenhum': 1,
-          'Iniciante': 10,
-          'Profissional': 50,
+          'Iniciante': Infinity,
+          'Profissional': Infinity,
           'Ilimitado': Infinity
         };
         const userPlan = getCleanPlanName(userProfile?.plano);
@@ -4395,11 +4395,17 @@ Para resolver isso:
 
 
   if (isPaymentPending) {
-    const plansLimits: {[key: string]: number} = { 'Iniciante': 10, 'Profissional': 50, 'Ilimitado': Infinity };
+    const plansLimits: {[key: string]: number} = { 
+      'Gratuito': 1,
+      'Iniciante': Infinity, 
+      'Profissional': Infinity, 
+      'Ilimitado': Infinity 
+    };
     const prices: {[key: string]: {mensal: number, anual: number}} = {
-      'Iniciante': { mensal: 49.90, anual: 39.90 },
-      'Profissional': { mensal: 99.90, anual: 79.90 },
-      'Ilimitado': { mensal: 199.90, anual: 149.90 }
+      'Gratuito': { mensal: 0.00, anual: 0.00 },
+      'Iniciante': { mensal: 19.90, anual: 15.90 },
+      'Profissional': { mensal: 19.90, anual: 15.90 },
+      'Ilimitado': { mensal: 19.90, anual: 15.90 }
     };
     const cleanPlanForPrice = getCleanPlanName(userProfile.plano);
     const currentPrices = prices[cleanPlanForPrice || 'Iniciante'] || { mensal: 49.90, anual: 39.90 };

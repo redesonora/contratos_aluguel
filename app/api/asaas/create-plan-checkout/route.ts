@@ -132,14 +132,13 @@ export async function POST(req: NextRequest) {
       "User-Agent": "RealizzeApp Plan Subscription Gateway"
     };
 
-    // 1. Tabela de preços oficial
+    // 1. Tabela de preços oficial simplificada
     const prices: {[key: string]: {mensal: number, anual: number}} = {
-      'Iniciante': { mensal: 49.90, anual: 39.90 },
-      'Profissional': { mensal: 99.90, anual: 79.90 },
-      'Ilimitado': { mensal: 199.90, anual: 149.90 }
+      'Gratuito': { mensal: 0.00, anual: 0.00 },
+      'Ilimitado': { mensal: 19.90, anual: 15.90 }
     };
 
-    const currentPrices = prices[planName] || { mensal: 49.90, anual: 39.90 };
+    const currentPrices = prices[planName] || prices['Ilimitado'];
     const pricePerMonth = cycle === 'mensal' ? currentPrices.mensal : currentPrices.anual;
     const priceAmount = cycle === 'mensal' ? pricePerMonth : pricePerMonth * 12;
 
