@@ -276,101 +276,95 @@ export const ModelosContratoTab: React.FC<ModelosContratoTabProps> = ({
   };
 
   return (
-    <div className="space-y-12 pb-24">
+    <div className="space-y-6 pb-12">
       {/* Modelos de Contratos Side-by-Side */}
-      <section className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center gap-3">
-             <div className="p-2 bg-blue-100 text-blue-600 rounded-xl">
-               <FileText size={20} />
-             </div>
-             <div>
-                <h2 className="text-xl font-black text-slate-800 tracking-tight uppercase">Modelos de Contratos</h2>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Edite seus modelos e utilize tags para preenchimento automático.</p>
-             </div>
+      <section className="space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-zinc-900 tracking-tight">Modelos de Contratos</h2>
+            <p className="text-xs text-zinc-500 font-normal">Edite modelos e utilize tags dinâmicas para preenchimento automático.</p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <button 
               onClick={() => setIsPromptModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 text-zinc-800 hover:bg-zinc-200 rounded-lg text-xs font-medium transition-colors cursor-pointer border border-zinc-200/80"
             >
-              <Sparkles size={14} />
+              <Sparkles size={13} className="text-indigo-600" />
               Elaborar com IA
             </button>
             <button 
               onClick={handleAddTemplate}
-              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 text-white hover:bg-zinc-800 rounded-lg text-xs font-medium transition-colors shadow-sm cursor-pointer"
             >
-              <PlusCircle size={14} />
+              <PlusCircle size={13} />
               Novo Modelo
             </button>
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6 bg-slate-50 p-6 rounded-[2.5rem] border border-slate-200">
+        <div className="flex flex-col lg:flex-row gap-4 bg-zinc-50/50 p-4 rounded-xl border border-zinc-200/80">
           {/* Sidebar de Modelos */}
-          <div className="w-full lg:w-72 space-y-2">
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-4">Selecione para Editar</p>
+          <div className="w-full lg:w-64 space-y-1.5">
+            <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider px-2 py-1">Modelos salvos</p>
             {contractTemplates.map((template) => (
               <button
                 key={template.id}
                 onClick={() => setSelectedTemplateId(template.id)}
-                className={`w-full text-left p-4 rounded-2xl transition-all border-2 flex flex-col gap-1 group cursor-pointer ${
+                className={`w-full text-left p-3 rounded-lg transition-all flex flex-col gap-0.5 group cursor-pointer border ${
                   selectedTemplateId === template.id 
-                    ? 'bg-white border-blue-500 shadow-md ring-4 ring-blue-50' 
-                    : 'bg-transparent border-transparent text-slate-500 hover:bg-white hover:border-slate-200'
+                    ? 'bg-white border-zinc-300 shadow-sm text-zinc-900 font-medium' 
+                    : 'bg-transparent border-transparent text-zinc-600 hover:bg-white/80 hover:border-zinc-200'
                 }`}
               >
-                <div className="flex justify-between items-center">
-                  <span className={`text-xs font-black uppercase tracking-tight ${selectedTemplateId === template.id ? 'text-blue-600' : 'text-slate-600'}`}>
+                <div className="flex justify-between items-center w-full">
+                  <span className="text-xs truncate">
                     {template.name}
                   </span>
-                  <div className={`transition-opacity ${selectedTemplateId === template.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                    <div className="w-2 h-2 rounded-full bg-blue-600" />
-                  </div>
+                  {selectedTemplateId === template.id && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-900" />
+                  )}
                 </div>
-                <p className="text-[10px] text-slate-400 font-medium truncate">Última edição: {new Date().toLocaleDateString()}</p>
               </button>
             ))}
             {contractTemplates.length === 0 && (
-              <div className="p-8 text-center text-slate-400 font-medium italic text-xs">Nenhum modelo criado.</div>
+              <div className="p-6 text-center text-zinc-400 font-normal text-xs">Nenhum modelo criado.</div>
             )}
           </div>
 
           {/* Editor de Modelo Selecionado */}
           <div className="flex-1 min-w-0">
             {selectedTemplate ? (
-              <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full animate-in fade-in duration-300">
-                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/30">
+              <div className="bg-white rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col h-full">
+                <div className="p-4 border-b border-zinc-200/80 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-zinc-50/40">
                   <div className="flex-1 w-full">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block ml-1">Identificação do Modelo</label>
+                    <label className="text-[11px] font-medium text-zinc-500 mb-1 block">Nome do Modelo</label>
                     <input 
                       type="text"
                       value={selectedTemplate.name}
                       onChange={(e) => handleUpdateTemplate(selectedIndex, 'name', e.target.value)}
-                      className="w-full bg-white border-2 border-slate-100 focus:border-blue-400 outline-none rounded-xl px-4 py-2 font-black text-slate-800 text-sm transition-all"
-                      placeholder="Ex: Contrato Residencial"
+                      className="w-full bg-white border border-zinc-200 focus:border-zinc-400 outline-none rounded-lg px-3 py-1.5 font-medium text-zinc-800 text-xs transition-colors"
+                      placeholder="Ex: Contrato de Locação Residencial"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 self-end sm:self-center">
                     <button 
                       onClick={() => setShowTagGuide(true)}
-                      className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-white rounded-xl transition-all shadow-sm group border border-transparent hover:border-slate-100 cursor-pointer"
-                      title="Guia de Tags"
+                      className="p-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors cursor-pointer"
+                      title="Dicionário de Tags"
                     >
-                      <BookOpen size={18} />
+                      <BookOpen size={16} />
                     </button>
                     <button 
                       onClick={() => setTemplateToDelete(selectedTemplate.id)}
-                      className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-white rounded-xl transition-all shadow-sm group border border-transparent hover:border-slate-100 cursor-pointer"
+                      className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                       title="Excluir este Modelo"
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
 
-                <div className="p-6">
+                <div className="p-4 flex-1 flex flex-col">
                   <RichEditor 
                     content={selectedTemplate.content}
                     onChange={(val) => handleUpdateTemplate(selectedIndex, 'content', val)}
@@ -378,31 +372,31 @@ export const ModelosContratoTab: React.FC<ModelosContratoTabProps> = ({
                     setActiveDropdown={setActiveDropdown}
                   />
 
-                  <div className="mt-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex-1 space-y-3">
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block font-black">Atalhos (Insert Tags):</label>
-                      <div className="flex flex-wrap gap-2">
+                  <div className="mt-4 pt-4 border-t border-zinc-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex-1 space-y-1.5">
+                      <label className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider block">Inserir Tags Rápidas:</label>
+                      <div className="flex flex-wrap gap-1.5">
                         {tagGroups.slice(0, 4).flatMap(g => g.tags.slice(0, 3)).map((tag, index) => (
                           <button 
                             key={`shortcut-${tag.tag}-${index}`}
                             onMouseDown={(e) => { e.preventDefault(); handleInsertTag(tag.tag); }}
-                            className="px-2.5 py-1.5 bg-slate-50 text-slate-500 rounded-lg text-[9px] font-bold border border-slate-100 hover:border-blue-200 hover:text-blue-600 transition-all cursor-pointer"
+                            className="px-2 py-1 bg-zinc-50 text-zinc-600 rounded-md text-[11px] font-mono border border-zinc-200/60 hover:border-zinc-300 hover:bg-white transition-colors cursor-pointer"
                           >
                             {tag.tag}
                           </button>
                         ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
+                    <div className="flex items-center gap-3 self-end md:self-center">
                        {saveSuccess && (
-                         <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest animate-pulse">Salvo!</span>
+                         <span className="text-xs font-medium text-emerald-600 animate-pulse">Salvo com sucesso!</span>
                        )}
                        <button 
                          onClick={handleSave}
                          disabled={isSaving}
-                         className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg active:scale-95 disabled:opacity-50 cursor-pointer"
+                         className="inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white rounded-lg text-xs font-medium hover:bg-zinc-800 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
                        >
-                          {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                          {isSaving ? <Loader2 className="animate-spin" size={13} /> : <Save size={13} />}
                           {isSaving ? 'Salvando...' : 'Salvar Modelo'}
                        </button>
                     </div>
@@ -410,7 +404,7 @@ export const ModelosContratoTab: React.FC<ModelosContratoTabProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center bg-white rounded-[2rem] border-2 border-dashed border-slate-200 text-slate-400 italic text-sm p-12">
+              <div className="h-full flex items-center justify-center bg-white rounded-xl border border-dashed border-zinc-200 text-zinc-400 font-normal text-xs p-8">
                 Selecione um modelo para começar a editar
               </div>
             )}
@@ -419,79 +413,61 @@ export const ModelosContratoTab: React.FC<ModelosContratoTabProps> = ({
       </section>
 
       {/* Alertas e Notificações */}
-      <section className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm border-2">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl">
-            <BellRing size={24} />
+      <section className="bg-white p-5 rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-zinc-100 text-zinc-700 rounded-lg">
+            <BellRing size={18} />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight italic uppercase">Alertas e Notificações</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Regras de aviso para vencimentos e tarefas</p>
+            <h2 className="text-sm font-semibold text-zinc-900 tracking-tight">Alertas de Vencimento de Contrato</h2>
+            <p className="text-xs text-zinc-500 font-normal">Defina a antecedência dos avisos antes da data de término</p>
           </div>
         </div>
 
-        <div className="max-w-md space-y-6">
-          <div className="space-y-4">
-            <div className="flex justify-between items-center mb-1">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Antecedência de Alerta (Vencimentos)</label>
-              <span className="text-xl font-black text-blue-600 italic">{notificationDays} dias</span>
-            </div>
-            <input 
-              type="range"
-              min="15"
-              max="120"
-              step="5"
-              value={notificationDays}
-              onChange={(e) => setNotificationDays(parseInt(e.target.value))}
-              className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
-            />
-            <div className="flex justify-between text-[8px] font-black text-slate-300 uppercase tracking-tighter">
-              <span>15 Dias</span>
-              <span>120 Dias</span>
-            </div>
+        <div className="max-w-sm space-y-3">
+          <div className="flex justify-between items-center">
+            <label className="text-xs font-medium text-zinc-600">Antecedência configurada</label>
+            <span className="text-xs font-semibold text-zinc-900 bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200/60">{notificationDays} dias</span>
+          </div>
+          <input 
+            type="range"
+            min="15"
+            max="120"
+            step="5"
+            value={notificationDays}
+            onChange={(e) => setNotificationDays(parseInt(e.target.value))}
+            className="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-zinc-900"
+          />
+          <div className="flex justify-between text-[10px] text-zinc-400 font-normal">
+            <span>15 dias</span>
+            <span>120 dias</span>
           </div>
         </div>
       </section>
 
       {/* Tag Guide Modal */}
       {showTagGuide && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm shadow-xl" onClick={() => setShowTagGuide(false)} />
-          <div className="relative bg-slate-50 w-full max-w-5xl max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden border border-white flex flex-col motion-safe:animate-in motion-safe:zoom-in-95 duration-200">
-            <div className="p-8 border-b border-slate-100 bg-white flex justify-between items-center">
-               <div className="flex items-center gap-4">
-                 <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-200">
-                   <Target size={24} />
-                 </div>
-                 <div>
-                    <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase italic">Dicionário de Tags do Contrato</h2>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Clique na tag para copiar</p>
-                 </div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-4xl max-h-[85vh] rounded-2xl shadow-xl overflow-hidden border border-zinc-200 flex flex-col">
+            <div className="p-4 px-6 border-b border-zinc-200/80 flex justify-between items-center bg-zinc-50/50">
+               <div>
+                  <h2 className="text-sm font-semibold text-zinc-900">Dicionário de Tags de Contrato</h2>
+                  <p className="text-xs text-zinc-500 font-normal">Clique na tag para copiá-la ou inseri-la no modelo</p>
                </div>
-               <button onClick={() => setShowTagGuide(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all cursor-pointer">
-                 <X size={24} className="text-slate-400" />
+               <button onClick={() => setShowTagGuide(false)} className="p-1 text-zinc-400 hover:text-zinc-600 rounded-lg transition-colors cursor-pointer">
+                 <X size={18} />
                </button>
             </div>
             
-            <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-6">
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {tagGroups.map((group) => (
-                    <div key={group.title} className={`${group.fullWidth ? 'md:col-span-2 lg:col-span-4 bg-blue-50/50 p-8 rounded-[2rem] border border-blue-100' : 'space-y-4'}`}>
-                       <h3 className={`text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-2 mb-4 ${
-                         group.color === 'blue' ? 'text-blue-600' : 
-                         group.color === 'purple' ? 'text-purple-600' :
-                         group.color === 'amber' ? 'text-amber-600' :
-                         group.color === 'emerald' ? 'text-emerald-600' : 'text-slate-600'
-                       }`}>
-                         {group.color === 'blue' && <Users size={14} />}
-                         {group.color === 'purple' && <Users size={14} />}
-                         {group.color === 'amber' && <ShieldAlert size={14} />}
-                         {group.color === 'emerald' && <Building size={14} />}
-                         {group.color === 'slate' && <FileText size={14} />}
+                    <div key={group.title} className={`${group.fullWidth ? 'md:col-span-2 lg:col-span-4 bg-zinc-50/60 p-4 rounded-xl border border-zinc-200/80' : 'space-y-2'}`}>
+                       <h3 className="text-xs font-semibold text-zinc-700 uppercase tracking-wider mb-2">
                          {group.title}
                        </h3>
                        
-                       <div className={`${group.fullWidth ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4' : 'grid grid-cols-1 gap-3'}`}>
+                       <div className={`${group.fullWidth ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2' : 'grid grid-cols-1 gap-1.5'}`}>
                           {group.tags.map((tag) => (
                             <TagItem 
                               key={`${group.title}-${tag.tag}`} 
@@ -506,15 +482,15 @@ export const ModelosContratoTab: React.FC<ModelosContratoTabProps> = ({
                </div>
             </div>
             
-            <div className="p-8 bg-white border-t border-slate-100 flex justify-between items-center bg-slate-50/30">
-               <p className="text-[10px] font-bold text-slate-400 uppercase italic">
-                 Use estas tags dentro do editor de cláusulas para preenchimento automático.
+            <div className="p-4 px-6 bg-zinc-50/50 border-t border-zinc-200 flex justify-between items-center">
+               <p className="text-xs text-zinc-500 font-normal">
+                 As tags entre chaves duplas serão substituídas pelos valores do cadastro.
                </p>
                <button 
                  onClick={() => setShowTagGuide(false)}
-                 className="px-8 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all cursor-pointer"
+                 className="px-4 py-2 bg-zinc-900 text-white rounded-lg text-xs font-medium hover:bg-zinc-800 transition-colors cursor-pointer"
                >
-                 Fechar Guia
+                 Fechar
                </button>
             </div>
           </div>
@@ -523,31 +499,30 @@ export const ModelosContratoTab: React.FC<ModelosContratoTabProps> = ({
 
       {/* AI Contract Model Maker Modal */}
       {isPromptModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => !isAiGenerating && setIsPromptModalOpen(false)} />
-          <div className="relative bg-white w-full max-w-2xl max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden border border-white flex flex-col motion-safe:animate-in motion-safe:zoom-in-95 duration-200">
-            <div className="p-8 border-b border-slate-100 bg-white flex justify-between items-center">
-               <div className="flex items-center gap-4">
-                 <div className="p-3 bg-indigo-100 text-indigo-600 rounded-2xl shadow-lg shadow-indigo-50">
-                   <Sparkles size={24} />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-xl max-h-[85vh] rounded-2xl shadow-xl overflow-hidden border border-zinc-200 flex flex-col">
+            <div className="p-4 px-6 border-b border-zinc-200/80 flex justify-between items-center bg-zinc-50/50">
+               <div className="flex items-center gap-2.5">
+                 <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                   <Sparkles size={16} />
                  </div>
                  <div>
-                    <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase italic flex items-center gap-2">Elaborar Modelo com IA</h2>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-relaxed">Escreva as diretrizes e a Inteligência Artificial criará um modelo estruturado com tags automáticas.</p>
+                    <h2 className="text-sm font-semibold text-zinc-900">Elaborar Modelo com IA</h2>
+                    <p className="text-xs text-zinc-500 font-normal">A IA gerará as cláusulas e inserirá as tags automáticas</p>
                  </div>
                </div>
-               <button onClick={() => !isAiGenerating && setIsPromptModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all cursor-pointer">
-                 <X size={24} className="text-slate-400" />
+               <button onClick={() => !isAiGenerating && setIsPromptModalOpen(false)} className="p-1 text-zinc-400 hover:text-zinc-600 rounded-lg transition-colors cursor-pointer">
+                 <X size={18} />
                </button>
             </div>
             
-            <div className="p-8 overflow-y-auto flex-1 space-y-6 custom-scrollbar bg-slate-50/55">
-               <div className="space-y-2">
-                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1 font-black">Tipo de Contrato</label>
+            <div className="p-6 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
+               <div className="space-y-1.5">
+                 <label className="text-xs font-medium text-zinc-700 block">Tipo de Contrato</label>
                  <select 
                    value={contractType}
                    onChange={(e) => setContractType(e.target.value)}
-                   className="w-full bg-white border-2 border-slate-100 focus:border-indigo-400 outline-none rounded-2xl px-4 py-3 font-bold text-sm transition-all"
+                   className="w-full bg-white border border-zinc-200 focus:border-zinc-400 outline-none rounded-lg px-3 py-2 text-xs font-normal text-zinc-800 transition-colors"
                  >
                    <option value="Contrato de Locação Residencial">Contrato de Locação Residencial</option>
                    <option value="Contrato de Locação Comercial">Contrato de Locação Comercial</option>
@@ -558,64 +533,61 @@ export const ModelosContratoTab: React.FC<ModelosContratoTabProps> = ({
                </div>
 
                {contractType === 'Outro' && (
-                 <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block ml-1 font-black">Digite o Nome do Tipo de Contrato</label>
+                 <div className="space-y-1.5">
+                   <label className="text-xs font-medium text-zinc-700 block">Nome do Tipo de Contrato</label>
                    <input 
                      type="text"
                      placeholder="Ex: Contrato de Comodato de Imóvel"
                      value={customType}
                      onChange={(e) => setCustomType(e.target.value)}
-                     className="w-full bg-white border-2 border-slate-100 focus:border-indigo-400 outline-none rounded-2xl px-4 py-3 font-bold text-sm transition-all animate-none"
+                     className="w-full bg-white border border-zinc-200 focus:border-zinc-400 outline-none rounded-lg px-3 py-2 text-xs font-normal text-zinc-800 transition-colors"
                    />
                  </div>
                )}
 
-               <div className="space-y-2">
-                 <div className="flex justify-between items-center ml-1">
-                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest font-black">Exigências, Cláusulas e Regras Especiais</label>
-                   <span className="text-[9px] text-slate-400 font-bold uppercase">Cláusulas Personalizadas</span>
-                 </div>
+               <div className="space-y-1.5">
+                 <label className="text-xs font-medium text-zinc-700 block">Cláusulas e Requisitos Especiais</label>
                  <textarea 
-                   rows={5}
-                   placeholder="Ex: Reajuste anual pelo IPCA, prazo de 30 meses, proibir animais domésticos, multa rescisória proporcional de 3 aluguéis, solicitar caução de 3 meses como garantia..."
+                   rows={4}
+                   placeholder="Ex: Reajuste anual pelo IPCA, prazo de 30 meses, proibir animais, multa rescisória de 3 aluguéis, caução de 3 meses..."
                    value={contractRulesPrompt}
                    onChange={(e) => setContractRulesPrompt(e.target.value)}
-                   className="w-full bg-white border-2 border-slate-100 focus:border-indigo-400 outline-none rounded-2xl px-4 py-3 font-bold text-sm transition-all resize-none leading-relaxed"
+                   className="w-full bg-white border border-zinc-200 focus:border-zinc-400 outline-none rounded-lg px-3 py-2 text-xs font-normal text-zinc-800 transition-colors resize-none leading-relaxed"
                  />
-                 <p className="text-[10px] text-slate-400 font-bold leading-normal ml-1 bg-slate-100/50 p-3 rounded-xl border border-slate-200/50">
-                   💡 <strong className="text-slate-600">Dica da IA:</strong> Você pode descrever de forma livre. A IA irá incluir automaticamente as seções jurídicas padrão e inserir as tags dinâmicas nos campos corretos!
+                 <p className="text-[11px] text-zinc-500 font-normal bg-zinc-50 p-2.5 rounded-lg border border-zinc-200/50">
+                   A IA incluirá as seções jurídicas padrão e as tags de substituição dinâmica.
                  </p>
                </div>
 
                {generationError && (
-                 <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-xs rounded-2xl font-semibold">
-                   ⚠️ {generationError}
+                 <div className="p-3 bg-rose-50 border border-rose-200/60 text-rose-700 text-xs rounded-lg font-normal">
+                   {generationError}
                  </div>
                )}
             </div>
             
-            <div className="p-8 bg-white border-t border-slate-100 flex justify-between items-center bg-slate-50/20">
+            <div className="p-4 px-6 bg-zinc-50/50 border-t border-zinc-200 flex justify-end items-center gap-2">
                <button 
                  onClick={() => setIsPromptModalOpen(false)}
                  disabled={isAiGenerating}
-                 className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50 cursor-pointer"
+                 className="px-4 py-2 text-zinc-600 hover:text-zinc-900 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
                >
                  Cancelar
                </button>
                <button 
                  onClick={handleGenerateAiTemplate}
                  disabled={isAiGenerating}
-                 className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 active:scale-95 disabled:opacity-50 cursor-pointer"
+                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white rounded-lg text-xs font-medium hover:bg-zinc-800 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
                >
                  {isAiGenerating ? (
                    <>
-                     <Loader2 className="animate-spin" size={14} />
-                     Elaborando com IA...
+                     <Loader2 className="animate-spin" size={13} />
+                     Elaborando...
                    </>
                  ) : (
                    <>
-                     <Sparkles size={14} />
-                     Elaborar Contrato
+                     <Sparkles size={13} />
+                     Gerar Modelo
                    </>
                  )}
                </button>
@@ -626,32 +598,31 @@ export const ModelosContratoTab: React.FC<ModelosContratoTabProps> = ({
 
       {/* Delete Confirmation Modal */}
       {templateToDelete && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setTemplateToDelete(null)} />
-          <div className="relative bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white flex flex-col motion-safe:animate-in motion-safe:zoom-in-95 duration-200">
-             <div className="p-8 text-center space-y-6">
-                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                   <Trash2 size={40} />
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-sm rounded-xl shadow-xl overflow-hidden border border-zinc-200 flex flex-col">
+             <div className="p-6 text-center space-y-4">
+                <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center mx-auto">
+                   <Trash2 size={18} />
                 </div>
                 <div>
-                   <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase italic">Confirmar Exclusão?</h2>
-                   <p className="text-xs text-slate-500 font-medium mt-2 leading-relaxed">
-                     O modelo <strong className="text-slate-800 font-black">"{contractTemplates.find(t => t.id === templateToDelete)?.name}"</strong> será removido permanentemente. Esta ação não poderá ser desfeita.
+                   <h2 className="text-sm font-semibold text-zinc-900">Excluir Modelo?</h2>
+                   <p className="text-xs text-zinc-500 font-normal mt-1 leading-relaxed">
+                     O modelo <strong className="text-zinc-800 font-medium">"{contractTemplates.find(t => t.id === templateToDelete)?.name}"</strong> será removido permanentemente.
                    </p>
                 </div>
                 
-                <div className="flex gap-4">
+                <div className="flex gap-2 pt-2">
                    <button 
                      onClick={() => setTemplateToDelete(null)}
-                     className="flex-1 px-6 py-4 bg-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95 cursor-pointer"
+                     className="flex-1 px-3 py-2 bg-zinc-100 text-zinc-700 rounded-lg text-xs font-medium hover:bg-zinc-200 transition-colors cursor-pointer"
                    >
                      Cancelar
                    </button>
                    <button 
                      onClick={handleDeleteTemplate}
-                     className="flex-1 px-6 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-lg shadow-red-200 active:scale-95 cursor-pointer"
+                     className="flex-1 px-3 py-2 bg-rose-600 text-white rounded-lg text-xs font-medium hover:bg-rose-700 transition-colors cursor-pointer shadow-sm"
                    >
-                     Sim, Excluir
+                     Excluir
                    </button>
                 </div>
              </div>

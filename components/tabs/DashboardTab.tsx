@@ -10,7 +10,8 @@ import {
   CreditCard,
   Mail,
   ChevronRight,
-  CheckCircle2
+  CheckCircle2,
+  Calendar
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -69,129 +70,132 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-8"
+      className="space-y-6"
     >
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <motion.div variants={itemVariants} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E2E8F0] shadow-sm transition-all hover:shadow-md">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-[#EFF6FF] text-[#1D4ED8] rounded-lg">
-              <DollarSign size={20} />
-            </div>
-            <span className="text-[10px] font-bold text-[#1D4ED8] bg-[#EFF6FF] px-2.5 py-1 rounded-full uppercase tracking-wider">A Receber</span>
+      {/* 4 Métricas Principais */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div variants={itemVariants} className="bg-white p-5 rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-zinc-300 transition-colors">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-zinc-500">Previsão do Mês</span>
+            <span className="text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-200/60 px-2 py-0.5 rounded-md">A Receber</span>
           </div>
-          <h3 className="text-[#64748B] text-[10px] font-semibold uppercase tracking-widest mb-1">Previsão Mensal</h3>
-          <p className="text-2xl font-black text-[#0F172A] tracking-tight">{formatarMoeda(stats.aReceber)}</p>
+          <p className="text-2xl font-semibold text-zinc-900 tracking-tight font-mono">{formatarMoeda(stats.aReceber)}</p>
+          <p className="text-[11px] text-zinc-400 mt-1">Total contratual previsto</p>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E2E8F0] shadow-sm transition-all hover:shadow-md">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-[#DCFCE7] text-[#15803D] rounded-lg">
-              <TrendingUp size={20} />
-            </div>
-            <span className="text-[10px] font-bold text-[#15803D] bg-[#DCFCE7] px-2.5 py-1 rounded-full uppercase tracking-wider">Recebido</span>
+        <motion.div variants={itemVariants} className="bg-white p-5 rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-zinc-300 transition-colors">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-zinc-500">Realizado no Mês</span>
+            <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md">Recebido</span>
           </div>
-          <h3 className="text-[#64748B] text-[10px] font-semibold uppercase tracking-widest mb-1">Realizado no Mês</h3>
-          <p className="text-2xl font-black text-[#0F172A] tracking-tight">{formatarMoeda(stats.recebido)}</p>
+          <p className="text-2xl font-semibold text-zinc-900 tracking-tight font-mono">{formatarMoeda(stats.recebido)}</p>
+          <p className="text-[11px] text-zinc-400 mt-1">Valores baixados e confirmados</p>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E2E8F0] shadow-sm transition-all hover:shadow-md">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-[#FEE2E2] text-[#B91C1C] rounded-lg">
-              <AlertCircle size={20} />
-            </div>
-            <span className={`text-[10px] font-bold text-[#B91C1C] bg-[#FEE2E2] px-2.5 py-1 rounded-full uppercase tracking-wider ${stats.inadimplenciaCount > 0 ? 'animate-pulse' : ''}`}>Inadimplência</span>
+        <motion.div variants={itemVariants} className="bg-white p-5 rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-zinc-300 transition-colors">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-zinc-500">Pendências / Atrasos</span>
+            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${
+              stats.inadimplenciaCount > 0 
+                ? 'text-rose-700 bg-rose-50 border-rose-200/60' 
+                : 'text-zinc-600 bg-zinc-50 border-zinc-200/60'
+            }`}>
+              {stats.inadimplenciaCount > 0 ? `${stats.inadimplenciaCount} em atraso` : 'Em dia'}
+            </span>
           </div>
-          <h3 className="text-[#64748B] text-[10px] font-semibold uppercase tracking-widest mb-1">Vencidos / No Mês</h3>
-          <p className="text-2xl font-black text-[#0F172A] tracking-tight">{stats.inadimplenciaCount}</p>
+          <p className={`text-2xl font-semibold tracking-tight font-mono ${stats.inadimplenciaCount > 0 ? 'text-rose-600' : 'text-zinc-900'}`}>
+            {stats.inadimplenciaCount}
+          </p>
+          <p className="text-[11px] text-zinc-400 mt-1">Parcelas vencidas no período</p>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="bg-[#FFFFFF] p-6 rounded-2xl border border-[#E2E8F0] shadow-sm transition-all hover:shadow-md">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-indigo-50 text-indigo-650 rounded-lg">
-              <Building2 size={20} />
-            </div>
-            <div className="flex flex-col items-end">
-              <span className="text-xl font-black text-[#1D4ED8]">{Math.round(stats.alugadosPercent)}%</span>
-            </div>
+        <motion.div variants={itemVariants} className="bg-white p-5 rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] hover:border-zinc-300 transition-colors">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-zinc-500">Ocupação da Carteira</span>
+            <span className="text-[11px] font-medium text-zinc-700 bg-zinc-100 border border-zinc-200/60 px-2 py-0.5 rounded-md">
+              {Math.round(stats.alugadosPercent)}%
+            </span>
           </div>
-          <h3 className="text-[#64748B] text-[10px] font-semibold uppercase tracking-widest mb-1">Locações Ativas / Em Uso</h3>
-          <div className="flex items-end gap-1">
-            <p className="text-2xl font-black text-[#0F172A] tracking-tight">{stats.alugadosCount}</p>
-            <p className="text-[10px] font-bold text-[#64748B] mb-1">/ {stats.totalImoveis} bens/itens</p>
+          <div className="flex items-baseline gap-1.5">
+            <p className="text-2xl font-semibold text-zinc-900 tracking-tight font-mono">{stats.alugadosCount}</p>
+            <p className="text-xs text-zinc-400">/ {stats.totalImoveis} bens cadastrados</p>
           </div>
+          <p className="text-[11px] text-zinc-400 mt-1">Locações ativas no momento</p>
         </motion.div>
       </section>
       
       {/* Fluxo de Caixa Chart */}
-      <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-[#E2E8F0] shadow-sm">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
-            <div>
-              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight italic">Fluxo de Caixa Mensal</h3>
-              <p className="text-[10px] text-[#64748B] font-semibold uppercase tracking-widest mt-1">Gestão inteligente de recebimentos ({new Date().getFullYear()})</p>
-            </div>
-            <div className="flex gap-6">
-              <div className="flex items-center gap-2">
-                 <div className="w-3 h-3 bg-[#2563EB] rounded-sm"></div>
-                 <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest">Recebido</span>
-              </div>
-              <div className="flex items-center gap-2">
-                 <div className="w-3 h-3 bg-[#F43F5E] rounded-sm"></div>
-                 <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-widest">Pendente</span>
-              </div>
-            </div>
-          </div>
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyCashFlowData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }}
-                  dy={10}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }}
-                  tickFormatter={(value) => `R$ ${value >= 1000 ? (value / 1000) + 'k' : value}`}
-                />
-                <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ 
-                    borderRadius: '16px', 
-                    border: '1px solid #f1f5f9', 
-                    boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
-                    fontSize: '12px',
-                    fontWeight: '800'
-                  }}
-                  formatter={(value: any) => formatarMoeda(value)}
-                />
-                <Bar dataKey="recebido" fill="#2563EB" radius={[6, 6, 0, 0]} barSize={32} />
-                <Bar dataKey="pendente" fill="#F43F5E" radius={[6, 6, 0, 0]} barSize={32} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-      </motion.div>
-
-      <motion.div variants={itemVariants} className="space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+      <motion.div variants={itemVariants} className="bg-white p-6 rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 pb-4 border-b border-zinc-100 gap-3">
           <div>
-            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight italic">Próximos Alertas</h2>
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mt-1">Ações recomendadas para os próximos {notificationDays} dias</p>
+            <h3 className="text-sm font-semibold text-zinc-900">Fluxo de Caixa Mensal</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Visão consolidada de recebimentos e previsões ({new Date().getFullYear()})</p>
+          </div>
+          <div className="flex items-center gap-5 text-xs text-zinc-600">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 bg-zinc-900 rounded-sm"></div>
+              <span>Recebido</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 bg-rose-500 rounded-sm"></div>
+              <span>Pendente</span>
+            </div>
           </div>
         </div>
+
+        <div className="h-[280px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthlyCashFlowData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f4f4f5" />
+              <XAxis 
+                dataKey="name" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fontSize: 11, fill: '#71717a' }}
+                dy={8}
+              />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fontSize: 11, fill: '#71717a' }}
+                tickFormatter={(value) => `R$ ${value >= 1000 ? (value / 1000) + 'k' : value}`}
+              />
+              <Tooltip 
+                cursor={{ fill: '#f4f4f5' }}
+                contentStyle={{ 
+                  borderRadius: '8px', 
+                  border: '1px solid #e4e4e7', 
+                  backgroundColor: '#ffffff',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                  fontSize: '12px',
+                  color: '#18181b'
+                }}
+                formatter={(value: any) => [formatarMoeda(value), '']}
+              />
+              <Bar dataKey="recebido" name="Recebido" fill="#18181b" radius={[4, 4, 0, 0]} barSize={24} />
+              <Bar dataKey="pendente" name="Pendente" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={24} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </motion.div>
+
+      {/* Alertas e Próximas Ações */}
+      <motion.div variants={itemVariants} className="bg-white rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-zinc-100">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-900 flex items-center gap-2">
+              <Bell size={15} className="text-zinc-500" />
+              Alertas e Vencimentos Próximos
+            </h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Contratos e parcelas que exigem atenção nos próximos {notificationDays} dias</p>
+          </div>
+          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-700">
+            {notifications.length} {notifications.length === 1 ? 'pendência' : 'pendências'}
+          </span>
+        </div>
         
-        <div className="space-y-4">
-        <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-          <Bell size={20} className="text-amber-500" />
-          Alertas Críticos ({notifications.length})
-        </h3>
-        <div className="flex flex-col gap-3">
-           {notifications.map((co) => {
-            const isContractExpiring = new Date(co.data_fim + 'T00:00:00') <= new Date(new Date().setDate(new Date().getDate() + notificationDays));
-            
+        <div className="divide-y divide-zinc-100">
+          {notifications.map((co) => {
             let nextDueDate = co.dia_vencimento ? new Date(new Date().getFullYear(), new Date().getMonth(), co.dia_vencimento) : null;
             
             const isOverdue = co.dia_vencimento && 
@@ -209,42 +213,43 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             const isRentDue = !isOverdue && nextDueDate && nextDueDate <= new Date(new Date().setDate(new Date().getDate() + 31));
 
             return (
-              <div key={co.id} className={`flex items-center justify-between p-4 rounded-xl border scale-in-center transition-all ${
-                isOverdue ? 'bg-red-50 border-red-100 shadow-sm' : 'bg-orange-50/50 border-orange-100'
-              }`}>
-                <div className="flex items-center gap-4 flex-1">
-                  <div className={`p-2 rounded-lg ${
-                    isOverdue ? 'bg-red-100 text-red-600' : 
-                    isRentDue ? 'bg-amber-100 text-amber-600' : 'bg-orange-100 text-orange-600'
+              <div key={co.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-zinc-50/60 transition-colors gap-3">
+                <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
+                  <div className={`p-2 rounded-lg flex-shrink-0 ${
+                    isOverdue ? 'bg-rose-50 text-rose-600 border border-rose-200/60' : 
+                    isRentDue ? 'bg-amber-50 text-amber-600 border border-amber-200/60' : 
+                    'bg-blue-50 text-blue-600 border border-blue-200/60'
                   }`}>
-                    {isOverdue ? <BadgeDollarSign size={18} /> : isRentDue ? <CreditCard size={18} /> : <AlertCircle size={18} />}
+                    {isOverdue ? <BadgeDollarSign size={16} /> : isRentDue ? <CreditCard size={16} /> : <AlertCircle size={16} />}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-slate-800 uppercase text-xs tracking-tight flex items-center gap-2">
-                      {co.inquilinos?.nome || 'Sem Nome'} 
-                      <span className={`text-[8px] px-1.5 py-0.5 rounded-full ${
-                        isOverdue ? 'bg-red-200 text-red-800 animate-pulse' :
-                        isRentDue ? 'bg-amber-200 text-amber-800' : 'bg-orange-200 text-orange-800'
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-xs font-medium text-zinc-900">{co.inquilinos?.nome || 'Sem Nome'}</p>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md border ${
+                        isOverdue ? 'bg-rose-50 text-rose-700 border-rose-200/60' :
+                        isRentDue ? 'bg-amber-50 text-amber-700 border-amber-200/60' : 
+                        'bg-blue-50 text-blue-700 border-blue-200/60'
                       }`}>
-                        {isOverdue ? 'EM ATRASO' : isRentDue ? 'ALUGUEL' : 'CONTRATO'}
+                        {isOverdue ? 'Em atraso' : isRentDue ? 'Vencimento próximo' : 'Término de contrato'}
                       </span>
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-medium italic truncate max-w-[300px]">{co.imoveis?.endereco}</p>
+                    </div>
+                    <p className="text-xs text-zinc-500 truncate mt-0.5">{co.imoveis?.endereco || 'Endereço não informado'}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      {isOverdue ? 'Vencido em:' : isRentDue ? 'Próximo Venc.:' : 'Expira em:'}
+
+                <div className="flex items-center justify-between sm:justify-end gap-4 pl-11 sm:pl-0">
+                  <div className="text-left sm:text-right">
+                    <p className="text-[11px] text-zinc-400">
+                      {isOverdue ? 'Vencimento' : isRentDue ? 'Próx. vencimento' : 'Data término'}
                     </p>
-                    <p className={`text-xs font-black ${isOverdue ? 'text-red-600' : 'text-slate-800'}`}>
+                    <p className={`text-xs font-medium font-mono ${isOverdue ? 'text-rose-600' : 'text-zinc-700'}`}>
                       {isOverdue && nextDueDate ? new Date(new Date().getFullYear(), new Date().getMonth(), co.dia_vencimento!).toLocaleDateString('pt-BR') :
                        isRentDue && nextDueDate ? nextDueDate.toLocaleDateString('pt-BR') : 
                        new Date(co.data_fim + 'T00:00:00').toLocaleDateString('pt-BR')}
                     </p>
                   </div>
                   
-                  <div className="flex gap-1">
+                  <div className="flex items-center gap-1">
                     {can('EDIT', 'pagamentos') && (isOverdue || isRentDue) && (
                       <button 
                         onClick={() => {
@@ -259,28 +264,29 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                             setCreateModalOpen(true);
                           }, 50);
                         }}
-                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                        className="p-1.5 text-zinc-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
                         title="Registrar Pagamento"
                       >
-                        <DollarSign size={18} />
+                        <DollarSign size={16} />
                       </button>
                     )}
                     {can('EDIT', 'contratos') && (
                       <button 
                         onClick={() => handleSendEmailNotification(co, isOverdue ? 'ATRASO' : 'VENCIMENTO', nextDueDate || undefined)}
-                        className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                        className="p-1.5 text-zinc-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Enviar Notificação por E-mail"
                       >
-                        <Mail size={18} />
+                        <Mail size={16} />
                       </button>
                     )}
                     <button 
                       onClick={() => {
                         setActiveTab('contratos');
                       }}
-                      className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                      className="p-1.5 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-colors"
+                      title="Ver contrato"
                     >
-                      <ChevronRight size={18} />
+                      <ChevronRight size={16} />
                     </button>
                   </div>
                 </div>
@@ -288,14 +294,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             );
           })}
           {notifications.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-2">
-              <CheckCircle2 size={32} className="text-green-200" />
-              <p className="text-xs font-medium italic">Nenhum vencimento próximo nos próximos {notificationDays} dias.</p>
+            <div className="flex flex-col items-center justify-center py-12 text-zinc-400 gap-2">
+              <CheckCircle2 size={24} className="text-emerald-500/60" />
+              <p className="text-xs text-zinc-500">Nenhum vencimento ou pendência para os próximos {notificationDays} dias.</p>
             </div>
           )}
         </div>
-      </div>
       </motion.div>
     </motion.div>
   );
 };
+

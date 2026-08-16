@@ -431,8 +431,8 @@ export default function PlanSelectionModal({
 
                       let userToken = '';
                       try {
-                        const { data: sessionData } = await supabase.auth.getSession();
-                        userToken = sessionData?.session?.access_token || '';
+                        const sessionRes = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+                        userToken = sessionRes?.data?.session?.access_token || '';
                       } catch (tokErr) {
                         console.warn("Failed to retrieve token for checkout request auth context:", tokErr);
                       }

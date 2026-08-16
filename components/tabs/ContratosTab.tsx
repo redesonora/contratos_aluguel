@@ -241,103 +241,102 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header com Busca */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+    <div className="space-y-4">
+      {/* Header com Busca e Novo Contrato */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-white p-3 sm:p-4 rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={15} />
           <input 
             type="text" 
-            placeholder="Buscar por bem / item, locatário ou proprietário / cedente..."
-            className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+            placeholder="Buscar por bem / item, locatário ou cedente..."
+            className="w-full pl-9 pr-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-normal text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all"
             value={contractSearch}
             onChange={(e) => setContractSearch(e.target.value)}
           />
         </div>
         <button 
           onClick={() => openCreateModal()}
-          className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 w-full md:w-auto justify-center"
+          className="flex items-center gap-2 bg-zinc-900 text-white px-4 py-2 rounded-lg font-medium text-xs hover:bg-zinc-800 transition-colors w-full sm:w-auto justify-center shadow-sm"
         >
-          <PlusCircle size={16} />
+          <PlusCircle size={14} />
           Novo Contrato
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {filteredContratos.map((co) => (
-          <div key={co.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-xl transition-all group flex flex-col">
-            <div className="p-6 flex-1">
-              {/* Top Row: Address & Badge */}
-              <div className="flex justify-between items-start mb-6">
-                <div className="flex-1 pr-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
-                      <Building size={16} />
+          <div key={co.id} className="bg-white rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col hover:border-zinc-300 transition-colors">
+            <div className="p-5 flex-1 flex flex-col justify-between">
+              {/* Top Row: Address & Status Badge */}
+              <div>
+                <div className="flex justify-between items-start gap-3 mb-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-6 h-6 rounded-md bg-zinc-100 text-zinc-600 flex items-center justify-center flex-shrink-0">
+                        <Building size={13} />
+                      </div>
+                      <h4 className="text-xs font-semibold text-zinc-900 line-clamp-1">
+                        {co.imoveis?.apelido || co.imoveis?.endereco || 'Item sem identificação'}
+                      </h4>
                     </div>
-                    <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight line-clamp-1">
-                      {co.imoveis?.apelido || co.imoveis?.endereco || 'Bem / Item sem identificação'}
-                    </h4>
+                    <p className="text-[11px] text-zinc-500 font-normal ml-8 line-clamp-1">
+                      {co.imoveis?.endereco ? `${co.imoveis.endereco}, ${co.imoveis.numero || 'S/N'}` : 'Endereço não informado'}
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-500 font-medium ml-9 line-clamp-1">
-                    {co.imoveis?.endereco ? `${co.imoveis.endereco}, ${co.imoveis.numero || 'S/N'}` : 'Localização/Endereço não informado'}
-                  </p>
+                  <div className={`text-[11px] px-2 py-0.5 rounded-md font-medium border flex-shrink-0 ${
+                    co.status === 'ativo' || !co.status ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' : 
+                    co.status === 'finalizado' ? 'bg-zinc-100 text-zinc-600 border-zinc-200/60' : 
+                    'bg-rose-50 text-rose-700 border-rose-200/60'
+                  }`}>
+                    {co.status === 'ativo' || !co.status ? 'Ativo' : co.status === 'finalizado' ? 'Finalizado' : 'Cancelado'}
+                  </div>
                 </div>
-                <div className={`text-[10px] px-3 py-1.5 rounded-xl font-black uppercase tracking-widest shadow-sm ${
-                  co.status === 'ativo' || !co.status ? 'bg-green-50 text-green-600 border border-green-100' : 
-                  co.status === 'finalizado' ? 'bg-slate-50 text-slate-500 border border-slate-100' : 
-                  'bg-red-50 text-red-600 border border-red-100'
-                }`}>
-                  {co.status === 'ativo' || !co.status ? 'Ativo' : co.status === 'finalizado' ? 'Finalizado' : 'Cancelado'}
-                </div>
-              </div>
 
-              {/* People Section */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="space-y-1">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <User size={10} /> Locatário / Cliente
-                  </p>
-                  <p className="text-xs font-bold text-slate-700 truncate">{co.inquilinos?.nome || 'Locatário s/ nome'}</p>
+                {/* People Section */}
+                <div className="grid grid-cols-2 gap-3 py-3 border-y border-zinc-100 mb-3">
+                  <div>
+                    <p className="text-[10px] text-zinc-400 font-medium flex items-center gap-1 uppercase tracking-wider mb-0.5">
+                      <User size={10} /> Locatário
+                    </p>
+                    <p className="text-xs font-medium text-zinc-800 truncate">{co.inquilinos?.nome || 'Não informado'}</p>
+                  </div>
+                  <div className="border-l border-zinc-100 pl-3">
+                    <p className="text-[10px] text-zinc-400 font-medium flex items-center gap-1 uppercase tracking-wider mb-0.5">
+                      <User size={10} /> Cedente / Prop.
+                    </p>
+                    <p className="text-xs font-medium text-zinc-800 truncate">{co.proprietarios?.nome || 'Não informado'}</p>
+                  </div>
                 </div>
-                <div className="space-y-1 border-l border-slate-100 pl-4">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                    <User size={10} /> Cedente / Proprietário
-                  </p>
-                  <p className="text-xs font-bold text-slate-700 truncate">{co.proprietarios?.nome || 'Não informado'}</p>
-                </div>
-              </div>
 
-              {/* Info Bar */}
-              <div className="bg-slate-50 rounded-2xl p-4 grid grid-cols-2 gap-4 border border-slate-100">
-                <div className="space-y-0.5">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Início do Contrato</p>
-                  <p className="text-xs font-black text-slate-600 tracking-tight">
-                    {co.data_inicio ? new Date(co.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '--/--/----'}
-                  </p>
+                {/* Dates info */}
+                <div className="grid grid-cols-2 gap-3 bg-zinc-50/75 rounded-lg p-3 border border-zinc-200/60 text-xs">
+                  <div>
+                    <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider block">Início</span>
+                    <span className="font-medium text-zinc-700">
+                      {co.data_inicio ? new Date(co.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '--/--/----'}
+                    </span>
+                  </div>
+                  <div className="border-l border-zinc-200/60 pl-3">
+                    <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider block">Término</span>
+                    <span className={`font-medium ${new Date(co.data_fim) < new Date() ? 'text-rose-600' : 'text-zinc-700'}`}>
+                      {co.data_fim ? new Date(co.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '--/--/----'}
+                    </span>
+                  </div>
                 </div>
-                <div className="space-y-0.5 border-l border-slate-200 pl-4">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Término do Contrato</p>
-                  <p className={`text-xs font-black tracking-tight ${new Date(co.data_fim) < new Date() ? 'text-red-600' : 'text-slate-600'}`}>
-                    {co.data_fim ? new Date(co.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '--/--/----'}
-                  </p>
-                </div>
-              </div>
 
-              {/* Document/Files Area */}
-              {(co.arquivo_url || (co.documentos && co.documentos.length > 0)) && (
-                <div className="mt-6 space-y-2">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Documentos Digitais</p>
-                   <div className="flex flex-wrap gap-2">
+                {/* Documents Area */}
+                {(co.arquivo_url || (co.documentos && co.documentos.length > 0)) && (
+                  <div className="mt-3 flex flex-wrap gap-1.5 items-center">
                     {co.arquivo_url && (
                       <a 
                         href={co.arquivo_url}
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight flex items-center gap-2 hover:bg-blue-600 hover:text-white transition-all border border-blue-100 shadow-sm"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200/70 px-2.5 py-1 rounded-md transition-colors"
                       >
                         <FileText size={12} />
-                        Contrato PDF
-                        <ExternalLink size={10} />
+                        PDF do Contrato
+                        <ExternalLink size={10} className="text-zinc-400" />
                       </a>
                     )}
                     {co.documentos?.map((doc: string, idx: number) => (
@@ -346,86 +345,82 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
                         href={doc} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="bg-white text-slate-600 px-3 py-1.5 border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-tighter flex items-center gap-1.5 hover:border-blue-300 hover:text-blue-600 transition-all shadow-sm"
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-600 bg-white border border-zinc-200 px-2 py-0.5 rounded-md hover:border-zinc-300 transition-colors"
                       >
-                        <Hash size={10} />
+                        <Hash size={10} className="text-zinc-400" />
                         Anexo {idx + 1}
                       </a>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Actions Footer */}
-            <div className="bg-slate-50 border-t border-slate-200 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                {/* Secondary Actions (Icons) */}
-                <div className="flex gap-1">
+            <div className="bg-zinc-50/75 border-t border-zinc-200/80 px-4 py-2.5 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-0.5">
+                <button 
+                  onClick={() => handleSendEmailNotification(co, 'VENCIMENTO')}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200/60 rounded-md transition-colors"
+                  title="Enviar Lembrete por E-mail"
+                >
+                  <Mail size={15} />
+                </button>
+                <button 
+                  onClick={() => {
+                    setSelectedContractForFinance(co);
+                    setFinanceModalOpen(true);
+                  }}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200/60 rounded-md transition-colors"
+                  title="Financeiro"
+                >
+                  <CreditCard size={15} />
+                </button>
+                {(co.status === 'ativo' || !co.status) && (
                   <button 
-                    onClick={() => handleSendEmailNotification(co, 'VENCIMENTO')}
-                    className="p-3 text-slate-400 hover:text-blue-600 hover:bg-white rounded-xl transition-all shadow-sm hover:shadow-md"
-                    title="Enviar Lembrete por E-mail"
+                    onClick={() => handleFinishContract(co)}
+                    className="p-1.5 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"
+                    title="Finalizar Contrato"
                   >
-                    <Mail size={18} />
+                    <Ban size={15} />
                   </button>
-                  <button 
-                    onClick={() => {
-                      setSelectedContractForFinance(co);
-                      setFinanceModalOpen(true);
-                    }}
-                    className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-sm hover:shadow-md"
-                    title="Financeiro"
-                  >
-                    <CreditCard size={18} />
-                  </button>
-                  {(co.status === 'ativo' || !co.status) && (
-                    <button 
-                      onClick={() => handleFinishContract(co)}
-                      className="p-3 text-slate-400 hover:text-red-500 hover:bg-white rounded-xl transition-all shadow-sm hover:shadow-md"
-                      title="Finalizar Contrato"
-                    >
-                      <Ban size={18} />
-                    </button>
-                  )}
-                </div>
+                )}
+              </div>
 
-                {/* Main Action Buttons (Text) */}
-                <div className="flex items-center gap-1 flex-1 sm:flex-none justify-end">
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => handlePrintDocument(co)}
+                  className="px-2.5 py-1 text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 rounded-md transition-colors inline-flex items-center gap-1"
+                >
+                  <Eye size={13} />
+                  <span>Ver</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setContractToRenew(co);
+                    setIsRenewModalOpen(true);
+                  }}
+                  className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors inline-flex items-center gap-1"
+                >
+                  <RefreshCw size={13} />
+                  <span>Renovar</span>
+                </button>
+                <button 
+                  onClick={() => openCreateModal(co)}
+                  className="px-2.5 py-1 text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 rounded-md transition-colors inline-flex items-center gap-1"
+                >
+                  <Edit3 size={13} />
+                  <span>Editar</span>
+                </button>
+                {can('DELETE', 'contratos') && (
                   <button 
-                    onClick={() => handlePrintDocument(co)}
-                    className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-900 transition-all rounded-lg flex items-center gap-1.5"
+                    onClick={() => setItemToDelete({ id: co.id, type: 'contratos' })}
+                    className="px-2 py-1 text-xs font-medium text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors inline-flex items-center"
+                    title="Excluir"
                   >
-                    <Eye size={14} />
-                    <span>Visualizar</span>
+                    <Trash2 size={13} />
                   </button>
-                  <button 
-                    onClick={() => {
-                      setContractToRenew(co);
-                      setIsRenewModalOpen(true);
-                    }}
-                    className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:bg-blue-600 hover:text-white transition-all rounded-lg flex items-center gap-1.5 shadow-sm bg-white"
-                  >
-                    <RefreshCw size={14} />
-                    <span>Renovar</span>
-                  </button>
-                  <button 
-                    onClick={() => openCreateModal(co)}
-                    className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-900 hover:text-white transition-all rounded-lg flex items-center gap-1.5 shadow-sm bg-white"
-                  >
-                    <Edit3 size={14} />
-                    <span>Editar</span>
-                  </button>
-                  {can('DELETE', 'contratos') && (
-                    <button 
-                      onClick={() => setItemToDelete({ id: co.id, type: 'contratos' })}
-                      className="flex-1 sm:flex-none px-3 py-2 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500 hover:text-white transition-all rounded-lg flex items-center gap-1.5 shadow-sm bg-white"
-                    >
-                      <Trash2 size={14} />
-                      <span>Excluir</span>
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -433,18 +428,20 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
       </div>
 
       {filteredContratos.length === 0 && (
-        <div className="bg-white border border-slate-200 border-dashed rounded-3xl py-32 flex flex-col items-center justify-center text-center px-4">
-          <div className="p-6 bg-slate-50 rounded-full text-slate-300 mb-4">
-            <FileText size={48} />
+        <div className="bg-white border border-zinc-200/80 rounded-xl py-20 flex flex-col items-center justify-center text-center px-4">
+          <div className="w-12 h-12 rounded-full bg-zinc-100 text-zinc-400 flex items-center justify-center mb-3">
+            <FileText size={22} />
           </div>
-          <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">Nenhum contrato encontrado</h3>
-          <p className="text-slate-500 text-sm max-w-xs mt-1">Sua busca não retornou resultados ou você ainda não possui contratos ativos registrados.</p>
-          <button 
-            onClick={() => setContractSearch('')}
-            className="mt-6 text-blue-600 font-black uppercase tracking-widest text-[10px] hover:underline"
-          >
-            Limpar Busca
-          </button>
+          <h3 className="text-sm font-semibold text-zinc-800">Nenhum contrato encontrado</h3>
+          <p className="text-zinc-500 text-xs max-w-xs mt-1">Sua busca não retornou resultados ou você ainda não possui contratos registrados.</p>
+          {contractSearch && (
+            <button 
+              onClick={() => setContractSearch('')}
+              className="mt-4 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+            >
+              Limpar busca
+            </button>
+          )}
         </div>
       )}
     </div>

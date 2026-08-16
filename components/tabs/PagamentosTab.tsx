@@ -81,65 +81,60 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
   };
 
   return (
-    <div className="flex flex-col gap-8">
-      {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all">
+    <div className="flex flex-col gap-5">
+      {/* Cards de Resumo */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-white p-4 rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Filtrado</p>
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight">{formatarMoeda(stats.totalFiltrado)}</h3>
+            <p className="text-[11px] font-medium text-zinc-500 mb-0.5">Total Filtrado</p>
+            <h3 className="text-xl font-semibold text-zinc-900 tracking-tight">{formatarMoeda(stats.totalFiltrado)}</h3>
           </div>
-          <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-            <DollarSign size={24} />
+          <div className="w-9 h-9 bg-zinc-100 text-zinc-600 rounded-lg flex items-center justify-center">
+            <DollarSign size={18} />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-green-200 transition-all">
+        <div className="bg-white p-4 rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Recebido</p>
-            <h3 className="text-2xl font-black text-green-600 tracking-tight">{formatarMoeda(stats.totalRecebido)}</h3>
+            <p className="text-[11px] font-medium text-zinc-500 mb-0.5">Total Recebido</p>
+            <h3 className="text-xl font-semibold text-emerald-600 tracking-tight">{formatarMoeda(stats.totalRecebido)}</h3>
           </div>
-          <div className="w-12 h-12 bg-green-50 text-green-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-            <TrendingUp size={24} />
+          <div className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center">
+            <TrendingUp size={18} />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-red-200 transition-all">
+        <div className="bg-white p-4 rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pendente</p>
-            <h3 className="text-2xl font-black text-red-600 tracking-tight">{formatarMoeda(stats.totalPendente)}</h3>
+            <p className="text-[11px] font-medium text-zinc-500 mb-0.5">Total Pendente</p>
+            <h3 className="text-xl font-semibold text-amber-600 tracking-tight">{formatarMoeda(stats.totalPendente)}</h3>
           </div>
-          <div className="w-12 h-12 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-            <AlertCircle size={24} />
+          <div className="w-9 h-9 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center">
+            <Clock size={18} />
           </div>
         </div>
       </div>
 
-      <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div>
-            <h2 className="text-xl font-black text-slate-800 tracking-tight italic uppercase">Histórico de Recebimentos</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Exibindo registros de {selectedYear}</p>
+      {/* Painel Principal com Tabela */}
+      <div className="bg-white rounded-xl border border-zinc-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col">
+        {/* Barra de Filtros */}
+        <div className="p-3 sm:p-4 border-b border-zinc-200/80 flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={15} />
+            <input 
+              type="text"
+              placeholder="Buscar por inquilino ou endereço..."
+              value={paymentSearch}
+              onChange={(e) => setPaymentSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-normal text-zinc-800 placeholder:text-zinc-400 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all"
+            />
           </div>
-
-          <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-            <div className="relative min-w-[280px] grow md:grow-0">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                <Search size={16} />
-              </span>
-              <input 
-                type="text"
-                placeholder="Pesquisar..."
-                value={paymentSearch}
-                onChange={(e) => setPaymentSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:border-blue-400 focus:bg-white transition-all transition-duration-300 shadow-sm"
-              />
-            </div>
-            
+          
+          <div className="flex flex-wrap gap-2">
             <select 
               value={paymentStatusFilter}
               onChange={(e) => setPaymentStatusFilter(e.target.value)}
-              className="px-4 py-3 bg-white border-2 border-slate-50 rounded-2xl text-xs font-black text-slate-600 uppercase tracking-widest outline-none focus:border-blue-400 transition-all shadow-sm"
+              className="px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-medium text-zinc-700 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400"
             >
               <option value="todos">Todos Status</option>
               <option value={StatusPagamento.PENDENTE}>Pendente</option>
@@ -150,51 +145,44 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
             <select 
               value={paymentMonthFilter}
               onChange={(e) => setPaymentMonthFilter(Number(e.target.value))}
-              className="px-4 py-3 bg-white border-2 border-slate-50 rounded-2xl text-xs font-black text-slate-600 uppercase tracking-widest outline-none focus:border-blue-400 transition-all shadow-sm"
+              className="px-3 py-2 bg-white border border-zinc-200 rounded-lg text-xs font-medium text-zinc-700 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400"
             >
-              <option value={0}>Todos Meses</option>
+              <option value={0}>Todos os Meses</option>
               {['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].map((m, i) => (
                 <option key={i} value={i + 1}>{m}</option>
               ))}
             </select>
 
-            <div className="flex items-center gap-2 bg-slate-50 px-4 py-3 rounded-2xl border-2 border-slate-50 shadow-sm">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ano:</span>
+            <div className="flex items-center gap-1.5 bg-zinc-50 px-3 py-2 rounded-lg border border-zinc-200">
+              <span className="text-[11px] font-medium text-zinc-500">Ano:</span>
               <select 
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="bg-transparent border-none outline-none text-xs font-black text-slate-600"
+                className="bg-transparent border-none outline-none text-xs font-semibold text-zinc-800"
               >
                 {[2024, 2025, 2026, 2027].map(y => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
             </div>
-
-            <button 
-              className="px-4 py-3 bg-white border-2 border-slate-50 rounded-2xl text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
-              title="Exportar dados"
-            >
-              <FileDown size={14} />
-              Exportar
-            </button>
           </div>
         </div>
 
-        <div className="overflow-x-auto -mx-8">
-          <table className="w-full text-left min-w-[1000px]">
-            <thead>
-              <tr className="text-slate-400 text-[10px] uppercase tracking-widest font-black border-b border-slate-50">
-                <th className="px-8 py-5">Beneficiário</th>
-                <th className="px-8 py-5">Período</th>
-                <th className="px-8 py-5">Vencimento</th>
-                <th className="px-8 py-5">Data Pagto</th>
-                <th className="px-8 py-5">Valor</th>
-                <th className="px-8 py-5">Status</th>
-                <th className="px-8 py-5 text-right">Ações</th>
+        {/* Tabela de Recebimentos */}
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left min-w-[850px]">
+            <thead className="bg-zinc-50/75 border-b border-zinc-200/80">
+              <tr className="text-zinc-500 text-xs font-medium">
+                <th className="px-5 py-3">Locatário / Imóvel</th>
+                <th className="px-5 py-3">Competência</th>
+                <th className="px-5 py-3">Vencimento</th>
+                <th className="px-5 py-3">Pagamento</th>
+                <th className="px-5 py-3">Valor</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3 text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-zinc-100 text-xs font-normal">
               {filteredPagamentos.map(p => {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -202,64 +190,63 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
                 const isAtrasado = p.status !== StatusPagamento.PAGO && vencimentoDate < today;
 
                 return (
-                  <tr key={p.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-8 py-6">
+                  <tr key={p.id} className="hover:bg-zinc-50/70 transition-colors">
+                    <td className="px-5 py-3.5">
                       <div className="flex flex-col">
-                        <p className="font-black text-slate-800 tracking-tight text-sm uppercase">
+                        <p className="font-medium text-zinc-900 text-xs">
                           {p.contratos?.inquilinos?.nome || 'Inquilino'}
                         </p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate max-w-[200px] italic">
+                        <p className="text-[11px] text-zinc-400 truncate max-w-[220px] mt-0.5">
                           {p.contratos?.imoveis?.endereco}
                         </p>
                       </div>
                     </td>
-                    <td className="px-8 py-6">
-                      <span className="text-[11px] font-black text-slate-600 bg-slate-100 px-3 py-1 rounded-lg">
+                    <td className="px-5 py-3.5">
+                      <span className="text-[11px] font-mono text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-md border border-zinc-200/50">
                         {String(p.competencia_mes).padStart(2, '0')}/{p.competencia_ano}
                       </span>
                     </td>
-                    <td className="px-8 py-6">
-                      <p className={`text-xs font-bold italic ${isAtrasado ? 'text-red-400 underline decoration-red-200' : 'text-slate-500'}`}>
+                    <td className="px-5 py-3.5">
+                      <p className={`text-xs ${isAtrasado ? 'text-rose-600 font-medium' : 'text-zinc-600'}`}>
                         {new Date(p.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </p>
                     </td>
-                    <td className="px-8 py-6">
-                      <p className="text-xs font-bold text-slate-600">
+                    <td className="px-5 py-3.5">
+                      <p className="text-xs text-zinc-600">
                         {p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '-'}
                       </p>
                     </td>
-                    <td className="px-8 py-6">
-                      <p className={`text-sm font-black ${p.status === StatusPagamento.PAGO ? 'text-green-600' : 'text-slate-800'}`}>
+                    <td className="px-5 py-3.5">
+                      <p className={`font-semibold ${p.status === StatusPagamento.PAGO ? 'text-emerald-600' : 'text-zinc-900'}`}>
                         {formatarMoeda(p.valor_pago || p.valor_esperado || 0)}
                       </p>
                     </td>
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-2">
-                        <span className={`flex items-center gap-1.5 text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-tighter shadow-sm border ${
-                          p.status === StatusPagamento.PAGO ? 'bg-green-50 text-green-600 border-green-100' : 
-                          isAtrasado ? 'bg-red-50 text-red-600 border-red-100 animate-pulse' : 'bg-slate-50 text-slate-400 border-slate-100'
-                        }`}>
-                          {p.status === StatusPagamento.PAGO ? (
-                            <><CheckCircle2 size={10} /> Pago</>
-                          ) : isAtrasado ? (
-                            <><AlertCircle size={10} /> Atrasado</>
-                          ) : (
-                            <><Clock size={10} /> Pendente</>
-                          )}
-                        </span>
-                      </div>
+                    <td className="px-5 py-3.5">
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md border ${
+                        p.status === StatusPagamento.PAGO ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' : 
+                        isAtrasado ? 'bg-rose-50 text-rose-700 border-rose-200/60' : 
+                        'bg-amber-50 text-amber-700 border-amber-200/60'
+                      }`}>
+                        {p.status === StatusPagamento.PAGO ? (
+                          <><CheckCircle2 size={11} /> Pago</>
+                        ) : isAtrasado ? (
+                          <><AlertCircle size={11} /> Atrasado</>
+                        ) : (
+                          <><Clock size={11} /> Pendente</>
+                        )}
+                      </span>
                     </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex items-center justify-end gap-3">
+                    <td className="px-5 py-3.5 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
                         {p.status === StatusPagamento.PAGO ? (
                           <button 
                             onClick={() => openReceiptModal(p)}
-                            className="text-blue-600 text-[10px] font-black uppercase tracking-widest hover:underline flex items-center gap-1 transition-all"
+                            className="text-zinc-600 hover:text-zinc-900 text-xs font-medium hover:bg-zinc-100 px-2 py-1 rounded-md transition-colors inline-flex items-center gap-1"
                           >
-                            <Printer size={12} /> Recibo
+                            <Printer size={13} /> Recibo
                           </button>
                         ) : (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             {p.observacoes && p.observacoes.startsWith('Asaas|') && (
                               <button 
                                 onClick={() => {
@@ -267,17 +254,17 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
                                   const url = parts[1];
                                   if (url) window.open(url, '_blank');
                                 }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest transition-all shadow-md shadow-blue-100 flex items-center gap-2 cursor-pointer"
+                                className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60 text-xs font-medium px-2.5 py-1 rounded-md transition-colors inline-flex items-center gap-1"
                                 title="Abrir link de cobrança no Asaas (Pix, Boleto, Cartão)"
                               >
                                 <CreditCard size={12} />
-                                Pagar (Asaas)
+                                Asaas
                               </button>
                             )}
                             <button 
                                onClick={() => handleMarkAsPaid(p, p.valor_esperado || 0)}
                                disabled={loading}
-                               className={`bg-green-600 text-white text-[10px] font-black px-4 py-2 rounded-lg uppercase tracking-widest hover:bg-green-700 transition-[#1A1A1A] block transition-all shadow-md shadow-green-100 flex items-center gap-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                               className={`bg-zinc-900 text-white text-xs font-medium px-3 py-1 rounded-md hover:bg-zinc-800 transition-colors inline-flex items-center gap-1.5 shadow-sm ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                               {loading ? <Loader2 size={12} className="animate-spin" /> : null}
                               Baixar
@@ -288,10 +275,10 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
                         {isAtrasado && p.status !== StatusPagamento.PAGO && (
                           <button 
                             onClick={() => handleSendEmailNotification(p.contratos, 'ATRASO', new Date(p.data_vencimento + 'T00:00:00'))}
-                            className="p-2 text-slate-400 hover:text-red-500 transition-all"
-                            title="Notificar cobrança"
+                            className="p-1 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                            title="Notificar cobrança por e-mail"
                           >
-                            <Mail size={16} />
+                            <Mail size={14} />
                           </button>
                         )}
                       </div>
@@ -301,8 +288,8 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
               })}
               {filteredPagamentos.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-24">
-                    <p className="text-slate-400 font-bold italic uppercase tracking-widest text-xs">Nenhum registro encontrado para {selectedYear}</p>
+                  <td colSpan={7} className="text-center py-16 text-zinc-400 font-normal">
+                    Nenhum registro encontrado para {selectedYear}.
                   </td>
                 </tr>
               )}
@@ -313,3 +300,4 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
     </div>
   );
 };
+

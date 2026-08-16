@@ -7,8 +7,14 @@ if (typeof window !== 'undefined') {
   const handleAuthErrorGlobal = () => {
     console.warn('Limpando sessão local devido a erro crítico de refresh/autenticação.');
     try {
+      if (supabaseInstance?.auth) {
+        supabaseInstance.auth.signOut({ scope: 'local' }).catch(() => {});
+      }
+
       // Limpar todos os tokens do localStorage do Supabase de forma agressiva
-      Object.keys(localStorage).forEach(key => {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (!key) continue;
         const lowerKey = key.toLowerCase();
         if (
           lowerKey.includes('auth-token') || 
@@ -19,11 +25,13 @@ if (typeof window !== 'undefined') {
         ) {
           localStorage.removeItem(key);
         }
-      });
+      }
       
       // Limpar sessionStorage também
-      Object.keys(sessionStorage).forEach(key => {
-        const lowerKey = key.toLowerCase();
+      for (let j = sessionStorage.length - 1; j >= 0; j--) {
+        const skey = sessionStorage.key(j);
+        if (!skey) continue;
+        const lowerKey = skey.toLowerCase();
         if (
           lowerKey.includes('auth-token') || 
           lowerKey.startsWith('sb-') || 
@@ -31,9 +39,9 @@ if (typeof window !== 'undefined') {
           lowerKey.includes('auth') || 
           lowerKey.includes('token')
         ) {
-          sessionStorage.removeItem(key);
+          sessionStorage.removeItem(skey);
         }
-      });
+      }
 
       // Limpar cookies para evitar loops de cookies expirados
       document.cookie.split(";").forEach((c) => { 
@@ -46,46 +54,37 @@ if (typeof window !== 'undefined') {
 
   const isAuthError = (err: any, extraMsg: string = '') => {
     if (!err && !extraMsg) return false;
-    const msg = ((err?.message || '') + ' ' + (err?.error_description || '') + ' ' + (err?.description || '') + ' ' + extraMsg).toLowerCase();
+    const msg = (
+      (err?.message || '') + ' ' + 
+      (err?.error_description || '') + ' ' + 
+      (err?.description || '') + ' ' + 
+      (typeof err === 'string' ? err : '') + ' ' + 
+      extraMsg
+    ).toLowerCase();
     const name = (err?.name || '').toLowerCase();
     
-    const hasRefreshTokenKeyword = msg.includes('refresh_token') || msg.includes('refresh token') || msg.includes('gotrue');
-    const hasSessionKeyword = msg.includes('session_not_found') || msg.includes('session not found');
+    const hasRefreshTokenKeyword = (
+      msg.includes('refresh_token') || 
+      msg.includes('refresh token') || 
+      msg.includes('gotrue') ||
+      msg.includes('invalid refresh') ||
+      msg.includes('invalid_grant')
+    );
+    const hasSessionKeyword = msg.includes('session_not_found') || msg.includes('session not found') || msg.includes('jwt expired');
     const hasAuthApiErrorKeyword = name.includes('authapierror') || name.includes('authretryableerror') || name.includes('autherror') || err?.__isAuthError === true;
     
-    // Devem possuir termos específicos de auth combinados com falha/expiração/ausência do token
-    const isCriticalAuthError = (hasRefreshTokenKeyword || hasSessionKeyword) && (
-      msg.includes('not found') || 
-      msg.includes('invalid') || 
-      msg.includes('expired') || 
-      msg.includes('revoked') || 
-      msg.includes('inactive') ||
-      msg.includes('fail')
-    );
-    
-    return isCriticalAuthError || hasAuthApiErrorKeyword;
+    return hasRefreshTokenKeyword || hasSessionKeyword || hasAuthApiErrorKeyword;
   };
 
   const handleRejection = (event: PromiseRejectionEvent) => {
     try {
       const err = event.reason;
       if (isAuthError(err)) {
-        console.error('Capturado unhandled rejection de autenticação antecipadamente no Supabase:', err);
-        event.preventDefault();
-        event.stopPropagation();
+        console.warn('Capturado unhandled rejection de autenticação antecipadamente no Supabase:', err);
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
         handleAuthErrorGlobal();
-        
-        // Evita loop de reload infinito
-        const lastReload = sessionStorage.getItem('last_global_auth_reload');
-        const now = Date.now();
-        if (!lastReload || (now - parseInt(lastReload)) > 6000) {
-          sessionStorage.setItem('last_global_auth_reload', now.toString());
-          setTimeout(() => {
-            window.location.reload();
-          }, 150);
-        } else {
-          console.warn('Prevenido loop de reload global de auth.');
-        }
       }
     } catch (e) {
       // Evitar que erros no próprio interceptador travem a execução
@@ -97,21 +96,11 @@ if (typeof window !== 'undefined') {
       const err = event.error;
       const msg = (event.message || '').toLowerCase();
       if (isAuthError(err, msg)) {
-        console.error('Capturado erro global de autenticação antecipadamente no Supabase:', err);
-        event.preventDefault();
-        event.stopPropagation();
+        console.warn('Capturado erro global de autenticação antecipadamente no Supabase:', err || msg);
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
         handleAuthErrorGlobal();
-
-        const lastReload = sessionStorage.getItem('last_global_auth_reload');
-        const now = Date.now();
-        if (!lastReload || (now - parseInt(lastReload)) > 6000) {
-          sessionStorage.setItem('last_global_auth_reload', now.toString());
-          setTimeout(() => {
-            window.location.reload();
-          }, 150);
-        } else {
-          console.warn('Prevenido loop de reload global de auth.');
-        }
       }
     } catch (e) {}
   };

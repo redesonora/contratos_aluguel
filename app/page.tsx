@@ -155,6 +155,9 @@ export default function DashboardPage() {
   const [myProfileEmail, setMyProfileEmail] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+  const [platformName, setPlatformName] = useState<string>('REALIZZE');
+  const [platformSubtitle, setPlatformSubtitle] = useState<string>('Gestão Imobiliária Integrada');
+  const [primaryColorTheme, setPrimaryColorTheme] = useState<string>('blue');
   const [notificationDays, setNotificationDays] = useState(60);
   const [notifications, setNotifications] = useState<Contrato[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -633,20 +636,22 @@ export default function DashboardPage() {
         const errorMsg = error.message?.toLowerCase() || '';
         if (
           errorMsg.includes('refresh token') || 
+          errorMsg.includes('refresh_token') ||
           errorMsg.includes('session_not_found') || 
           errorMsg.includes('expired') ||
+          errorMsg.includes('invalid_grant') ||
           error.code === 'PGRST301' || 
           error.code === 'PGRST302'
         ) {
           console.warn('fetchProfile: Detectado erro de refresh token ou autenticação expirada. Tratando...', errorMsg);
-          try { await supabase.auth.signOut(); } catch(e) {}
+          try { await supabase.auth.signOut({ scope: 'local' }); } catch(e) {}
           if (typeof window !== 'undefined') {
-            Object.keys(localStorage).forEach(key => {
-              if (key.includes('-auth-token')) {
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const key = localStorage.key(i);
+              if (key && (key.includes('token') || key.includes('supabase') || key.includes('auth') || key.startsWith('sb-'))) {
                 localStorage.removeItem(key);
               }
-            });
-            // Limpar cookies de auth
+            }
             document.cookie.split(";").forEach((c) => { 
               document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
             });
@@ -665,7 +670,8 @@ export default function DashboardPage() {
         }
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const userRes = await supabase.auth.getUser().catch(() => ({ data: { user: null }, error: null }));
+      const user = userRes?.data?.user;
       const meta = user?.user_metadata || {};
 
       if (!data) {
@@ -775,7 +781,8 @@ export default function DashboardPage() {
         // Auto-approve if email is confirmed in auth.users
         try {
           // REMOVIDO: await supabase.auth.refreshSession(); pois causava loop infinito disparando TOKEN_REFRESHED
-          const { data: { user } } = await supabase.auth.getUser();
+          const userRes = await supabase.auth.getUser().catch(() => ({ data: { user: null }, error: null }));
+          const user = userRes?.data?.user;
           
           // Force MASTER role for specific user
           if (user?.email && isGleisonMaster(user.email) && finalData.role !== 'MASTER') {
@@ -851,38 +858,29 @@ export default function DashboardPage() {
       
       if (typeof window !== 'undefined') {
         try {
-          // Set friendly expired session notice flag to show at login screen
           sessionStorage.setItem('auth_expired_notice', 'true');
         } catch (e) {}
       }
 
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (e) {}
+
       // Limpeza manual imediata dos tokens para parar qualquer refresh em background do cliente Supabase
       if (typeof window !== 'undefined') {
         try {
-          Object.keys(localStorage).forEach(key => {
-            const lowerKey = key.toLowerCase();
-            if (
-              lowerKey.includes('auth-token') || 
-              lowerKey.startsWith('sb-') || 
-              lowerKey.includes('supabase') || 
-              lowerKey.includes('auth') || 
-              lowerKey.includes('token')
-            ) {
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && (key.includes('token') || key.includes('supabase') || key.includes('auth') || key.startsWith('sb-'))) {
               localStorage.removeItem(key);
             }
-          });
-          Object.keys(sessionStorage).forEach(key => {
-            const lowerKey = key.toLowerCase();
-            if (
-              lowerKey.includes('auth-token') || 
-              lowerKey.startsWith('sb-') || 
-              lowerKey.includes('supabase') || 
-              lowerKey.includes('auth') || 
-              lowerKey.includes('token')
-            ) {
-              sessionStorage.removeItem(key);
+          }
+          for (let j = sessionStorage.length - 1; j >= 0; j--) {
+            const skey = sessionStorage.key(j);
+            if (skey && (skey.includes('token') || skey.includes('supabase') || skey.includes('auth') || skey.startsWith('sb-'))) {
+              sessionStorage.removeItem(skey);
             }
-          });
+          }
           // Tenta limpar cookies também
           document.cookie.split(";").forEach(function(c) { 
             document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
@@ -895,20 +893,6 @@ export default function DashboardPage() {
       setSession(null);
       setUserProfile(null);
       setAuthLoading(false);
-
-      // Se estávamos num loop, um reload ajuda a recriar o cliente Supabase sem lixo em memória
-      if (typeof window !== 'undefined') {
-        const lastError = sessionStorage.getItem('last_auth_error_time');
-        const now = Date.now();
-        if (!lastError || (now - parseInt(lastError)) > 10000) {
-          sessionStorage.setItem('last_auth_error_time', now.toString());
-          setTimeout(() => {
-            window.location.reload();
-          }, 150);
-        } else {
-          console.warn("Prevenido reload infinito de autenticação.");
-        }
-      }
       isHandlingErrorLock = false;
     };
 
@@ -916,24 +900,34 @@ export default function DashboardPage() {
       const err = event.reason;
       if (!err) return;
       
-      const msg = err.message?.toLowerCase() || '';
-      const name = err.name?.toLowerCase() || '';
+      const msg = (
+        (err.message || '') + ' ' + 
+        (err.error_description || '') + ' ' + 
+        (err.description || '') + ' ' + 
+        (typeof err === 'string' ? err : '')
+      ).toLowerCase();
+      const name = (err.name || '').toLowerCase();
       const isSpecificAuth = (
         msg.includes('refresh_token_not_found') || 
+        msg.includes('refresh_token') || 
         msg.includes('refresh token') ||
-        msg.includes('session_not_found')
+        msg.includes('session_not_found') ||
+        msg.includes('invalid_grant') ||
+        msg.includes('invalid refresh') ||
+        name.includes('authapierror')
       );
 
       if (isSpecificAuth) {
         console.warn('Capturado Unhandled Rejection de Auth no Supabase:', err);
-        event.preventDefault();
-        event.stopPropagation();
+        if (typeof event.preventDefault === 'function') event.preventDefault();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
         handleAuthError();
       }
     };
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('unhandledrejection', handleUnhandledRejection);
+      window.addEventListener('unhandledrejection', handleUnhandledRejection, true);
     }
 
     const initAuth = async () => {
@@ -948,46 +942,51 @@ export default function DashboardPage() {
       }, 8000);
 
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const sessionRes = await supabase.auth.getSession().catch((e: any) => ({ data: { session: null }, error: e }));
         clearTimeout(fallbackTimer);
-        console.log('initAuth: getSession result', { session, error });
+        const { data, error } = sessionRes || {};
+        const initialSession = data?.session || null;
+        console.log('initAuth: getSession result', { session: initialSession, error });
         
         if (error) {
-          console.error('Erro ao buscar sessão inicial:', error);
-          const msg = error.message?.toLowerCase() || '';
-          const name = error.name?.toLowerCase() || '';
-          const isSpecificAuth = msg.includes('refresh_token_not_found') || msg.includes('refresh token') || msg.includes('session_not_found');
+          console.warn('Aviso ao buscar sessão inicial:', error);
+          const msg = (
+            (error.message || '') + ' ' + 
+            (error.error_description || '') + ' ' + 
+            (error.description || '')
+          ).toLowerCase();
+          const name = (error.name || '').toLowerCase();
+          const isSpecificAuth = (
+            msg.includes('refresh_token_not_found') || 
+            msg.includes('refresh token') || 
+            msg.includes('refresh_token') ||
+            msg.includes('session_not_found') ||
+            msg.includes('invalid_grant') ||
+            msg.includes('invalid refresh') ||
+            name.includes('authapierror')
+          );
           if (isSpecificAuth) {
-            console.log('initAuth: erro de auth, tratando');
+            console.log('initAuth: erro de auth detectado, tratando');
             await handleAuthError();
           } else {
-            console.log('initAuth: erro desconhecido, setAuthLoading(false)');
+            console.log('initAuth: finalizando loading');
             setAuthLoading(false);
           }
           return;
         }
 
-        setSession(session);
-        if (session) {
+        setSession(initialSession);
+        if (initialSession) {
           console.log('initAuth: tem sessão, fetchProfile');
-          fetchProfile(session.user.id, session.user.email);
+          fetchProfile(initialSession.user.id, initialSession.user.email);
         } else {
           console.log('initAuth: não tem sessão, setAuthLoading(false)');
           setAuthLoading(false);
         }
       } catch (err: any) {
         clearTimeout(fallbackTimer);
-        console.error('Falha no carregamento da autenticação:', err);
-        const msg = err?.message?.toLowerCase() || '';
-        const name = err?.name?.toLowerCase() || '';
-        const isSpecificAuth = msg.includes('refresh_token_not_found') || msg.includes('refresh token') || msg.includes('session_not_found');
-        if (isSpecificAuth) {
-          console.log('initAuth: exceção de auth, tratando');
-          await handleAuthError();
-        } else {
-          console.log('initAuth: exceção, setAuthLoading(false)');
-          setAuthLoading(false);
-        }
+        console.warn('Falha tratada no carregamento da autenticação:', err);
+        await handleAuthError();
       }
     };
 
@@ -1053,6 +1052,18 @@ export default function DashboardPage() {
         setPwdErrorMsg(null);
         setPwdSuccess(false);
         setIsChangePasswordOpen(true);
+      }
+
+      const savedName = localStorage.getItem('realizze_platform_name');
+      if (savedName) setPlatformName(savedName);
+      const savedSub = localStorage.getItem('realizze_platform_subtitle');
+      if (savedSub) setPlatformSubtitle(savedSub);
+      const savedTheme = localStorage.getItem('realizze_theme_color');
+      if (savedTheme) setPrimaryColorTheme(savedTheme);
+      const savedDays = localStorage.getItem('notification_days');
+      if (savedDays) {
+        const d = parseInt(savedDays, 10);
+        if (!isNaN(d)) setNotificationDays(d);
       }
     }
   }, []);
@@ -3580,8 +3591,8 @@ Para resolver isso:
                             if (tenantObj && generatedPayments && generatedPayments.length > 0) {
                               let userToken = "";
                               try {
-                                const { data: sessionData } = await supabase.auth.getSession();
-                                userToken = sessionData?.session?.access_token || "";
+                                const sessionRes = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+                                userToken = sessionRes?.data?.session?.access_token || "";
                               } catch (tokErr) {
                                 console.warn("Failed to get session token for create-billing auth:", tokErr);
                               }
@@ -3949,6 +3960,25 @@ Para resolver isso:
           <ConfiguracoesTab 
             perfis={perfis}
             logs={logs}
+            imoveis={imoveis}
+            inquilinos={inquilinos}
+            proprietarios={proprietarios}
+            contratos={contratos}
+            pagamentos={pagamentos}
+            contractTemplates={contractTemplates}
+            setContractTemplates={setContractTemplates}
+            notificationDays={notificationDays}
+            setNotificationDays={setNotificationDays}
+            platformName={platformName}
+            setPlatformName={setPlatformName}
+            platformSubtitle={platformSubtitle}
+            setPlatformSubtitle={setPlatformSubtitle}
+            primaryColorTheme={primaryColorTheme}
+            setPrimaryColorTheme={setPrimaryColorTheme}
+            userProfile={userProfile}
+            session={session}
+            fetchData={fetchData}
+            recordLog={recordLog}
           />
         );
       }
@@ -3985,65 +4015,65 @@ Para resolver isso:
     }
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative">
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-4 relative font-sans">
         <button 
           onClick={() => setShowAuth(false)}
-          className="absolute top-6 left-6 text-slate-500 hover:text-slate-700 font-black text-[11px] uppercase tracking-widest flex items-center gap-2 transition-colors z-50 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200"
+          className="absolute top-6 left-6 text-zinc-600 hover:text-zinc-900 font-medium text-xs flex items-center gap-1.5 transition-colors z-50 bg-white px-3.5 py-2 rounded-lg shadow-sm border border-zinc-200/80"
         >
           ← Voltar ao Início
         </button>
 
         {registeredEmailWelcome && (
-          <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[999] bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white p-8 sm:p-10 rounded-[2.5rem] shadow-2xl w-full max-w-lg border-2 border-slate-100 relative text-center"
+              className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-md border border-zinc-200 relative text-center"
             >
               <button 
                 onClick={() => {
                   setRegisteredEmailWelcome(null);
                   setAuthTab('login');
                 }}
-                className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 transition-colors"
+                className="absolute top-5 right-5 text-zinc-400 hover:text-zinc-600 transition-colors"
                 title="Fechar"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
 
-              <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-50">
-                <CheckCircle2 size={40} strokeWidth={2.5} className="animate-bounce" />
+              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mx-auto mb-4 border border-emerald-200/60">
+                <CheckCircle2 size={28} />
               </div>
 
-              <span className="text-[10px] font-black tracking-widest text-emerald-600 bg-emerald-50 px-4 py-1.5 rounded-full uppercase">
-                🎉 Cadastro Iniciado!
+              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200/60 inline-block mb-2">
+                Cadastro Iniciado!
               </span>
 
-              <h2 className="text-2xl sm:text-3.5xl font-black text-slate-800 tracking-tight uppercase mt-4 leading-tight">
-                Seja Bem-Vindo à REALIZZE!
+              <h2 className="text-xl font-bold text-zinc-900 tracking-tight">
+                Seja Bem-Vindo ao REALIZZE
               </h2>
 
-              <p className="text-sm font-medium text-slate-500 mt-4 leading-relaxed">
-                Faltam apenas alguns passos para você começar! Enviamos um e-mail de confirmação para:
+              <p className="text-xs text-zinc-600 mt-2 leading-relaxed">
+                Enviamos uma mensagem de confirmação para o seu e-mail:
               </p>
 
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 my-4 font-mono text-xs text-blue-600 font-bold tracking-tight select-all break-all">
+              <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 my-3 font-mono text-xs text-zinc-800 font-medium break-all">
                 {registeredEmailWelcome}
               </div>
 
-              <div className="text-left text-xs text-slate-400 space-y-3 p-4 bg-blue-50/50 rounded-2xl border border-blue-100/30">
-                <p className="font-bold uppercase tracking-widest text-[9px] text-blue-600 mb-1">Passos para ativação de sua conta:</p>
-                <div className="flex gap-2">
-                  <span className="font-black text-blue-600">1.</span>
-                  <span>Acesse sua caixa de entrada (ou lixo eletrônico/spam).</span>
+              <div className="text-left text-xs text-zinc-600 space-y-2 p-3.5 bg-zinc-50 rounded-lg border border-zinc-200/70">
+                <p className="font-semibold text-zinc-800 text-[11px]">Passos para ativação:</p>
+                <div className="flex gap-2 text-[11px]">
+                  <span className="font-bold text-zinc-900">1.</span>
+                  <span>Acesse sua caixa de entrada (ou spam).</span>
                 </div>
-                <div className="flex gap-2">
-                  <span className="font-black text-blue-600">2.</span>
-                  <span>Abra o e-mail de registro enviado pela nossa equipe do Supabase e clique em <strong>Confirmar E-mail</strong> (Confirm Email).</span>
+                <div className="flex gap-2 text-[11px]">
+                  <span className="font-bold text-zinc-900">2.</span>
+                  <span>Abra a mensagem e clique em <strong>Confirmar E-mail</strong>.</span>
                 </div>
-                <div className="flex gap-2">
-                  <span className="font-black text-blue-600">3.</span>
-                  <span>Depois de confirmado, você poderá logar no sistema com as suas credenciais para usufruir de seus 7 dias grátis de trial.</span>
+                <div className="flex gap-2 text-[11px]">
+                  <span className="font-bold text-zinc-900">3.</span>
+                  <span>Após confirmar, faça login normalmente para começar.</span>
                 </div>
               </div>
 
@@ -4052,112 +4082,67 @@ Para resolver isso:
                   setRegisteredEmailWelcome(null);
                   setAuthTab('login');
                 }}
-                className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-xs tracking-widest py-4 rounded-2xl shadow-lg shadow-blue-100 hover:shadow-xl transition-all active:scale-95"
+                className="w-full mt-5 bg-zinc-900 hover:bg-zinc-800 text-white font-medium text-xs py-3 rounded-lg shadow-sm transition-all"
               >
-                Concluir e ir para o Login
+                Ir para o Login
               </button>
             </motion.div>
           </div>
         )}
 
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md border border-slate-200"
+          className="bg-white p-6 sm:p-8 rounded-2xl shadow-sm w-full max-w-md border border-zinc-200/80"
         >
-          <div className="flex items-center gap-3 text-blue-600 mb-8 justify-center">
-            <Home size={32} strokeWidth={2.5} />
-            <h1 className="text-2xl font-black tracking-tight">
-              REALIZZE<span className="text-blue-600">APP</span>
+          <div className="flex items-center gap-2.5 text-zinc-900 mb-6 justify-center">
+            <div className="w-8 h-8 rounded-lg bg-zinc-900 text-white flex items-center justify-center">
+              <Building2 size={18} />
+            </div>
+            <h1 className="text-lg font-bold tracking-tight">
+              REALIZZE
             </h1>
           </div>
           
           {authTab !== 'recover' ? (
-            <div className="bg-slate-50 p-1.5 rounded-2xl flex items-center gap-2 mb-8">
+            <div className="bg-zinc-100 p-1 rounded-lg flex items-center gap-1 mb-6 text-xs font-medium">
               <button 
                 onClick={() => { setAuthTab('login'); setLoginError(null); setLoginSuccess(null); }}
-                className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                  authTab === 'login' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                className={`flex-1 py-2 px-3 rounded-md transition-all ${
+                  authTab === 'login' ? 'bg-white text-zinc-900 shadow-sm font-semibold' : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
                 Entrar
               </button>
               <button 
                 onClick={() => { setAuthTab('register'); setLoginError(null); setLoginSuccess(null); }}
-                className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-                  authTab === 'register' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                className={`flex-1 py-2 px-3 rounded-md transition-all ${
+                  authTab === 'register' ? 'bg-white text-zinc-900 shadow-sm font-semibold' : 'text-zinc-500 hover:text-zinc-900'
                 }`}
               >
-                Cadastrar
+                Criar Conta
               </button>
             </div>
           ) : (
             <div className="text-center mb-6">
-              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Recuperar Senha</h2>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Insira seu e-mail de cadastro para receber as instruções</p>
+              <h2 className="text-base font-bold text-zinc-900">Recuperar Senha</h2>
+              <p className="text-xs text-zinc-500 mt-1">Informe seu e-mail cadastrado para redefinir o acesso</p>
             </div>
           )}
 
-          <form onSubmit={authTab === 'login' ? handleLogin : authTab === 'register' ? handleRegister : handleRecoverPassword} className="space-y-5">
+          <form onSubmit={authTab === 'login' ? handleLogin : authTab === 'register' ? handleRegister : handleRecoverPassword} className="space-y-4">
             {loginSuccess && (
-              <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-emerald-100 relative text-center"
-                >
-                  <button 
-                    onClick={() => setLoginSuccess(null)}
-                    type="button"
-                    className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    <X size={20} />
-                  </button>
-                  
-                  <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-50 animate-bounce">
-                    <CheckCircle2 size={32} strokeWidth={2.5} />
-                  </div>
-                  
-                  <h3 className="text-[17px] font-black text-slate-800 mb-3 uppercase tracking-tight">Sucesso</h3>
-                  <p className="text-sm font-medium text-slate-600 leading-relaxed max-w-[280px] mx-auto mb-8">
-                    {loginSuccess}
-                  </p>
-                  
-                  <button
-                    type="button"
-                    onClick={() => setLoginSuccess(null)}
-                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-100 hover:shadow-xl active:scale-95 transition-all font-black text-[11px] uppercase tracking-widest py-4 rounded-xl"
-                  >
-                    Continuar
-                  </button>
-                </motion.div>
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                <span>{loginSuccess}</span>
               </div>
             )}
 
             {loginError && (
-              <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-red-100 relative text-center"
-                >
-                  <button 
-                    onClick={() => setLoginError(null)}
-                    type="button"
-                    className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    <X size={20} />
-                  </button>
-                  
-                  <div className="w-16 h-16 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-red-50 animate-shake">
-                    <AlertCircle size={32} strokeWidth={2.5} />
-                  </div>
-                  
-                  <h3 className="text-[17px] font-black text-slate-800 mb-3 uppercase tracking-tight">Ocorreu um erro</h3>
-                  <p className="text-sm font-medium text-slate-600 leading-relaxed max-w-[280px] mx-auto mb-8">
-                    {loginError}
-                  </p>
-                  
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-lg flex items-start gap-2">
+                <AlertCircle size={16} className="text-rose-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p>{loginError}</p>
                   {authTab === 'register' && (loginError.includes('duplicidade') || loginError.includes('cadastrado')) && (
                     <button
                       type="button"
@@ -4166,73 +4151,65 @@ Para resolver isso:
                         setLoginError(null);
                         setLoginSuccess(null);
                       }}
-                      className="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 active:scale-95 transition-all font-black text-[11px] uppercase tracking-widest py-4 rounded-xl text-center mb-3"
+                      className="mt-2 text-blue-600 font-semibold underline block text-left"
                     >
-                      Ir para Recuperar Senha →
+                      Ir para Recuperação de Senha →
                     </button>
                   )}
-                  
-                  <button
-                    type="button"
-                    onClick={() => setLoginError(null)}
-                    className="w-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 transition-all font-black text-[11px] uppercase tracking-widest py-4 rounded-xl"
-                  >
-                    Tentar Novamente
-                  </button>
-                </motion.div>
+                </div>
               </div>
             )}
 
             {authTab === 'register' && (
               <>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
-                  <div className="relative group">
-                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-zinc-700">Nome Completo</label>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                     <input 
                       name="nome" 
                       type="text" 
                       required 
-                      className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
-                      placeholder="Seu nome completo"
+                      className="w-full bg-white border border-zinc-200 focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 outline-none rounded-lg pl-10 pr-3.5 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 transition-all" 
+                      placeholder="Ex: João da Silva"
                     />
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Usuário</label>
-                  <div className="relative group">
-                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-zinc-700">Nome de Usuário</label>
+                  <div className="relative">
+                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                     <input 
                       name="username" 
                       type="text" 
                       required 
-                      className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
-                      placeholder="Escolha seu usuário"
+                      className="w-full bg-white border border-zinc-200 focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 outline-none rounded-lg pl-10 pr-3.5 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 transition-all" 
+                      placeholder="Ex: joaosilva"
                     />
                   </div>
                 </div>
               </>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail</label>
-              <div className="relative group">
-                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-zinc-700">E-mail</label>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input 
                   name="email" 
                   type="email" 
                   required 
-                  className="w-full bg-slate-50/50 border-2 border-slate-100 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all focus:border-blue-400"
+                  className="w-full bg-white border border-zinc-200 focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 outline-none rounded-lg pl-10 pr-3.5 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 transition-all"
                   placeholder="seu@email.com"
                 />
               </div>
             </div>
 
             {authTab === 'register' && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">CPF</label>
-                <div className="relative group">
-                  <BadgeDollarSign size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-700">CPF</label>
+                <div className="relative">
+                  <BadgeDollarSign size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                   <input 
                     name="cpf" 
                     type="text" 
@@ -4251,7 +4228,7 @@ Para resolver isso:
                       }
                       e.target.value = formatted;
                     }}
-                    className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
+                    className="w-full bg-white border border-zinc-200 focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 outline-none rounded-lg pl-10 pr-3.5 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 transition-all font-mono" 
                     placeholder="000.000.000-00"
                   />
                 </div>
@@ -4259,15 +4236,15 @@ Para resolver isso:
             )}
 
             {authTab !== 'recover' && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Senha</label>
-                <div className="relative group">
-                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-700">Senha</label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                   <input 
                     name="password" 
                     type="password" 
                     required 
-                    className="w-full bg-slate-50/50 border-2 border-slate-100 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all focus:border-blue-400"
+                    className="w-full bg-white border border-zinc-200 focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 outline-none rounded-lg pl-10 pr-3.5 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 transition-all"
                     placeholder="••••••••"
                   />
                 </div>
@@ -4275,15 +4252,15 @@ Para resolver isso:
             )}
 
             {authTab === 'register' && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Confirmar Senha</label>
-                <div className="relative group">
-                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" />
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-700">Confirmar Senha</label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
                   <input 
                     name="confirmPassword" 
                     type="password" 
                     required 
-                    className="w-full bg-slate-50/50 border-2 border-slate-100 focus:border-blue-400 outline-none rounded-2xl pl-12 pr-4 py-4 font-bold text-sm transition-all" 
+                    className="w-full bg-white border border-zinc-200 focus:border-zinc-900 focus:ring-1 focus:ring-zinc-900 outline-none rounded-lg pl-10 pr-3.5 py-2.5 text-xs text-zinc-900 placeholder:text-zinc-400 transition-all" 
                     placeholder="••••••••"
                   />
                 </div>
@@ -4293,16 +4270,12 @@ Para resolver isso:
             <button 
               type="submit"
               disabled={loading}
-              className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg flex justify-center items-center gap-3 active:scale-95 ${
-                authTab === 'login' || authTab === 'register'
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100' 
-                  : 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-100'
-              } disabled:opacity-50`}
+              className="w-full py-2.5 rounded-lg font-medium text-xs transition-all shadow-sm flex justify-center items-center gap-2 active:scale-[0.98] bg-zinc-900 text-white hover:bg-zinc-800 disabled:opacity-50 mt-2"
             >
-              {loading ? <Loader2 className="animate-spin" size={18} /> : (
+              {loading ? <Loader2 className="animate-spin" size={16} /> : (
                 <>
-                  {authTab === 'login' ? 'Acessar Dashboard' : authTab === 'register' ? 'Criar minha conta' : 'Enviar E-mail de Recuperação'}
-                  <ChevronRight size={18} />
+                  <span>{authTab === 'login' ? 'Entrar no Sistema' : authTab === 'register' ? 'Criar Conta Grátis' : 'Enviar Instruções'}</span>
+                  <ChevronRight size={15} />
                 </>
               )}
             </button>
@@ -4311,7 +4284,7 @@ Para resolver isso:
               <button 
                 type="button"
                 onClick={() => { setAuthTab('login'); setLoginError(null); setLoginSuccess(null); }}
-                className="w-full text-center text-slate-400 text-[10px] font-black uppercase tracking-widest hover:text-slate-600 py-2.5"
+                className="w-full text-center text-zinc-500 text-xs font-medium hover:text-zinc-900 py-2"
               >
                 ← Voltar para Entrar
               </button>
@@ -4321,18 +4294,18 @@ Para resolver isso:
               <>
                 <div className="relative py-2 flex items-center justify-center">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t-2 border-slate-100"></div>
+                    <div className="w-full border-t border-zinc-200"></div>
                   </div>
-                  <span className="relative bg-white px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ou continue com</span>
+                  <span className="relative bg-white px-3 text-[11px] text-zinc-400">ou</span>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={loading}
-                  className="w-full py-4 border-2 border-slate-200 hover:border-slate-300 rounded-2xl font-black text-xs transition-all flex justify-center items-center gap-3 bg-white text-slate-700 active:scale-95 disabled:opacity-50 hover:bg-slate-50 shadow-sm"
+                  className="w-full py-2.5 border border-zinc-200 hover:border-zinc-300 rounded-lg text-xs font-medium transition-all flex justify-center items-center gap-2 bg-white text-zinc-700 active:scale-[0.98] disabled:opacity-50 hover:bg-zinc-50"
                 >
-                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                     <path
                       fill="#EA4335"
                       d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.65 1.58 15.01 1 12 1 7.37 1 3.4 3.65 1.48 7.5l3.85 3c.92-2.74 3.49-4.46 6.67-4.46z"
@@ -4350,31 +4323,22 @@ Para resolver isso:
                       d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.71-2.88c-1.03.69-2.35 1.1-4.25 1.1-3.18 0-5.75-1.72-6.67-4.46l-3.85 3A11.96 11.96 0 0 0 12 23z"
                     />
                   </svg>
-                  {authTab === 'login' ? 'Entrar com Google' : 'Cadastrar com Google'}
+                  <span>{authTab === 'login' ? 'Entrar com Google' : 'Cadastrar com Google'}</span>
                 </button>
               </>
             )}
           </form>
 
-          {authTab === 'register' && (
-            <div className="mt-8 space-y-4">
-              <div className="flex items-start gap-3 bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50 text-[11px] font-medium text-blue-700 leading-relaxed">
-                <Info size={16} className="shrink-0 mt-0.5 text-blue-500" />
-                <p>Se você é um novo colaborador, realize o cadastro para acessar as ferramentas imediatamente com período de trial.</p>
-              </div>
-              <div className="flex items-start gap-3 bg-amber-50/50 p-4 rounded-2xl border border-amber-100/50 text-[10px] font-bold text-amber-700 leading-relaxed">
-                <ShieldAlert size={16} className="shrink-0 mt-0.5 text-amber-500" />
-                <p>
-                  <span className="block uppercase tracking-tight mb-0.5">Nota de Segurança:</span>
-                  O CPF é utilizado como identificador único para evitar duplicicade de contas e garantir a integridade dos seus dados financeiros.
-                </p>
-              </div>
-            </div>
-          )}
-
           {authTab === 'login' && (
-            <p className="text-center mt-8 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
-              Esqueceu sua senha? <button type="button" onClick={() => { setAuthTab('recover'); setLoginError(null); setLoginSuccess(null); }} className="text-blue-500 hover:underline">Recuperar</button>
+            <p className="text-center mt-6 text-zinc-500 text-xs">
+              Esqueceu sua senha?{' '}
+              <button 
+                type="button" 
+                onClick={() => { setAuthTab('recover'); setLoginError(null); setLoginSuccess(null); }} 
+                className="text-zinc-900 font-semibold hover:underline"
+              >
+                Recuperar
+              </button>
             </p>
           )}
         </motion.div>
@@ -4756,7 +4720,12 @@ Para resolver isso:
       <header className="md:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 z-50 sticky top-0">
         <div className="flex items-center gap-2 text-blue-600">
           <Home size={24} strokeWidth={2.5} />
-          <h1 className="text-lg font-bold tracking-tight italic">REALIZZE<span className="text-blue-600">.</span></h1>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight italic uppercase">{platformName || 'REALIZZE'}<span className="text-blue-600">.</span></h1>
+            {platformSubtitle && (
+              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wider -mt-1">{platformSubtitle}</p>
+            )}
+          </div>
         </div>
         <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-slate-600">
           {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
@@ -4784,7 +4753,12 @@ Para resolver isso:
       `}>
         <div className="flex items-center gap-2 text-blue-600 px-2">
           <Home size={28} strokeWidth={2.5} />
-          <h1 className="text-xl font-bold tracking-tight italic">REALIZZE<span className="text-blue-600">.</span></h1>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight italic uppercase">{platformName || 'REALIZZE'}<span className="text-blue-600">.</span></h1>
+            {platformSubtitle && (
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider -mt-1">{platformSubtitle}</p>
+            )}
+          </div>
         </div>
         
         <nav className="flex flex-col gap-1 flex-1 overflow-y-auto custom-scrollbar">

@@ -12,16 +12,17 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, act
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 p-3 transition-all duration-300 ${
+      className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium rounded-lg transition-all duration-150 text-left ${
         active 
-          ? 'bg-[#2563EB] text-[#FFFFFF] rounded-[8px]' 
-          : 'text-[#64748B] hover:text-[#0F172A] hover:bg-slate-50 rounded-[8px]'
+          ? 'bg-zinc-900 text-white shadow-xs' 
+          : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80'
       }`}
     >
       <div className="flex-shrink-0">
-        <Icon size={20} />
+        <Icon size={16} strokeWidth={active ? 2 : 1.75} className={active ? 'text-white' : 'text-zinc-500'} />
       </div>
-      {isOpen && <span className="font-bold text-sm tracking-tight whitespace-nowrap">{label}</span>}
+      {isOpen && <span className="tracking-normal truncate">{label}</span>}
     </button>
   );
 };
+
