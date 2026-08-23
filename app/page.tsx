@@ -4869,7 +4869,7 @@ Para resolver isso:
           </div>
           <button 
             onClick={() => setIsMyProfileOpen(true)}
-            className="text-[10px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest p-2 transition-colors text-left flex items-center gap-1.5"
+            className="w-full text-[10px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest p-2 transition-colors text-left"
           >
             Meu Perfil
           </button>
@@ -4878,14 +4878,14 @@ Para resolver isso:
               setPwdForm({ current: '', new: '', confirm: '' });
               setIsChangePasswordOpen(true);
             }}
-            className="text-[10px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest p-2 transition-colors text-left flex items-center gap-1.5"
+            className="w-full text-[10px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest p-2 transition-colors text-left"
           >
             Alterar Senha
           </button>
           <SidebarHelp />
           <button 
             onClick={handleLogout}
-            className="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-widest p-2 transition-colors text-left"
+            className="w-full text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-widest p-2 transition-colors text-left"
           >
             Sair da Conta
           </button>

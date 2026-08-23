@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { HelpCircle } from 'lucide-react';
 import HelpModal from './HelpModal';
 
 export default function SidebarHelp() {
@@ -11,9 +10,8 @@ export default function SidebarHelp() {
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="w-full py-4 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-blue-500 transition-colors flex items-center justify-center gap-2"
+        className="text-[10px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest p-2 transition-colors text-left w-full"
       >
-        <HelpCircle size={14} />
         Ajuda / FAQ
       </button>
       {isOpen && <HelpModal onClose={() => setIsOpen(false)} />}
