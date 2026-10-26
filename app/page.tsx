@@ -114,12 +114,18 @@ import { UsuariosTab } from '../components/tabs/UsuariosTab';
 import { ConfiguracoesTab } from '../components/tabs/ConfiguracoesTab';
 import { ModelosContratoTab } from '../components/tabs/ModelosContratoTab';
 import { LandingPage } from './components/LandingPage';
-import { PendingActivation } from '../components/PendingActivation';
-
 export default function DashboardPage() {
   const isGleisonMaster = (email: string) => {
     const e = (email || '').toLowerCase().trim();
-    return e === 'gleisonisaias@gmail.com' || e === 'gleisonisaia@gmail.com' || e === 'gleisonisias@gmail.com';
+    if (!e) return false;
+    return e.includes('gleison');
+  };
+
+  const isUnlimitedUser = (profile?: UserProfile | null, sessionEmail?: string | null) => {
+    if (profile?.role === 'MASTER') return true;
+    const e = (profile?.email || sessionEmail || session?.user?.email || '').toLowerCase().trim();
+    if (isGleisonMaster(e)) return true;
+    return false;
   };
 
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -1775,8 +1781,8 @@ Para resolver isso:
   };
 
   const checkPlanLimit = (): string | null => {
-    // Override bypass limt for the dev
-    if (userProfile?.email && isGleisonMaster(userProfile.email)) {
+    // Override bypass limit for Master and Gleison (sem limites de cadastro)
+    if (isUnlimitedUser(userProfile, session?.user?.email)) {
       return null;
     }
     
@@ -1862,6 +1868,79 @@ Para resolver isso:
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhone(e.target.value);
+    e.target.value = formatted;
+  };
+
+  const parseAndFormatBirthDate = (raw: string): string => {
+    if (!raw) return '';
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+
+    // Ano de 2 dígitos atual para determinar o século correto (ex: se ano atual é 2026, 26)
+    const currentYear2Digit = new Date().getFullYear() % 100;
+
+    // Se já contém separadores como '/', '-', '.', ou espaço
+    const parts = trimmed.split(/[/.\-\s]+/).map(p => p.trim()).filter(Boolean);
+    if (parts.length === 3) {
+      const day = parts[0].replace(/\D/g, '').padStart(2, '0').slice(0, 2);
+      const month = parts[1].replace(/\D/g, '').padStart(2, '0').slice(0, 2);
+      let year = parts[2].replace(/\D/g, '');
+      if (year.length === 2) {
+        const yNum = parseInt(year, 10);
+        year = yNum > currentYear2Digit ? `19${year}` : `20${year}`;
+      }
+      if (day && month && year.length === 4) {
+        return `${day}/${month}/${year}`;
+      }
+    }
+
+    // Apenas dígitos
+    const digits = trimmed.replace(/\D/g, '');
+
+    // Formato 6 dígitos (DDMMAA - ex: 111081 -> 11/10/1981, 111005 -> 11/10/2005)
+    if (digits.length === 6) {
+      const day = digits.slice(0, 2);
+      const month = digits.slice(2, 4);
+      const yy = digits.slice(4, 6);
+      const yNum = parseInt(yy, 10);
+      const year = yNum > currentYear2Digit ? `19${yy}` : `20${yy}`;
+      return `${day}/${month}/${year}`;
+    }
+
+    // Formato 8 dígitos (DDMMAAAA - ex: 11101981 -> 11/10/1981)
+    if (digits.length === 8) {
+      const day = digits.slice(0, 2);
+      const month = digits.slice(2, 4);
+      const year = digits.slice(4, 8);
+      return `${day}/${month}/${year}`;
+    }
+
+    // Formatação progressiva enquanto digita
+    if (digits.length > 4) {
+      return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
+    }
+    if (digits.length > 2) {
+      return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    }
+
+    return digits;
+  };
+
+  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.replace(/\D/g, '');
+    if (val.length > 8) val = val.slice(0, 8);
+
+    let formatted = val;
+    if (val.length > 4) {
+      formatted = `${val.slice(0, 2)}/${val.slice(2, 4)}/${val.slice(4)}`;
+    } else if (val.length > 2) {
+      formatted = `${val.slice(0, 2)}/${val.slice(2)}`;
+    }
+    e.target.value = formatted;
+  };
+
+  const handleBirthDateBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const formatted = parseAndFormatBirthDate(e.target.value);
     e.target.value = formatted;
   };
 
@@ -2869,6 +2948,10 @@ Para resolver isso:
       '{{locatario_naturalidade}}': inquilino?.naturalidade || '[NATURALIDADE]',
       '{{inquilino_uf_nasc}}': inquilino?.uf_nascimento || '[UF NASC]',
       '{{locatario_uf_nasc}}': inquilino?.uf_nascimento || '[UF NASC]',
+      '{{inquilino_data_nasc}}': inquilino?.data_nascimento || '[DATA NASCIMENTO]',
+      '{{locatario_data_nasc}}': inquilino?.data_nascimento || '[DATA NASCIMENTO]',
+      '{{inquilino_nascimento}}': inquilino?.data_nascimento || '[DATA NASCIMENTO]',
+      '{{locatario_nascimento}}': inquilino?.data_nascimento || '[DATA NASCIMENTO]',
 
       // Fiador
       '{{fiador_nome}}': inquilino?.nome_fiador || '[NOME FIADOR]',
@@ -3262,6 +3345,7 @@ Para resolver isso:
           const { error: err } = await supabase.from('imoveis').update(payload).eq('id', editingItem.id);
           dbError = err;
         } else if (activeTab === 'inquilinos') {
+          const formattedDataNasc = rawData.data_nascimento ? parseAndFormatBirthDate(String(rawData.data_nascimento)) : null;
           const payload: any = { 
             nome: rawData.nome,
             cpf_cnpj: rawData.cpf_cnpj || null,
@@ -3273,6 +3357,7 @@ Para resolver isso:
             nacionalidade: rawData.nacionalidade || null,
             naturalidade: rawData.naturalidade || null,
             uf_nascimento: rawData.uf_nascimento || null,
+            data_nascimento: formattedDataNasc,
             documentos_fiador: finalGuarantorDocs,
             proprietario_id: userProfile?.role === 'PROPRIETARIO' ? userProfile.proprietario_id : (rawData.proprietario_id || null)
           };
@@ -3297,6 +3382,7 @@ Para resolver isso:
             delete fallbackPayload.endereco_fiador;
             delete fallbackPayload.cep_fiador;
             delete fallbackPayload.arquivado;
+            delete fallbackPayload.data_nascimento;
             const { error: secondErr } = await supabase.from('inquilinos').update(fallbackPayload).eq('id', editingItem.id);
             err = secondErr;
           }
@@ -3359,21 +3445,22 @@ Para resolver isso:
         }
       } else {
         // Insert logic
+        const isUnlimited = isUnlimitedUser(userProfile, session?.user?.email);
         const userPlanLimits: {[key: string]: number} = {
-          'Gratuito': 1,
-          'Nenhum': 1,
+          'Gratuito': isUnlimited ? Infinity : 1,
+          'Nenhum': isUnlimited ? Infinity : 1,
           'Iniciante': Infinity,
           'Profissional': Infinity,
           'Ilimitado': Infinity
         };
         const userPlan = getCleanPlanName(userProfile?.plano);
-        // ADMIN and other users are subject to their respective plan limits to preserve the safety locks
-        const limit = userPlanLimits[userPlan] || 1;
+        // Master e Gleison possuem limites ilimitados
+        const limit = isUnlimited ? Infinity : (userPlanLimits[userPlan] || 1);
         const planDisplayName = userProfile?.plano || 'Gratuito';
 
         if (activeTab === 'imoveis') {
           const activeImoveisCount = imoveis.filter(i => !i.arquivado).length;
-          if (activeImoveisCount >= limit) {
+          if (!isUnlimited && activeImoveisCount >= limit) {
             throw new Error(`Você atingiu o limite de ${limit} bens/itens ativos do seu plano (${planDisplayName}). Faça upgrade para continuar.`);
           }
 
@@ -3398,10 +3485,11 @@ Para resolver isso:
           dbError = err;
         } else if (activeTab === 'inquilinos') {
           const activeInquilinosCount = inquilinos.filter(i => !i.arquivado).length;
-          if (activeInquilinosCount >= limit) {
+          if (!isUnlimited && activeInquilinosCount >= limit) {
             throw new Error(`Você atingiu o limite de ${limit} locatários/clientes ativos do seu plano (${planDisplayName}). Faça upgrade para continuar.`);
           }
 
+          const formattedDataNasc = rawData.data_nascimento ? parseAndFormatBirthDate(String(rawData.data_nascimento)) : null;
           const payload: any = { 
             nome: rawData.nome,
             cpf_cnpj: rawData.cpf_cnpj || null,
@@ -3413,6 +3501,7 @@ Para resolver isso:
             nacionalidade: rawData.nacionalidade || null,
             naturalidade: rawData.naturalidade || null,
             uf_nascimento: rawData.uf_nascimento || null,
+            data_nascimento: formattedDataNasc,
             documentos_fiador: finalGuarantorDocs,
             user_id: session.user.id,
             proprietario_id: userProfile?.role === 'PROPRIETARIO' ? userProfile.proprietario_id : (rawData.proprietario_id || null)
@@ -3439,6 +3528,7 @@ Para resolver isso:
             delete fallbackPayload.endereco_fiador;
             delete fallbackPayload.cep_fiador; // Caso exista
             delete fallbackPayload.arquivado;
+            delete fallbackPayload.data_nascimento;
 
             const { error: secondErr } = await supabase.from('inquilinos').insert([fallbackPayload]);
             err = secondErr;
@@ -3447,7 +3537,7 @@ Para resolver isso:
           dbError = err;
         } else if (activeTab === 'proprietarios') {
           const activeProprietariosCount = proprietarios.filter(p => !p.arquivado).length;
-          if (activeProprietariosCount >= limit) {
+          if (!isUnlimited && activeProprietariosCount >= limit) {
             throw new Error(`Você atingiu o limite de ${limit} cedentes/proprietários ativos do seu plano (${planDisplayName}). Faça upgrade para continuar.`);
           }
 
@@ -3472,7 +3562,7 @@ Para resolver isso:
             // Tiered Pricing Plan Limit Check
             const activeContractCount = contratos.filter(c => !c.arquivado).length;
             
-            if (activeContractCount >= limit) {
+            if (!isUnlimited && activeContractCount >= limit) {
               throw new Error(`Você atingiu o limite de ${limit} contratos ativos do seu plano (${planDisplayName}). Faça upgrade para continuar.`);
             }
 
@@ -4355,7 +4445,7 @@ Para resolver isso:
       return clean === 'Iniciante' || clean === 'Profissional' || clean === 'Ilimitado';
     })() && 
     userProfile.status_pagamento !== 'PAGO' && 
-    !(userProfile.email && isGleisonMaster(userProfile.email)); // Bypass the payment lock for this email
+    !isUnlimitedUser(userProfile, session?.user?.email); // Bypass payment lock for Master and Gleison
 
 
   if (isPaymentPending) {
@@ -5186,20 +5276,34 @@ Para resolver isso:
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block tracking-tight flex justify-between">
-                            <span>CPF do Locatário (Opcional)</span>
+                            <span>CPF (Opcional)</span>
                             {formErrors.cpf_cnpj && <span className="text-red-500 normal-case font-bold">{formErrors.cpf_cnpj}</span>}
                           </label>
                           <input name="cpf_cnpj" onBlur={handleCpfBlur} onChange={handleDocumentChange} defaultValue={editingItem?.cpf_cnpj} className={`w-full border-2 ${formErrors.cpf_cnpj ? 'border-red-200 bg-red-50' : 'border-slate-100'} focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all`} placeholder="000.000.000-00" />
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block tracking-tight flex justify-between">
-                            <span>RG do Locatário (Opcional)</span>
+                            <span>RG (Opcional)</span>
                             {formErrors.rg && <span className="text-red-500 normal-case font-bold">{formErrors.rg}</span>}
                           </label>
                           <input name="rg" defaultValue={editingItem?.rg} onBlur={handleFieldBlur} className={`w-full border-2 ${formErrors.rg ? 'border-red-200 bg-red-50' : 'border-slate-100'} focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all`} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block tracking-tight flex justify-between">
+                            <span>Data de Nascimento</span>
+                          </label>
+                          <input 
+                            name="data_nascimento" 
+                            defaultValue={editingItem?.data_nascimento} 
+                            placeholder="00/00/0000" 
+                            onChange={handleBirthDateChange} 
+                            onBlur={handleBirthDateBlur} 
+                            maxLength={10} 
+                            className="w-full border-2 border-slate-100 focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all" 
+                          />
                         </div>
                       </div>
 

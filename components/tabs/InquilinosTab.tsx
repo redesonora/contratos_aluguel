@@ -39,6 +39,7 @@ export const InquilinosTab: React.FC<InquilinosTabProps> = ({
       (inq.nome || '').toLowerCase().includes(searchLower) ||
       (inq.email || '').toLowerCase().includes(searchLower) ||
       (inq.cpf_cnpj || '').toLowerCase().includes(searchLower) ||
+      (inq.data_nascimento || '').toLowerCase().includes(searchLower) ||
       (inq.telefone || '').toLowerCase().includes(searchLower);
     
     return matchesSearch;
@@ -56,7 +57,7 @@ export const InquilinosTab: React.FC<InquilinosTabProps> = ({
           </span>
           <input 
             type="text"
-            placeholder="Buscar por nome, e-mail, CPF/CNPJ ou telefone..."
+            placeholder="Buscar por nome, e-mail, CPF/CNPJ, nascimento ou telefone..."
             value={inquilinoSearch}
             onChange={(e) => setInquilinoSearch(e.target.value)}
             className="pl-9 pr-3 py-2 border border-zinc-200 rounded-lg text-xs font-normal text-zinc-800 placeholder:text-zinc-400 outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-400 transition-all w-full bg-white"
@@ -86,7 +87,10 @@ export const InquilinosTab: React.FC<InquilinosTabProps> = ({
                       </div>
                       <div>
                         <p className="font-medium text-zinc-900">{inq.nome}</p>
-                        <p className="text-[11px] text-zinc-400 font-mono mt-0.5">DOC: {inq.cpf_cnpj}</p>
+                        <p className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                          DOC: {inq.cpf_cnpj || 'Não inf.'}
+                          {inq.data_nascimento && ` • Nasc: ${inq.data_nascimento}`}
+                        </p>
                       </div>
                     </div>
                   </td>

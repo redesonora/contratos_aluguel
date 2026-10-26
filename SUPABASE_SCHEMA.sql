@@ -19,6 +19,7 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_login timestamptz;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_key text;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_env text DEFAULT 'sandbox';
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_auto_billing boolean DEFAULT false;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS data_nascimento text;
 
 -- Adicionalmente, você pode atualizar os e-mails dos usuários que já existem
 -- vinculando-os com base nos metadados ou inserções da sessão. O sistema
@@ -122,6 +123,7 @@ CREATE TABLE IF NOT EXISTS inquilinos (
   cpf_cnpj text NOT NULL,
   email text,
   telefone text,
+  data_nascimento text,
   status text DEFAULT 'Ativo',
   observacoes text,
   user_id uuid REFERENCES auth.users ON DELETE SET NULL,
