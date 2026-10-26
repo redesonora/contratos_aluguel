@@ -83,6 +83,8 @@ export default function RootLayout({
             `,
           }}
         />
+      </head>
+      <body className={inter.className}>
         <Script
           strategy="afterInteractive"
           src="https://www.googletagmanager.com/gtag/js?id=G-CDDHS8E03G"
@@ -99,8 +101,8 @@ export default function RootLayout({
             `,
           }}
         />
-      </head>
-      <body className={inter.className}>{children}</body>
+        {children}
+      </body>
     </html>
   );
 }

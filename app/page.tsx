@@ -939,17 +939,18 @@ export default function DashboardPage() {
     const initAuth = async () => {
       console.log('initAuth: começando');
       
-      // Fallback de timeout: se em 8 segundos não resolver, libera o loading
+      // Fallback de segurança rápido: em no máximo 2.5 segundos libera o loading
       const fallbackTimer = setTimeout(() => {
-        if (authLoading) {
-          console.warn('initAuth: timeout atingido, liberando loading');
-          setAuthLoading(false);
-        }
-      }, 8000);
+        console.warn('initAuth: timeout de segurança atingido, liberando loading para a interface');
+        setAuthLoading(false);
+      }, 2500);
 
       try {
-        const sessionRes = await supabase.auth.getSession().catch((e: any) => ({ data: { session: null }, error: e }));
-        clearTimeout(fallbackTimer);
+        const sessionRes = await Promise.race([
+          supabase.auth.getSession().catch((e: any) => ({ data: { session: null }, error: e })),
+          new Promise<any>((resolve) => setTimeout(() => resolve({ data: { session: null }, error: null }), 2000))
+        ]);
+
         const { data, error } = sessionRes || {};
         const initialSession = data?.session || null;
         console.log('initAuth: getSession result', { session: initialSession, error });
@@ -982,17 +983,19 @@ export default function DashboardPage() {
         }
 
         setSession(initialSession);
-        if (initialSession) {
+        if (initialSession?.user) {
           console.log('initAuth: tem sessão, fetchProfile');
-          fetchProfile(initialSession.user.id, initialSession.user.email);
-        } else {
-          console.log('initAuth: não tem sessão, setAuthLoading(false)');
-          setAuthLoading(false);
+          await Promise.race([
+            fetchProfile(initialSession.user.id, initialSession.user.email),
+            new Promise((resolve) => setTimeout(resolve, 2000))
+          ]);
         }
       } catch (err: any) {
-        clearTimeout(fallbackTimer);
         console.warn('Falha tratada no carregamento da autenticação:', err);
         await handleAuthError();
+      } finally {
+        clearTimeout(fallbackTimer);
+        setAuthLoading(false);
       }
     };
 
@@ -4080,8 +4083,23 @@ Para resolver isso:
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin text-blue-600" size={40} />
+      <div 
+        className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4"
+        style={{ minHeight: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}
+      >
+        <div 
+          className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white"
+          style={{ width: '48px', height: '48px', borderRadius: '16px', backgroundColor: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff' }}
+        >
+          <Building2 size={24} />
+        </div>
+        <div 
+          className="flex items-center gap-2.5 text-slate-700 text-sm font-medium"
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#334155', fontSize: '14px', fontWeight: 500 }}
+        >
+          <Loader2 className="animate-spin text-blue-600" size={18} />
+          <span>Iniciando REALIZZE...</span>
+        </div>
       </div>
     );
   }
