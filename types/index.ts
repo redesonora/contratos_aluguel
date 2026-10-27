@@ -45,12 +45,15 @@ export interface Inquilino {
   nome_fiador?: string;
   cpf_fiador?: string;
   rg_fiador?: string;
+  cep_fiador?: string;
   endereco_fiador?: string;
   telefone_fiador?: string;
   email_fiador?: string;
   profissao_fiador?: string;
   estado_civil_fiador?: string;
   nacionalidade_fiador?: string;
+  documentos?: string[];
+  documentos_fiador?: string[];
   arquivado?: boolean;
 }
 

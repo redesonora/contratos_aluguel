@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Archive, ArchiveRestore, Trash2, Edit2 } from 'lucide-react';
+import { Search, Archive, ArchiveRestore, Trash2, Edit2, FileText } from 'lucide-react';
 
 interface InquilinosTabProps {
   showArchived: boolean;
@@ -91,6 +91,44 @@ export const InquilinosTab: React.FC<InquilinosTabProps> = ({
                           DOC: {inq.cpf_cnpj || 'Não inf.'}
                           {inq.data_nascimento && ` • Nasc: ${inq.data_nascimento}`}
                         </p>
+                        {((inq.documentos && inq.documentos.length > 0) || (inq.documentos_fiador && inq.documentos_fiador.length > 0)) && (
+                          <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                            {inq.documentos && inq.documentos.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                {inq.documentos.map((url: string, i: number) => (
+                                  <a
+                                    key={i}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 px-1.5 py-0.5 rounded border border-blue-200/60 transition-colors"
+                                    title="Abrir documento do locatário"
+                                  >
+                                    <FileText size={10} />
+                                    Doc {inq.documentos.length > 1 ? `#${i + 1}` : 'Locatário'}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                            {inq.documentos_fiador && inq.documentos_fiador.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                {inq.documentos_fiador.map((url: string, i: number) => (
+                                  <a
+                                    key={i}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200/60 transition-colors"
+                                    title="Abrir documento do fiador"
+                                  >
+                                    <FileText size={10} />
+                                    Fiador {inq.documentos_fiador.length > 1 ? `#${i + 1}` : ''}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>

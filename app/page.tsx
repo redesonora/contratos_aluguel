@@ -3361,6 +3361,7 @@ Para resolver isso:
             naturalidade: rawData.naturalidade || null,
             uf_nascimento: rawData.uf_nascimento || null,
             data_nascimento: formattedDataNasc,
+            documentos: finalDocUrls,
             documentos_fiador: finalGuarantorDocs,
             proprietario_id: userProfile?.role === 'PROPRIETARIO' ? userProfile.proprietario_id : (rawData.proprietario_id || null)
           };
@@ -3374,10 +3375,11 @@ Para resolver isso:
 
           let { error: err } = await supabase.from('inquilinos').update(payload).eq('id', editingItem.id);
           
-          // Fallback if columns are missing (especially guarantor related)
+          // Fallback if columns are missing (especially guarantor or doc related)
           if (err && (err.message?.includes('column') || err.code === 'PGRST204')) {
-            console.warn("Detectada ausência de colunas de fiador no banco. Tentando atualizar apenas dados básicos do inquilino...");
+            console.warn("Detectada ausência de colunas no banco. Tentando atualizar apenas dados básicos do inquilino...");
             const fallbackPayload = { ...payload };
+            delete fallbackPayload.documentos;
             delete fallbackPayload.documentos_fiador;
             delete fallbackPayload.nome_fiador;
             delete fallbackPayload.cpf_fiador;
@@ -3505,6 +3507,7 @@ Para resolver isso:
             naturalidade: rawData.naturalidade || null,
             uf_nascimento: rawData.uf_nascimento || null,
             data_nascimento: formattedDataNasc,
+            documentos: finalDocUrls,
             documentos_fiador: finalGuarantorDocs,
             user_id: session.user.id,
             proprietario_id: userProfile?.role === 'PROPRIETARIO' ? userProfile.proprietario_id : (rawData.proprietario_id || null)
@@ -3519,11 +3522,12 @@ Para resolver isso:
 
           let { error: err } = await supabase.from('inquilinos').insert([payload]);
 
-          // Fallback for missing columns (guarantor related)
+          // Fallback for missing columns (guarantor or doc related)
           if (err && (err.message?.includes('column') || err.code === 'PGRST204')) {
-            console.warn("Detectada ausência de colunas de fiador no banco. Tentando salvar apenas dados básicos do inquilino...");
+            console.warn("Detectada ausência de colunas no banco. Tentando salvar apenas dados básicos do inquilino...");
             const fallbackPayload = { ...payload };
             // Remove todos os campos que costumam causar erro de esquema se a tabela for antiga
+            delete fallbackPayload.documentos;
             delete fallbackPayload.documentos_fiador;
             delete fallbackPayload.nome_fiador;
             delete fallbackPayload.cpf_fiador;
@@ -5374,6 +5378,60 @@ Para resolver isso:
                             {formErrors.telefone && <span className="text-red-500 normal-case font-bold">{formErrors.telefone}</span>}
                           </label>
                           <input name="telefone" placeholder="(00) 00000-0000" onBlur={handleFieldBlur} onChange={handlePhoneChange} defaultValue={editingItem?.telefone} className={`w-full border-2 ${formErrors.telefone ? 'border-red-200 bg-red-50' : 'border-slate-100'} focus:border-blue-400 outline-none rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all`} />
+                        </div>
+                      </div>
+
+                      {/* Documentos do Locatário / Inquilino */}
+                      <div className="pt-3 border-t border-slate-100">
+                        <label className="text-[10px] font-black text-slate-500 uppercase mb-2 block tracking-tight">Documentos do Locatário (RG, CPF, Comprovante Residência/Renda)</label>
+                        
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {existingDocs.map((url, idx) => (
+                            <div key={idx} className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-[10px] font-bold border border-blue-100">
+                              <FileText size={12} />
+                              <a href={url} target="_blank" rel="noopener noreferrer" className="truncate max-w-[120px] hover:underline flex items-center gap-1">
+                                Doc Locatário {idx + 1}
+                                <ExternalLink size={10} />
+                              </a>
+                              <button 
+                                type="button" 
+                                onClick={() => setExistingDocs(prev => prev.filter((_, i) => i !== idx))}
+                                className="text-blue-400 hover:text-red-500 transition-colors ml-1"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ))}
+                          {filesToUpload.map((file, idx) => (
+                            <div key={idx} className="flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg text-[10px] font-bold border border-amber-100">
+                              <Loader2 size={12} className="animate-pulse" />
+                              <span className="truncate max-w-[120px]">{file.name}</span>
+                              <button 
+                                type="button" 
+                                onClick={() => setFilesToUpload(prev => prev.filter((_, i) => i !== idx))}
+                                className="text-amber-400 hover:text-red-500 transition-colors"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="relative group">
+                          <input 
+                            type="file" 
+                            multiple 
+                            onChange={(e) => {
+                              if (e.target.files) {
+                                setFilesToUpload(prev => [...prev, ...Array.from(e.target.files!)]);
+                              }
+                            }}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          />
+                          <div className="border-2 border-dashed border-slate-200 rounded-xl py-6 flex flex-col items-center justify-center gap-2 group-hover:border-blue-300 transition-all bg-slate-50/50">
+                            <PlusCircle size={24} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Anexar documentos do locatário</p>
+                          </div>
                         </div>
                       </div>
 

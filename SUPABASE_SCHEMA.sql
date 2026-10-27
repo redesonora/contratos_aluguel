@@ -121,9 +121,22 @@ CREATE TABLE IF NOT EXISTS inquilinos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   nome text NOT NULL,
   cpf_cnpj text NOT NULL,
+  rg text,
+  profissao text,
+  estado_civil text,
+  nacionalidade text,
+  naturalidade text,
+  uf_nascimento text,
   email text,
   telefone text,
   data_nascimento text,
+  documentos text[],
+  nome_fiador text,
+  cpf_fiador text,
+  rg_fiador text,
+  cep_fiador text,
+  endereco_fiador text,
+  documentos_fiador text[],
   status text DEFAULT 'Ativo',
   observacoes text,
   user_id uuid REFERENCES auth.users ON DELETE SET NULL,
@@ -367,5 +380,25 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+
+-- -------------------------------------------------------------------------
+-- 🔄 MIGRAÇÕES / ATUALIZAÇÃO DE TABELAS EXISTENTES NO SUPABASE
+-- -------------------------------------------------------------------------
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS data_nascimento text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS rg text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS profissao text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS estado_civil text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS nacionalidade text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS naturalidade text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS uf_nascimento text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS documentos text[];
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS documentos_fiador text[];
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS nome_fiador text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS cpf_fiador text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS rg_fiador text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS cep_fiador text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS endereco_fiador text;
+
 
 
