@@ -5037,7 +5037,7 @@ Para resolver isso:
           >
             Sair da Conta
           </button>
-          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.9.1</p>
+          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.9.2</p>
         </div>
       </aside>
 
