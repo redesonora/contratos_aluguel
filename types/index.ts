@@ -95,6 +95,12 @@ export interface Contrato {
   clausulas?: string;
   alinhamento_texto?: 'left' | 'center' | 'right' | 'justify';
   arquivado?: boolean;
+  data_encerramento?: string;
+  motivo_encerramento?: string;
+  multa_rescisoria?: number;
+  valor_pendencias?: number;
+  termo_rescisao?: string;
+  observacoes?: string;
   imoveis?: any;
   inquilinos?: any;
   proprietarios?: any;

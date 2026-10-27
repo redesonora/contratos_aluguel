@@ -113,6 +113,7 @@ import { LogsTab } from '../components/tabs/LogsTab';
 import { UsuariosTab } from '../components/tabs/UsuariosTab';
 import { ConfiguracoesTab } from '../components/tabs/ConfiguracoesTab';
 import { ModelosContratoTab } from '../components/tabs/ModelosContratoTab';
+import { TermoRescisaoModal, RescisaoData } from '../components/modals/TermoRescisaoModal';
 import { LandingPage } from './components/LandingPage';
 export default function DashboardPage() {
   const isGleisonMaster = (email: string) => {
@@ -224,6 +225,8 @@ export default function DashboardPage() {
   const [selectedContractForFinance, setSelectedContractForFinance] = useState<Contrato | null>(null);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
   const [contractToRenew, setContractToRenew] = useState<Contrato | null>(null);
+  const [isRescisaoModalOpen, setIsRescisaoModalOpen] = useState(false);
+  const [contractToRescind, setContractToRescind] = useState<Contrato | null>(null);
   const itemsPerPage = 8;
 
   const recordLog = useCallback(async (acao: string, tabela: string, registroId?: string, detalhes?: any) => {
@@ -2305,49 +2308,81 @@ Para resolver isso:
     }
   };
 
-  const handleFinishContract = async (contract: Contrato) => {
-    try {
-      const inquilinoNome = contract.inquilinos?.nome || 'este inquilino';
-      const resp = confirm(`Tem certeza que deseja FINALIZAR o contrato de ${inquilinoNome}? Esta ação liberará o imóvel.`);
-      if (!resp) return;
+  const handleOpenRescisaoModal = (contract: Contrato) => {
+    setContractToRescind(contract);
+    setIsRescisaoModalOpen(true);
+  };
 
+  const handleFinishContract = (contract: Contrato) => {
+    handleOpenRescisaoModal(contract);
+  };
+
+  const handleConfirmRescisao = async (contract: Contrato, data: RescisaoData) => {
+    try {
       setLoading(true);
       setErrorMsg(null);
 
-      // 1. Atualizar status do contrato
-      const { error: coError } = await supabase
+      const inquilinoNome = contract.inquilinos?.nome || 'este inquilino';
+
+      // 1. Atualizar contrato com status 'finalizado' (e tentar incluir colunas de rescisão se existirem)
+      let updatePayload: any = {
+        status: 'finalizado',
+        data_encerramento: data.dataEncerramento,
+        motivo_encerramento: data.motivo,
+        multa_rescisoria: data.valorMulta,
+        valor_pendencias: data.pendenciasContas,
+        termo_rescisao: `Encerrado em ${data.dataEncerramento}. Motivo: ${data.motivo}. Vistoria: ${data.statusVistoria}. Total acerto: R$ ${(data.valorMulta + data.aluguelProporcional + data.pendenciasContas).toFixed(2)}.`
+      };
+
+      let { error: coError } = await supabase
         .from('contratos')
-        .update({ status: 'finalizado' })
+        .update(updatePayload)
         .eq('id', contract.id);
+
+      // Se colunas de rescisão ainda não existirem no Supabase, atualizar apenas o status
+      if (coError && (coError.code === '42703' || coError.code === 'PGRST204')) {
+        const { error: retryError } = await supabase
+          .from('contratos')
+          .update({ status: 'finalizado' })
+          .eq('id', contract.id);
+        coError = retryError;
+      }
 
       if (coError) {
         console.error('Erro ao finalizar contrato (update):', coError);
         throw coError;
       }
 
-      // 2. Liberar o imóvel
+      // 2. Liberar o imóvel automaticamente
       if (contract.imovel_id) {
         const { error: imError } = await supabase
           .from('imoveis')
           .update({ status: 'Disponível' })
           .eq('id', contract.imovel_id);
         
-        if (imError) console.warn('Erro ao liberar imóvel (não crítico):', imError);
+        if (imError) console.warn('Erro ao liberar imóvel:', imError);
       }
 
-      await recordLog('FINALIZAR', 'contratos', contract.id, { 
+      // 3. Registrar auditoria
+      await recordLog('FINALIZAR_RESCISAO', 'contratos', contract.id, { 
         inquilino: inquilinoNome,
-        imovel: contract.imoveis?.apelido || contract.imoveis?.endereco || 'Desconhecido'
+        imovel: contract.imoveis?.apelido || contract.imoveis?.endereco || 'Desconhecido',
+        data_encerramento: data.dataEncerramento,
+        motivo: data.motivo,
+        multa: data.valorMulta,
+        pendencias: data.pendenciasContas
       });
 
       setSuccess(true);
       await fetchData();
-      alert('Contrato finalizado com sucesso!');
+      setIsRescisaoModalOpen(false);
+      setContractToRescind(null);
+      alert('Contrato encerrado e finalizado com sucesso! O imóvel associado agora está Disponível para nova locação.');
     } catch (err: any) {
       console.error('Erro ao finalizar contrato:', err);
       const msg = err.message || 'Erro inesperado';
       setErrorMsg(msg);
-      alert('Erro ao finalizar contrato: ' + msg + '\nVerifique se o banco de dados está atualizado (SQL rodado?).');
+      alert('Erro ao finalizar contrato: ' + msg);
     } finally {
       setLoading(false);
     }
@@ -3952,6 +3987,7 @@ Para resolver isso:
             setItemToDelete={setItemToDelete}
             setIsRenewModalOpen={setIsRenewModalOpen}
             setContractToRenew={setContractToRenew}
+            handleOpenRescisaoModal={handleOpenRescisaoModal}
           />
         );
       }
@@ -7173,6 +7209,18 @@ Para resolver isso:
           </div>
         )}
       </AnimatePresence>
+
+      {/* Modal de Rescisão / Encerramento do Contrato */}
+      <TermoRescisaoModal
+        isOpen={isRescisaoModalOpen}
+        onClose={() => {
+          setIsRescisaoModalOpen(false);
+          setContractToRescind(null);
+        }}
+        contrato={contractToRescind}
+        onConfirmEncerramento={handleConfirmRescisao}
+        loading={loading}
+      />
 
       <style jsx global>{`
         @media print {

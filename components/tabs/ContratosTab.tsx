@@ -19,7 +19,9 @@ import {
   AlertCircle,
   Calendar,
   CheckCircle2,
-  Filter
+  Filter,
+  FileX,
+  Printer
 } from 'lucide-react';
 
 interface ContratosTabProps {
@@ -39,6 +41,7 @@ interface ContratosTabProps {
   setItemToDelete: (val: {id: string, type: 'contratos' | 'imoveis' | 'inquilinos' | 'proprietarios'}) => void;
   setIsRenewModalOpen: (open: boolean) => void;
   setContractToRenew: (co: any) => void;
+  handleOpenRescisaoModal?: (co: any) => void;
 }
 
 export interface ContractExpirationInfo {
@@ -161,7 +164,8 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
   openCreateModal,
   setItemToDelete,
   setIsRenewModalOpen,
-  setContractToRenew
+  setContractToRenew,
+  handleOpenRescisaoModal
 }) => {
   const [filterMode, setFilterMode] = useState<'todos' | 'vencendo' | 'vigentes' | 'vencidos'>('todos');
 
@@ -728,15 +732,17 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
                   >
                     <CreditCard size={15} />
                   </button>
-                  {isAtivo && (
-                    <button 
-                      onClick={() => handleFinishContract(co)}
-                      className="p-1.5 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"
-                      title="Finalizar Contrato"
-                    >
-                      <Ban size={15} />
-                    </button>
-                  )}
+                  <button 
+                    onClick={() => handleOpenRescisaoModal ? handleOpenRescisaoModal(co) : handleFinishContract(co)}
+                    className={`p-1.5 rounded-md transition-colors ${
+                      isAtivo 
+                        ? 'text-zinc-400 hover:text-rose-600 hover:bg-rose-50' 
+                        : 'text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200/60'
+                    }`}
+                    title={isAtivo ? "Encerrar / Rescindir Contrato" : "Ver Termo de Rescisão"}
+                  >
+                    <Ban size={15} />
+                  </button>
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -747,20 +753,41 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
                     <Eye size={13} />
                     <span>Ver</span>
                   </button>
-                  <button 
-                    onClick={() => {
-                      setContractToRenew(co);
-                      setIsRenewModalOpen(true);
-                    }}
-                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors inline-flex items-center gap-1 ${
-                      isAtivo && expInfo.isExpiringSoon
-                        ? 'text-amber-800 bg-amber-100 hover:bg-amber-200/80 border border-amber-300'
-                        : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'
-                    }`}
-                  >
-                    <RefreshCw size={13} />
-                    <span>Renovar</span>
-                  </button>
+                  {isAtivo ? (
+                    <button 
+                      onClick={() => handleOpenRescisaoModal ? handleOpenRescisaoModal(co) : handleFinishContract(co)}
+                      className="px-2.5 py-1 text-xs font-semibold text-rose-700 hover:text-rose-800 hover:bg-rose-50 border border-rose-200/80 rounded-md transition-colors inline-flex items-center gap-1 shadow-2xs"
+                      title="Encerrar contrato e emitir termo de rescisão"
+                    >
+                      <FileX size={13} />
+                      <span>Encerrar</span>
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleOpenRescisaoModal ? handleOpenRescisaoModal(co) : handleFinishContract(co)}
+                      className="px-2.5 py-1 text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200/80 border border-zinc-200/80 rounded-md transition-colors inline-flex items-center gap-1 shadow-2xs"
+                      title="Visualizar e imprimir termo de rescisão"
+                    >
+                      <Printer size={13} />
+                      <span>Termo Rescisão</span>
+                    </button>
+                  )}
+                  {isAtivo && (
+                    <button 
+                      onClick={() => {
+                        setContractToRenew(co);
+                        setIsRenewModalOpen(true);
+                      }}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors inline-flex items-center gap-1 ${
+                        isAtivo && expInfo.isExpiringSoon
+                          ? 'text-amber-800 bg-amber-100 hover:bg-amber-200/80 border border-amber-300'
+                          : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'
+                      }`}
+                    >
+                      <RefreshCw size={13} />
+                      <span>Renovar</span>
+                    </button>
+                  )}
                   <button 
                     onClick={() => openCreateModal(co)}
                     className="px-2.5 py-1 text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/60 rounded-md transition-colors inline-flex items-center gap-1"

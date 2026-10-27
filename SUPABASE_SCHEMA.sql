@@ -18,8 +18,13 @@ ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_login timestamptz;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_key text;
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_env text DEFAULT 'sandbox';
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS asaas_auto_billing boolean DEFAULT false;
 ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS data_nascimento text;
+ALTER TABLE inquilinos ADD COLUMN IF NOT EXISTS documentos text[];
+ALTER TABLE contratos ADD COLUMN IF NOT EXISTS data_encerramento text;
+ALTER TABLE contratos ADD COLUMN IF NOT EXISTS motivo_encerramento text;
+ALTER TABLE contratos ADD COLUMN IF NOT EXISTS multa_rescisoria numeric;
+ALTER TABLE contratos ADD COLUMN IF NOT EXISTS valor_pendencias numeric;
+ALTER TABLE contratos ADD COLUMN IF NOT EXISTS termo_rescisao text;
 
 -- Adicionalmente, você pode atualizar os e-mails dos usuários que já existem
 -- vinculando-os com base nos metadados ou inserções da sessão. O sistema
