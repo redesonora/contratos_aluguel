@@ -14,6 +14,7 @@ import {
   Edit3,
   RefreshCw,
   Eye,
+  EyeOff,
   Clock,
   AlertTriangle,
   AlertCircle,
@@ -21,7 +22,8 @@ import {
   CheckCircle2,
   Filter,
   FileX,
-  Printer
+  Printer,
+  Loader2
 } from 'lucide-react';
 
 interface ContratosTabProps {
@@ -42,6 +44,8 @@ interface ContratosTabProps {
   setIsRenewModalOpen: (open: boolean) => void;
   setContractToRenew: (co: any) => void;
   handleOpenRescisaoModal?: (co: any) => void;
+  handleReactivateContract?: (co: any) => void;
+  reactivatingContractId?: string | null;
 }
 
 export interface ContractExpirationInfo {
@@ -165,22 +169,35 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
   setItemToDelete,
   setIsRenewModalOpen,
   setContractToRenew,
-  handleOpenRescisaoModal
+  handleOpenRescisaoModal,
+  handleReactivateContract,
+  reactivatingContractId
 }) => {
-  const [filterMode, setFilterMode] = useState<'todos' | 'vencendo' | 'vigentes' | 'vencidos'>('todos');
+  // Helper para identificar contratos encerrados / finalizados / rescindidos
+  const isContratoFinalizado = (co: any) => {
+    const s = String(co?.status || '').toLowerCase().trim();
+    return s === 'finalizado' || s === 'cancelado' || s === 'encerrado' || s === 'rescindido' || !!co?.data_encerramento;
+  };
+
+  const [filterMode, setFilterMode] = useState<'todos' | 'vencendo' | 'vigentes' | 'vencidos' | 'finalizados'>('todos');
+  const [hideFinalizados, setHideFinalizados] = useState<boolean>(true);
 
   const activeContratos = contratos.filter(c => !c.arquivado);
   
   // Contadores para os filtros rápidos
   const stats = activeContratos.reduce((acc, co) => {
-    const exp = getContractExpirationInfo(co.data_fim, co.status);
-    if (co.status === 'ativo' || !co.status) {
+    const isEncerrado = isContratoFinalizado(co);
+    if (isEncerrado) {
+      acc.finalizados++;
+    } else {
+      acc.ativos++;
+      const exp = getContractExpirationInfo(co.data_fim, co.status);
       if (exp.isExpiringSoon) acc.vencendo++;
       else if (exp.isExpired) acc.vencidos++;
       else acc.vigentes++;
     }
     return acc;
-  }, { vencendo: 0, vencidos: 0, vigentes: 0 });
+  }, { vencendo: 0, vencidos: 0, vigentes: 0, finalizados: 0, ativos: 0 });
 
   // Busca textual
   const searchedContratos = activeContratos.filter(co => {
@@ -192,12 +209,29 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
     return matchEndereco || matchApelido || matchInquilino || matchProprietario;
   });
 
-  // Filtro por modo (todos / vencendo / vigentes / vencidos)
+  // Filtro por modo e controle de ocultar finalizados
   const filteredContratos = searchedContratos.filter(co => {
-    if (filterMode === 'todos') return true;
+    const isEncerrado = isContratoFinalizado(co);
+
+    // Se o usuário clicou especificamente na aba "Finalizados"
+    if (filterMode === 'finalizados') {
+      return isEncerrado;
+    }
+
+    // Se a opção de ocultar finalizados estiver ativa, oculta-os das outras visualizações
+    if (hideFinalizados && isEncerrado) {
+      return false;
+    }
+
+    // Se for 'todos', permite todos (ou todos ativos se hideFinalizados estiver ligado)
+    if (filterMode === 'todos') {
+      return true;
+    }
+
+    // Modos específicos aplicam-se apenas a contratos em andamento / ativos
+    if (isEncerrado) return false;
+
     const exp = getContractExpirationInfo(co.data_fim, co.status);
-    const isActive = co.status === 'ativo' || !co.status;
-    if (!isActive) return false;
     if (filterMode === 'vencendo') return exp.isExpiringSoon;
     if (filterMode === 'vencidos') return exp.isExpired;
     if (filterMode === 'vigentes') return !exp.isExpiringSoon && !exp.isExpired;
@@ -208,13 +242,14 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
   // 1. Contratos próximos a vencer no topo (0 a 30 dias), ordenados do mais próximo para o mais distante.
   // 2. Contratos vencidos ativos.
   // 3. Demais contratos vigentes ordenados cronologicamente pelo término mais próximo.
-  // 4. Sem data de término ou finalizados ao final.
+  // 4. Sem data de término.
+  // 5. Finalizados / encerrados ao final.
   const sortedContratos = [...filteredContratos].sort((a, b) => {
     const expA = getContractExpirationInfo(a.data_fim, a.status);
     const expB = getContractExpirationInfo(b.data_fim, b.status);
 
     const getRank = (exp: ContractExpirationInfo, co: any) => {
-      if (co.status === 'finalizado' || co.status === 'cancelado') return 4;
+      if (isContratoFinalizado(co)) return 5;
       if (exp.daysRemaining === null) return 4;
       if (exp.isExpiringSoon) return 1; // Prioridade máxima: vence em até 30 dias
       if (exp.isExpired) return 2;      // Vencidos ativos
@@ -478,7 +513,7 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
                 filterMode === 'todos' ? 'bg-zinc-700 text-white' : 'bg-zinc-200 text-zinc-700'
               }`}>
-                {activeContratos.length}
+                {hideFinalizados ? stats.ativos : activeContratos.length}
               </span>
             </button>
 
@@ -534,11 +569,70 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
                 </span>
               </button>
             )}
+
+            {stats.finalizados > 0 && (
+              <button
+                onClick={() => {
+                  setFilterMode('finalizados');
+                  setHideFinalizados(false);
+                }}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  filterMode === 'finalizados'
+                    ? 'bg-rose-600 text-white shadow-xs ring-2 ring-rose-300'
+                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100/80 border border-rose-300'
+                }`}
+                title="Exibir apenas contratos encerrados / finalizados"
+              >
+                <FileX size={12} className={filterMode === 'finalizados' ? 'text-white' : 'text-rose-600'} />
+                <span>Finalizados</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  filterMode === 'finalizados' ? 'bg-rose-700 text-white' : 'bg-rose-200 text-rose-900'
+                }`}>
+                  {stats.finalizados}
+                </span>
+              </button>
+            )}
           </div>
 
-          <div className="text-[11px] text-zinc-500 font-medium flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-            <span>Ordenados por proximidade do vencimento</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {stats.finalizados > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (filterMode === 'finalizados') {
+                    setFilterMode('todos');
+                    setHideFinalizados(true);
+                  } else {
+                    setHideFinalizados(prev => !prev);
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                  hideFinalizados && filterMode !== 'finalizados'
+                    ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 shadow-2xs'
+                    : 'bg-zinc-100 text-zinc-700 border-zinc-200 hover:bg-zinc-200/80'
+                }`}
+                title={hideFinalizados && filterMode !== 'finalizados' ? "Contratos finalizados estão ocultos da listagem. Clique para exibir." : "Contratos finalizados estão visíveis. Clique para ocultar."}
+              >
+                {hideFinalizados && filterMode !== 'finalizados' ? (
+                  <EyeOff size={13} className="text-rose-600" />
+                ) : (
+                  <Eye size={13} className="text-zinc-600" />
+                )}
+                <span>{hideFinalizados && filterMode !== 'finalizados' ? 'Finalizados ocultos' : 'Finalizados visíveis'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  hideFinalizados && filterMode !== 'finalizados'
+                    ? 'bg-rose-200 text-rose-800'
+                    : 'bg-zinc-200 text-zinc-700'
+                }`}>
+                  {stats.finalizados}
+                </span>
+              </button>
+            )}
+
+            <div className="text-[11px] text-zinc-500 font-medium flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              <span>Ordenados por proximidade</span>
+            </div>
           </div>
         </div>
       </div>
@@ -547,19 +641,38 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {sortedContratos.map((co) => {
           const expInfo = getContractExpirationInfo(co.data_fim, co.status);
-          const isAtivo = co.status === 'ativo' || !co.status;
+          const isEncerrado = isContratoFinalizado(co);
+          const isAtivo = !isEncerrado;
 
           return (
             <div 
               key={co.id} 
               className={`rounded-xl border shadow-[0_1px_2px_rgba(0,0,0,0.03)] overflow-hidden flex flex-col transition-all relative ${
-                isAtivo && expInfo.isExpiringSoon
+                isEncerrado
+                  ? 'bg-gradient-to-b from-rose-50/40 via-white to-white border-rose-300 ring-1 ring-rose-200/80 shadow-rose-500/5 hover:border-rose-400'
+                  : isAtivo && expInfo.isExpiringSoon
                   ? 'bg-gradient-to-b from-amber-50/40 via-white to-white border-amber-300 ring-1 ring-amber-200/70 hover:border-amber-400 hover:shadow-md hover:shadow-amber-500/5'
                   : isAtivo && expInfo.isExpired
                   ? 'bg-gradient-to-b from-rose-50/40 via-white to-white border-rose-300 ring-1 ring-rose-200/60 hover:border-rose-400'
                   : 'bg-white border-zinc-200/80 hover:border-zinc-300'
               }`}
             >
+              {/* Alerta Visual de Contrato Finalizado / Encerrado Destacado em Vermelho */}
+              {isEncerrado && (
+                <div className="bg-gradient-to-r from-rose-100 via-rose-50 to-red-50/80 border-b border-rose-200 px-4 py-2 flex items-center justify-between text-rose-950">
+                  <div className="flex items-center gap-2 text-xs font-bold text-rose-900">
+                    <FileX size={14} className="text-rose-600 flex-shrink-0" />
+                    <span>
+                      Contrato Finalizado / Encerrado
+                      {co.data_encerramento && ` • ${new Date(co.data_encerramento + 'T12:00:00').toLocaleDateString('pt-BR')}`}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-700 bg-rose-200/80 px-2.5 py-0.5 rounded-full border border-rose-300 shadow-2xs">
+                    {co.status === 'cancelado' ? 'Cancelado' : 'Finalizado'}
+                  </span>
+                </div>
+              )}
+
               {/* Alerta Visual Sutil no Topo do Card para Contratos com Vencimento Próximo (1 mês) */}
               {isAtivo && expInfo.isExpiringSoon && (
                 <div className="bg-gradient-to-r from-amber-100/90 via-amber-50 to-orange-50/70 border-b border-amber-200 px-4 py-2 flex items-center justify-between text-amber-950">
@@ -593,11 +706,13 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${
-                          isAtivo && expInfo.isExpiringSoon 
+                          isEncerrado
+                            ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                            : isAtivo && expInfo.isExpiringSoon 
                             ? 'bg-amber-100 text-amber-700' 
                             : 'bg-zinc-100 text-zinc-600'
                         }`}>
-                          <Building size={13} />
+                          {isEncerrado ? <FileX size={13} /> : <Building size={13} />}
                         </div>
                         <h4 className="text-xs font-semibold text-zinc-900 line-clamp-1">
                           {co.imoveis?.apelido || co.imoveis?.endereco || 'Item sem identificação'}
@@ -615,12 +730,15 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
                           <span>{expInfo.daysRemaining === 0 ? 'Vence hoje' : `${expInfo.daysRemaining}d restantes`}</span>
                         </div>
                       )}
-                      <div className={`text-[11px] px-2 py-0.5 rounded-md font-medium border flex-shrink-0 ${
-                        isAtivo ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' : 
-                        co.status === 'finalizado' ? 'bg-zinc-100 text-zinc-600 border-zinc-200/60' : 
-                        'bg-rose-50 text-rose-700 border-rose-200/60'
+                      <div className={`text-[11px] px-2.5 py-0.5 rounded-md font-bold border flex-shrink-0 flex items-center gap-1 shadow-2xs ${
+                        isEncerrado
+                          ? 'bg-rose-100 text-rose-700 border-rose-300 ring-1 ring-rose-200'
+                          : isAtivo
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
+                          : 'bg-rose-50 text-rose-700 border-rose-200/60'
                       }`}>
-                        {isAtivo ? 'Ativo' : co.status === 'finalizado' ? 'Finalizado' : 'Cancelado'}
+                        {isEncerrado && <FileX size={11} className="text-rose-600" />}
+                        <span>{isEncerrado ? (co.status === 'cancelado' ? 'Cancelado' : 'Finalizado') : 'Ativo'}</span>
                       </div>
                     </div>
                   </div>
@@ -641,9 +759,11 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Datas de Início e Término */}
+                  {/* Datas de Início e Término / Encerramento */}
                   <div className={`grid grid-cols-2 gap-3 rounded-lg p-3 border text-xs transition-colors ${
-                    isAtivo && expInfo.isExpiringSoon 
+                    isEncerrado
+                      ? 'bg-rose-50/50 border-rose-200/80'
+                      : isAtivo && expInfo.isExpiringSoon 
                       ? 'bg-amber-50/60 border-amber-200/80' 
                       : isAtivo && expInfo.isExpired
                       ? 'bg-rose-50/50 border-rose-200/80'
@@ -656,22 +776,34 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
                       </span>
                     </div>
                     <div className={`border-l pl-3 ${
-                      isAtivo && expInfo.isExpiringSoon ? 'border-amber-200' : 'border-zinc-200/60'
+                      isEncerrado ? 'border-rose-200' : isAtivo && expInfo.isExpiringSoon ? 'border-amber-200' : 'border-zinc-200/60'
                     }`}>
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider block">Término</span>
+                        <span className={`text-[10px] font-medium uppercase tracking-wider block ${
+                          isEncerrado ? 'text-rose-600 font-bold' : 'text-zinc-400'
+                        }`}>
+                          {isEncerrado && co.data_encerramento ? 'Encerramento' : 'Término'}
+                        </span>
                         {isAtivo && expInfo.isExpiringSoon && (
                           <span className="text-[9px] font-bold text-amber-700 bg-amber-100/90 px-1.5 py-0.2 rounded">
                             {expInfo.statusLabel}
                           </span>
                         )}
+                        {isEncerrado && (
+                          <span className="text-[9px] font-bold text-rose-700 bg-rose-200/80 px-1.5 py-0.2 rounded">
+                            Encerrado
+                          </span>
+                        )}
                       </div>
                       <span className={`font-medium ${
+                        isEncerrado ? 'text-rose-700 font-bold' :
                         isAtivo && expInfo.isExpired ? 'text-rose-600 font-semibold' : 
                         isAtivo && expInfo.isExpiringSoon ? 'text-amber-800 font-semibold' : 
                         'text-zinc-700'
                       }`}>
-                        {co.data_fim ? new Date(co.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '--/--/----'}
+                        {isEncerrado && co.data_encerramento
+                          ? new Date(co.data_encerramento + 'T12:00:00').toLocaleDateString('pt-BR')
+                          : co.data_fim ? new Date(co.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '--/--/----'}
                       </span>
                     </div>
                   </div>
@@ -710,7 +842,9 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
 
               {/* Rodapé de Ações */}
               <div className={`border-t px-4 py-2.5 flex items-center justify-between gap-2 ${
-                isAtivo && expInfo.isExpiringSoon 
+                isEncerrado
+                  ? 'bg-rose-50/40 border-rose-200/70'
+                  : isAtivo && expInfo.isExpiringSoon 
                   ? 'bg-amber-50/50 border-amber-200/70' 
                   : 'bg-zinc-50/75 border-zinc-200/80'
               }`}>
@@ -763,14 +897,44 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
                       <span>Encerrar</span>
                     </button>
                   ) : (
-                    <button 
-                      onClick={() => handleOpenRescisaoModal ? handleOpenRescisaoModal(co) : handleFinishContract(co)}
-                      className="px-2.5 py-1 text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200/80 border border-zinc-200/80 rounded-md transition-colors inline-flex items-center gap-1 shadow-2xs"
-                      title="Visualizar e imprimir termo de rescisão"
-                    >
-                      <Printer size={13} />
-                      <span>Termo Rescisão</span>
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => handleOpenRescisaoModal ? handleOpenRescisaoModal(co) : handleFinishContract(co)}
+                        className="px-2.5 py-1 text-xs font-semibold text-rose-700 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200/90 rounded-md transition-colors inline-flex items-center gap-1 shadow-2xs"
+                        title="Visualizar e imprimir termo de rescisão"
+                      >
+                        <Printer size={12} />
+                        <span>Termo</span>
+                      </button>
+                      <button 
+                        type="button"
+                        disabled={reactivatingContractId === co.id}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (handleReactivateContract) {
+                            await handleReactivateContract(co);
+                          }
+                        }}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors inline-flex items-center gap-1.5 shadow-2xs ${
+                          reactivatingContractId === co.id
+                            ? 'bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed'
+                            : 'text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/90 cursor-pointer active:scale-95'
+                        }`}
+                        title="Reverter encerramento e reativar contrato"
+                      >
+                        {reactivatingContractId === co.id ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin text-emerald-600" />
+                            <span>Reativando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw size={12} className="text-emerald-600" />
+                            <span>Reativar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                   {isAtivo && (
                     <button 
@@ -822,6 +986,20 @@ export const ContratosTab: React.FC<ContratosTabProps> = ({
               ? 'Não há contratos nesta categoria no momento.' 
               : 'Sua busca não retornou resultados ou você ainda não possui contratos registrados.'}
           </p>
+          {hideFinalizados && stats.finalizados > 0 && filterMode !== 'finalizados' && (
+            <div className="mt-3">
+              <button 
+                onClick={() => {
+                  setFilterMode('finalizados');
+                  setHideFinalizados(false);
+                }}
+                className="text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3.5 py-1.5 rounded-lg transition-colors inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              >
+                <Eye size={13} className="text-rose-600" />
+                <span>Exibir {stats.finalizados === 1 ? '1 contrato finalizado oculto' : `${stats.finalizados} contratos finalizados ocultos`}</span>
+              </button>
+            </div>
+          )}
           {(contractSearch || filterMode !== 'todos') && (
             <div className="flex items-center gap-2 mt-4">
               {contractSearch && (

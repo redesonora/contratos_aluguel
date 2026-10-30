@@ -607,7 +607,7 @@ export const ModelosContratoTab: React.FC<ModelosContratoTabProps> = ({
                 <div>
                    <h2 className="text-sm font-semibold text-zinc-900">Excluir Modelo?</h2>
                    <p className="text-xs text-zinc-500 font-normal mt-1 leading-relaxed">
-                     O modelo <strong className="text-zinc-800 font-medium">"{contractTemplates.find(t => t.id === templateToDelete)?.name}"</strong> será removido permanentemente.
+                     O modelo <strong className="text-zinc-800 font-medium">&quot;{contractTemplates.find(t => t.id === templateToDelete)?.name}&quot;</strong> será removido permanentemente.
                    </p>
                 </div>
                 

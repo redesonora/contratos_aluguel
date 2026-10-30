@@ -114,6 +114,7 @@ import { UsuariosTab } from '../components/tabs/UsuariosTab';
 import { ConfiguracoesTab } from '../components/tabs/ConfiguracoesTab';
 import { ModelosContratoTab } from '../components/tabs/ModelosContratoTab';
 import { TermoRescisaoModal, RescisaoData } from '../components/modals/TermoRescisaoModal';
+import { ReactivateContractModal } from '../components/modals/ReactivateContractModal';
 import { LandingPage } from './components/LandingPage';
 export default function DashboardPage() {
   const isGleisonMaster = (email: string) => {
@@ -225,8 +226,21 @@ export default function DashboardPage() {
   const [selectedContractForFinance, setSelectedContractForFinance] = useState<Contrato | null>(null);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
   const [contractToRenew, setContractToRenew] = useState<Contrato | null>(null);
+  const [renewRentValue, setRenewRentValue] = useState<string>('');
+
+  useEffect(() => {
+    if (contractToRenew) {
+      setRenewRentValue((contractToRenew.valor_aluguel || 0).toString());
+    }
+  }, [contractToRenew]);
+
   const [isRescisaoModalOpen, setIsRescisaoModalOpen] = useState(false);
   const [contractToRescind, setContractToRescind] = useState<Contrato | null>(null);
+  const [isReactivateModalOpen, setIsReactivateModalOpen] = useState(false);
+  const [contractToReactivate, setContractToReactivate] = useState<Contrato | null>(null);
+  const [reactivateLoading, setReactivateLoading] = useState(false);
+  const [reactivateError, setReactivateError] = useState<string | null>(null);
+  const [reactivatingContractId, setReactivatingContractId] = useState<string | null>(null);
   const itemsPerPage = 8;
 
   const recordLog = useCallback(async (acao: string, tabela: string, registroId?: string, detalhes?: any) => {
@@ -337,6 +351,15 @@ export default function DashboardPage() {
     });
   };
 
+  const isPaymentInactiveOrFinalized = useCallback((p: any) => {
+    if (p.status === StatusPagamento.PAGO) return false;
+    if (p.status === StatusPagamento.FINALIZADO || p.status === StatusPagamento.CANCELADO) return true;
+    const co = p.contratos || contratos.find(c => c.id === p.contrato_id);
+    const coStatus = (co?.status || '').toLowerCase();
+    const hasEncerramento = Boolean(co?.data_encerramento);
+    return coStatus === 'finalizado' || coStatus === 'encerrado' || coStatus === 'rescindido' || hasEncerramento;
+  }, [contratos]);
+
   const monthlyCashFlowData = React.useMemo(() => {
     const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const currentYear = new Date().getFullYear();
@@ -350,7 +373,7 @@ export default function DashboardPage() {
         .reduce((acc, p) => acc + (p.valor_pago || 0), 0);
         
       const pendente = monthPagamentos
-        .filter(p => p.status !== StatusPagamento.PAGO)
+        .filter(p => p.status !== StatusPagamento.PAGO && !isPaymentInactiveOrFinalized(p))
         .reduce((acc, p) => acc + (p.valor_esperado || p.contratos?.valor_aluguel || 0), 0);
         
       return {
@@ -359,10 +382,10 @@ export default function DashboardPage() {
         pendente
       };
     });
-  }, [pagamentos]);
+  }, [pagamentos, isPaymentInactiveOrFinalized]);
 
   const stats = React.useMemo(() => {
-    const activeContratos = contratos.filter(c => !c.arquivado);
+    const activeContratos = contratos.filter(c => !c.arquivado && c.status !== 'finalizado' && c.status !== 'encerrado' && c.status !== 'rescindido');
     const activeImoveis = imoveis.filter(i => !i.arquivado);
     const totalImoveis = activeImoveis.length;
     const alugadosCount = activeImoveis.filter(i => i.status === 'Alugado').length;
@@ -375,7 +398,7 @@ export default function DashboardPage() {
     const currentMonthPagamentos = pagamentos.filter(p => p.competencia_mes === currentMonth && p.competencia_ano === currentYear);
     
     const aReceber = currentMonthPagamentos
-      .filter(p => !p.status || p.status === StatusPagamento.PENDENTE || p.status === StatusPagamento.ATRASADO)
+      .filter(p => !isPaymentInactiveOrFinalized(p) && (!p.status || p.status === StatusPagamento.PENDENTE || p.status === StatusPagamento.ATRASADO))
       .reduce((acc, p) => acc + (p.valor_esperado || p.contratos?.valor_aluguel || 0), 0);
       
     const recebido = currentMonthPagamentos
@@ -383,7 +406,7 @@ export default function DashboardPage() {
       .reduce((acc, p) => acc + (p.valor_pago || 0), 0);
       
     const inadimplenciaCount = currentMonthPagamentos
-      .filter(p => p.status === StatusPagamento.ATRASADO || (!p.status && new Date(p.data_vencimento) < now))
+      .filter(p => !isPaymentInactiveOrFinalized(p) && (p.status === StatusPagamento.ATRASADO || (!p.status && new Date(p.data_vencimento) < now)))
       .length;
 
     return {
@@ -397,7 +420,7 @@ export default function DashboardPage() {
       disponiveisCount,
       alugadosPercent: totalImoveis > 0 ? (alugadosCount / totalImoveis) * 100 : 0
     };
-  }, [contratos, imoveis, pagamentos]);
+  }, [contratos, imoveis, pagamentos, isPaymentInactiveOrFinalized]);
 
   const getPaginatedAndSortedData = useCallback((data: any[], tab: string) => {
     const { key, direction } = sortConfig[tab] || { key: '', direction: 'asc' };
@@ -1474,7 +1497,96 @@ Para resolver isso:
       
       setProprietarios(prRes.data || []);
       setContratos(coRes.data || []);
-      setPagamentos(paRes.data || []);
+
+      // Auto-correção e saneamento para parcelas geradas indevidamente antes da data de início do contrato
+      const rawPagamentos = paRes.data || [];
+      const correctedPagamentos = [...rawPagamentos];
+      
+      const invalidPayments = rawPagamentos.filter((p: any) => {
+        if (!p.contratos || !p.contratos.data_inicio || !p.data_vencimento) return false;
+        if (p.status === StatusPagamento.PAGO) return false;
+        
+        const dataInicioStr = p.contratos.data_inicio.split('T')[0];
+        const dataVencStr = p.data_vencimento.split('T')[0];
+        return dataVencStr < dataInicioStr;
+      });
+
+      if (invalidPayments.length > 0) {
+        for (const invP of invalidPayments) {
+          const parts = invP.data_vencimento.split('-');
+          const dueDay = parseInt(parts[2], 10) || invP.contratos.dia_vencimento || 15;
+          const contractStartDate = new Date(invP.contratos.data_inicio + 'T12:00:00');
+          let nextMonth = contractStartDate.getMonth() + 1;
+          let nextYear = contractStartDate.getFullYear();
+          if (nextMonth > 11) {
+            nextMonth = 0;
+            nextYear += 1;
+          }
+          const lastDayOfNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
+          const targetDay = Math.min(dueDay, lastDayOfNextMonth);
+          const targetDueDate = new Date(nextYear, nextMonth, targetDay);
+          const targetDueDateStr = targetDueDate.toISOString().split('T')[0];
+          const targetMonthNum = nextMonth + 1;
+
+          const alreadyHasNext = rawPagamentos.some((other: any) => 
+            other.contrato_id === invP.contrato_id && 
+            other.id !== invP.id && 
+            other.competencia_mes === targetMonthNum && 
+            other.competencia_ano === nextYear
+          );
+
+          if (alreadyHasNext) {
+            supabase.from('pagamentos').delete().eq('id', invP.id).then(() => {});
+            const idx = correctedPagamentos.findIndex((p: any) => p.id === invP.id);
+            if (idx !== -1) correctedPagamentos.splice(idx, 1);
+          } else {
+            supabase.from('pagamentos').update({
+              data_vencimento: targetDueDateStr,
+              competencia_mes: targetMonthNum,
+              competencia_ano: nextYear,
+              status: StatusPagamento.PENDENTE
+            }).eq('id', invP.id).then(() => {});
+
+            invP.data_vencimento = targetDueDateStr;
+            invP.competencia_mes = targetMonthNum;
+            invP.competencia_ano = nextYear;
+            invP.status = StatusPagamento.PENDENTE;
+          }
+        }
+      }
+
+      // Auto-finalização de parcelas restantes de contratos que já estão finalizados/encerrados (ex: contrato da Jonaina)
+      const finalizedContractMap = new Map<string, any>();
+      (coRes.data || []).forEach((c: any) => {
+        const cStatus = (c.status || '').toLowerCase();
+        if (cStatus === 'finalizado' || cStatus === 'encerrado' || cStatus === 'rescindido' || c.data_encerramento) {
+          finalizedContractMap.set(c.id, c);
+        }
+      });
+
+      const pagamentosToFinalize: string[] = [];
+
+      correctedPagamentos.forEach((p: any) => {
+        if (finalizedContractMap.has(p.contrato_id)) {
+          if (p.status !== StatusPagamento.PAGO && p.status !== StatusPagamento.FINALIZADO && p.status !== StatusPagamento.CANCELADO) {
+            p.status = StatusPagamento.FINALIZADO;
+            pagamentosToFinalize.push(p.id);
+          }
+        }
+      });
+
+      if (pagamentosToFinalize.length > 0) {
+        console.log(`Auto-finalizando ${pagamentosToFinalize.length} parcelas restantes de contratos finalizados/encerrados...`);
+        supabase
+          .from('pagamentos')
+          .update({ status: 'Finalizado' })
+          .in('id', pagamentosToFinalize)
+          .then(({ error }: any) => {
+            if (error) console.warn('Aviso ao persistir parcelas finalizadas:', error);
+          });
+      }
+
+      setPagamentos(correctedPagamentos);
 
       // Migração e carregamento de templates do banco
       const userStorageKey = `contratos_templates_${session.user.id}`;
@@ -1594,7 +1706,12 @@ Para resolver isso:
       const threshold = new Date();
       threshold.setDate(threshold.getDate() + notificationDays);
       
-      const contracts = (coRes.data as Contrato[] || []).filter(c => !c.arquivado);
+      const contracts = (coRes.data as Contrato[] || []).filter(c => {
+        if (c.arquivado) return false;
+        const cStatus = (c.status || '').toLowerCase();
+        if (cStatus === 'finalizado' || cStatus === 'encerrado' || cStatus === 'rescindido' || c.data_encerramento) return false;
+        return true;
+      });
       
       // 1. Contract Expirations
       const expirations = contracts.filter(c => {
@@ -2196,12 +2313,13 @@ Para resolver isso:
       
       const existingKeys = new Set((existingPagamentos || []).map((p: any) => `${p.competencia_mes}_${p.competencia_ano}`));
 
-      // Ajuste de fuso horário
-      const startDate = new Date(startDateStr + 'T12:00:00');
-      const endDate = new Date(endDateStr + 'T12:00:00');
+      // Ajuste de datas (início às 00:00:00 e fim às 23:59:59 para comparações seguras)
+      const startDate = new Date(startDateStr + 'T00:00:00');
+      const endDate = new Date(endDateStr + 'T23:59:59');
       
       const parcelas = [];
-      let currentDate = new Date(startDate);
+      // Iniciar a varredura mensal a partir do primeiro dia do mês de início do contrato
+      let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
       
       let safetyCounter = 0;
       while (currentDate <= endDate && safetyCounter < 120) {
@@ -2209,12 +2327,13 @@ Para resolver isso:
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth() + 1;
         
-        if (!existingKeys.has(`${month}_${year}`)) {
-          // Calcular dia de vencimento real
-          const lastDayOfMonth = new Date(year, month, 0).getDate();
-          const actualDueDay = Math.min(dueDay || 5, lastDayOfMonth);
-          const dueDate = new Date(year, month - 1, actualDueDay);
-          
+        // Calcular dia de vencimento real do mês
+        const lastDayOfMonth = new Date(year, month, 0).getDate();
+        const actualDueDay = Math.min(dueDay || 5, lastDayOfMonth);
+        const dueDate = new Date(year, month - 1, actualDueDay, 12, 0, 0);
+        
+        // Validação estrita: o vencimento nunca pode ser anterior ao início do contrato
+        if (dueDate >= startDate && !existingKeys.has(`${month}_${year}`)) {
           parcelas.push({
             contrato_id: contract.id,
             valor_esperado: rentValue,
@@ -2363,6 +2482,17 @@ Para resolver isso:
         if (imError) console.warn('Erro ao liberar imóvel:', imError);
       }
 
+      // 2.1 Finalizar as prestações restantes não pagas do contrato rescindido para cessar cobranças e valores a receber
+      try {
+        await supabase
+          .from('pagamentos')
+          .update({ status: 'Finalizado' })
+          .eq('contrato_id', contract.id)
+          .neq('status', StatusPagamento.PAGO);
+      } catch (errP) {
+        console.warn('Aviso ao finalizar prestações restantes no Supabase:', errP);
+      }
+
       // 3. Registrar auditoria
       await recordLog('FINALIZAR_RESCISAO', 'contratos', contract.id, { 
         inquilino: inquilinoNome,
@@ -2377,15 +2507,151 @@ Para resolver isso:
       await fetchData();
       setIsRescisaoModalOpen(false);
       setContractToRescind(null);
-      alert('Contrato encerrado e finalizado com sucesso! O imóvel associado agora está Disponível para nova locação.');
     } catch (err: any) {
       console.error('Erro ao finalizar contrato:', err);
-      const msg = err.message || 'Erro inesperado';
+      const msg = err.message || 'Erro inesperado ao finalizar contrato.';
       setErrorMsg(msg);
-      alert('Erro ao finalizar contrato: ' + msg);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleOpenReactivateModal = (contract: Contrato) => {
+    setContractToReactivate(contract);
+    setReactivateError(null);
+    setIsReactivateModalOpen(true);
+  };
+
+  const handleConfirmReactivate = async (contract: Contrato) => {
+    if (!contract || !contract.id) {
+      setReactivateError('Identificador do contrato inválido.');
+      return;
+    }
+
+    try {
+      setReactivatingContractId(contract.id);
+      setReactivateLoading(true);
+      setReactivateError(null);
+
+      // 1. Verificação de integridade: consultar dados atuais do contrato no banco
+      const { data: dbContract, error: dbFetchErr } = await supabase
+        .from('contratos')
+        .select('id, imovel_id, inquilino_id, status, arquivado')
+        .eq('id', contract.id)
+        .single();
+
+      if (dbFetchErr || !dbContract) {
+        throw new Error('Contrato não localizado no banco de dados. Atualize a listagem e tente novamente.');
+      }
+
+      if (dbContract.status === 'ativo') {
+        throw new Error('Este contrato já se encontra com status Ativo no sistema.');
+      }
+
+      // 2. Verificação de segurança e conflito de ocupação do imóvel:
+      // Garante que o imóvel não possui outro contrato ativo concorrente antes de reverter status
+      if (dbContract.imovel_id) {
+        const { data: activeContracts, error: activeErr } = await supabase
+          .from('contratos')
+          .select('id, status, inquilinos(nome)')
+          .eq('imovel_id', dbContract.imovel_id)
+          .eq('status', 'ativo')
+          .neq('id', contract.id);
+
+        if (!activeErr && activeContracts && activeContracts.length > 0) {
+          const locatarioAtual = (activeContracts[0] as any)?.inquilinos?.nome || 'Outro inquilino';
+          throw new Error(
+            `Não é possível reativar o contrato: O imóvel já possui outro contrato ATIVO em vigor (Locatário: ${locatarioAtual}). Para evitar duplicidade de locação, finalize o contrato atual antes de reativar este.`
+          );
+        }
+      }
+
+      // 3. Atualizar contrato para 'ativo' e limpar dados de rescisão
+      const updatePayload: Record<string, any> = { 
+        status: 'ativo',
+        data_encerramento: null,
+        motivo_encerramento: null,
+        multa_rescisoria: null,
+        valor_pendencias: null,
+        termo_rescisao: null
+      };
+
+      let { error: coError } = await supabase
+        .from('contratos')
+        .update(updatePayload)
+        .eq('id', contract.id);
+
+      // Fallback para caso colunas opcionais de rescisão não existam no schema
+      if (coError) {
+        console.warn('Tentativa com payload completo falhou, aplicando fallback:', coError.message);
+        const fallbackPayload: Record<string, any> = {
+          status: 'ativo',
+          data_encerramento: null,
+          motivo_encerramento: null
+        };
+        const { error: fallbackErr } = await supabase
+          .from('contratos')
+          .update(fallbackPayload)
+          .eq('id', contract.id);
+        
+        if (fallbackErr) throw fallbackErr;
+      }
+
+      // 4. Apenas após a integridade do contrato ser validada e salva, reverter status do imóvel para 'Alugado'
+      if (dbContract.imovel_id) {
+        const { error: imError } = await supabase
+          .from('imoveis')
+          .update({ status: 'Alugado' })
+          .eq('id', dbContract.imovel_id);
+
+        if (imError) {
+          console.warn('Aviso: Erro ao reverter status do imóvel para Alugado:', imError.message);
+        }
+      }
+
+      // Reverter parcelas finalizadas para pendente ao reativar contrato
+      try {
+        await supabase
+          .from('pagamentos')
+          .update({ status: StatusPagamento.PENDENTE })
+          .eq('contrato_id', contract.id)
+          .eq('status', 'Finalizado');
+      } catch (errP) {
+        console.warn('Aviso ao reativar parcelas:', errP);
+      }
+
+      // 5. Registrar no Log de Auditoria
+      const inquilinoNome = contract.inquilinos?.nome || 'Não identificado';
+      const imovelIdent = contract.imoveis?.apelido || contract.imoveis?.endereco || 'Não identificado';
+      await recordLog('REATIVAR_CONTRATO', 'contratos', contract.id, { 
+        inquilino: inquilinoNome,
+        imovel: imovelIdent,
+        imovel_id: dbContract.imovel_id,
+        status_anterior: dbContract.status,
+        novo_status: 'ativo',
+        imovel_status_revertido: 'Alugado',
+        usuario_responsavel: session?.user?.email || session?.user?.id || 'Usuário',
+        data_reativacao: new Date().toISOString()
+      });
+
+      // 6. Atualizar estado local e fechar modal
+      setIsReactivateModalOpen(false);
+      setContractToReactivate(null);
+      setSuccess(true);
+      await fetchData();
+    } catch (err: any) {
+      console.error('Erro na reativação do contrato:', err);
+      const msg = err.message || 'Erro inesperado ao reativar contrato.';
+      setReactivateError(msg);
+      setErrorMsg(msg);
+    } finally {
+      setReactivateLoading(false);
+      setReactivatingContractId(null);
+    }
+  };
+
+  const handleReactivateContract = (contract: Contrato) => {
+    handleOpenReactivateModal(contract);
   };
 
   const generateReceiptPDF = () => {
@@ -3988,6 +4254,8 @@ Para resolver isso:
             setIsRenewModalOpen={setIsRenewModalOpen}
             setContractToRenew={setContractToRenew}
             handleOpenRescisaoModal={handleOpenRescisaoModal}
+            handleReactivateContract={handleReactivateContract}
+            reactivatingContractId={reactivatingContractId}
           />
         );
       }
@@ -4696,7 +4964,7 @@ Para resolver isso:
               >
                 Sair da Conta
               </button>
-              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.9.1</p>
+              <p className="text-[10px] font-black text-white/30 uppercase tracking-widest text-center mt-1">v1.9.4</p>
             </div>
           </div>
 
@@ -5037,7 +5305,7 @@ Para resolver isso:
           >
             Sair da Conta
           </button>
-          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.9.2</p>
+          <p className="text-[10px] font-black text-blue-500/70 uppercase tracking-widest text-center mt-2.5">v1.9.9</p>
         </div>
       </aside>
 
@@ -6717,169 +6985,214 @@ Para resolver isso:
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 custom-scrollbar">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Resumo do Contrato</h4>
-                     <div className="space-y-3">
-                        <div className="flex justify-between items-center text-sm">
-                           <span className="text-slate-500 font-medium">Valor do Aluguel:</span>
-                           <span className="font-black text-slate-800">{formatarMoeda(selectedContractForFinance.valor_aluguel)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                           <span className="text-slate-500 font-medium">Dia Vencimento:</span>
-                           <span className="font-black text-slate-800">Todo dia {selectedContractForFinance.dia_vencimento}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm border-t border-slate-50 pt-2">
-                           <span className="text-slate-500 font-medium">Total Recebido:</span>
-                           <span className="font-black text-green-600">{formatarMoeda(pagamentos
-                             .filter(p => p.contrato_id === selectedContractForFinance.id && p.status === StatusPagamento.PAGO)
-                             .reduce((acc, p) => acc + (p.valor_pago || 0), 0))}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                           <span className="text-slate-500 font-medium">Saldo Pendente:</span>
-                           <span className="font-black text-amber-600">{formatarMoeda(pagamentos
-                             .filter(p => p.contrato_id === selectedContractForFinance.id && p.status !== StatusPagamento.PAGO)
-                             .reduce((acc, p) => acc + (p.valor_esperado || 0), 0))}</span>
-                        </div>
-                        <div className="pt-4 mt-2 border-t border-slate-100 flex flex-col gap-2">
-                           {(!selectedContractForFinance.arquivado) && (
-                             <button
-                               onClick={() => {
-                                 handleFinishContract(selectedContractForFinance);
-                                 setFinanceModalOpen(false);
-                               }}
-                               className="w-full py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2"
-                             >
-                               <Ban size={14} />
-                               Finalizar Contrato
-                             </button>
-                           )}
-                        </div>
-                     </div>
-                  </div>
+              {(() => {
+                const isContractClosed = selectedContractForFinance?.status === 'finalizado' || 
+                  selectedContractForFinance?.status === 'encerrado' || 
+                  selectedContractForFinance?.status === 'rescindido' || 
+                  Boolean(selectedContractForFinance?.data_encerramento);
 
-                  <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Controle de Parcelas</h4>
-                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                           <thead>
-                              <tr className="text-[10px] font-black text-slate-400 uppercase tracking-tight border-b border-slate-50">
-                                 <th className="pb-2">Mês/Ano</th>
-                                 <th className="pb-2">Vencimento</th>
-                                 <th className="pb-2">Valor</th>
-                                 <th className="pb-2 text-center">Status</th>
-                                 <th className="pb-2 text-right">Ações</th>
-                              </tr>
-                           </thead>
-                           <tbody className="divide-y divide-slate-50">
-                              {pagamentos
-                                .filter(p => p.contrato_id === selectedContractForFinance.id)
-                                .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
-                                .map(p => {
-                                  const today = new Date();
-                                  today.setHours(0, 0, 0, 0);
-                                  const vencimentoDate = new Date(p.data_vencimento + 'T00:00:00');
-                                  const isAtrasado = p.status !== StatusPagamento.PAGO && vencimentoDate < today;
+                const totalRecebido = pagamentos
+                  .filter(p => p.contrato_id === selectedContractForFinance.id && p.status === StatusPagamento.PAGO)
+                  .reduce((acc, p) => acc + (p.valor_pago || 0), 0);
 
-                                  return (
-                                    <tr key={p.id} className="text-sm hover:bg-slate-50/80 transition-colors">
-                                       <td className="py-3 font-bold text-slate-600">
-                                          {p.competencia_mes.toString().padStart(2, '0')}/{p.competencia_ano}
-                                       </td>
-                                       <td className="py-3 text-slate-500">
-                                          {new Date(p.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}
-                                       </td>
-                                       <td className="py-3 font-black text-slate-800">
-                                          {formatarMoeda(p.valor_esperado || selectedContractForFinance.valor_aluguel)}
-                                       </td>
-                                       <td className="py-3">
-                                          <div className="flex justify-center">
-                                            {p.status === StatusPagamento.PAGO ? (
-                                              <span className="text-[9px] font-black bg-green-50 text-green-600 px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1">
-                                                 <CheckCircle2 size={10} /> Pago
-                                              </span>
-                                            ) : isAtrasado ? (
-                                              <span className="text-[9px] font-black bg-red-50 text-red-600 px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1 animate-pulse">
-                                                 <AlertCircle size={10} /> Atrasado
-                                              </span>
-                                            ) : (
-                                              <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                                                 Pendente
-                                              </span>
-                                            )}
-                                          </div>
-                                       </td>
-                                       <td className="py-3 text-right">
-                                          {p.status !== StatusPagamento.PAGO ? (
-                                            <button 
-                                              onClick={() => handleMarkAsPaid(p, p.valor_esperado || selectedContractForFinance.valor_aluguel)}
-                                              disabled={loading}
-                                              className={`bg-green-600 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-green-700 transition-all shadow-md shadow-green-100 flex items-center justify-center gap-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                            >
-                                              {loading && <Loader2 size={10} className="animate-spin" />}
-                                              Baixar
-                                            </button>
-                                          ) : (
-                                            <button 
-                                              onClick={() => {
-                                                const contrato = selectedContractForFinance;
-                                                const locadorNome = contrato?.proprietarios?.nome || contrato?.imoveis?.proprietarios?.nome || 'N/A';
-                                                const locadorCpf = contrato?.proprietarios?.cpf_cnpj || contrato?.imoveis?.proprietarios?.cpf_cnpj || 'N/A';
-                                                setReceiptData({
-                                                  inquilino: contrato?.inquilinos?.nome || 'N/A',
-                                                  cpf: contrato?.inquilinos?.cpf_cnpj || 'N/A',
-                                                  valor: p.valor_pago || 0,
-                                                  competencia: `${p.competencia_mes}/${p.competencia_ano}`,
-                                                  vencimento: p.data_vencimento ? new Date(p.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A',
-                                                  locador: locadorNome,
-                                                  locador_cpf: locadorCpf,
-                                                  endereco: contrato?.imoveis?.endereco || 'N/A',
-                                                  numero: contrato?.imoveis?.numero || '',
-                                                  complemento: contrato?.imoveis?.complemento || '',
-                                                  bairro: contrato?.imoveis?.bairro || '',
-                                                  cidade: contrato?.imoveis?.cidade || '',
-                                                  estado: contrato?.imoveis?.estado || '',
-                                                  cep: contrato?.imoveis?.cep || '',
-                                                  data: p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')
-                                                });
-                                                setReceiptModalOpen(true);
-                                              }}
-                                              className="text-slate-400 hover:text-blue-600 p-1"
-                                              title="Ver Recibo"
-                                            >
-                                              <Printer size={16} />
-                                            </button>
-                                          )}
-                                       </td>
+                const saldoPendente = isContractClosed 
+                  ? 0 
+                  : pagamentos
+                      .filter(p => p.contrato_id === selectedContractForFinance.id && p.status !== StatusPagamento.PAGO && p.status !== StatusPagamento.FINALIZADO && p.status !== StatusPagamento.CANCELADO)
+                      .reduce((acc, p) => acc + (p.valor_esperado || 0), 0);
+
+                const totalEfetivo = pagamentos
+                  .filter(p => p.contrato_id === selectedContractForFinance.id)
+                  .filter(p => {
+                    if (isContractClosed) return p.status === StatusPagamento.PAGO;
+                    return p.status !== StatusPagamento.FINALIZADO && p.status !== StatusPagamento.CANCELADO;
+                  })
+                  .reduce((acc, p) => acc + (p.valor_pago || p.valor_esperado || 0), 0);
+
+                return (
+                  <>
+                    <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50 custom-scrollbar">
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Resumo do Contrato</h4>
+                           <div className="space-y-3">
+                              <div className="flex justify-between items-center text-sm">
+                                 <span className="text-slate-500 font-medium">Valor do Aluguel:</span>
+                                 <span className="font-black text-slate-800">{formatarMoeda(selectedContractForFinance.valor_aluguel)}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-sm">
+                                 <span className="text-slate-500 font-medium">Dia Vencimento:</span>
+                                 <span className="font-black text-slate-800">Todo dia {selectedContractForFinance.dia_vencimento}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-sm border-t border-slate-50 pt-2">
+                                 <span className="text-slate-500 font-medium">Total Recebido:</span>
+                                 <span className="font-black text-green-600">{formatarMoeda(totalRecebido)}</span>
+                              </div>
+                              <div className="flex justify-between items-center text-sm">
+                                 <span className="text-slate-500 font-medium">Saldo Pendente:</span>
+                                 <span className={`font-black ${isContractClosed ? 'text-slate-400' : 'text-amber-600'}`}>{formatarMoeda(saldoPendente)}</span>
+                              </div>
+                              <div className="pt-4 mt-2 border-t border-slate-100 flex flex-col gap-2">
+                                 {(!selectedContractForFinance.arquivado) && (
+                                   isContractClosed ? (
+                                     <div className="w-full py-2.5 px-3 bg-red-50 border border-red-200/80 rounded-xl text-center flex flex-col items-center gap-1">
+                                       <span className="text-[10px] font-black text-red-600 uppercase tracking-widest flex items-center gap-1.5">
+                                         <Ban size={12} /> Contrato Finalizado
+                                       </span>
+                                       {selectedContractForFinance.data_encerramento && (
+                                         <span className="text-[10px] text-red-500 font-medium">
+                                           Encerrado em {new Date(selectedContractForFinance.data_encerramento + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                         </span>
+                                       )}
+                                     </div>
+                                   ) : (
+                                     <button
+                                       onClick={() => {
+                                         handleFinishContract(selectedContractForFinance);
+                                         setFinanceModalOpen(false);
+                                       }}
+                                       className="w-full py-2 bg-red-50 text-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                                     >
+                                       <Ban size={14} />
+                                       Finalizar Contrato
+                                     </button>
+                                   )
+                                 )}
+                              </div>
+                           </div>
+                        </div>
+
+                        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Controle de Parcelas</h4>
+                           <div className="overflow-x-auto">
+                              <table className="w-full text-left">
+                                 <thead>
+                                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-tight border-b border-slate-50">
+                                       <th className="pb-2">Mês/Ano</th>
+                                       <th className="pb-2">Vencimento</th>
+                                       <th className="pb-2">Valor</th>
+                                       <th className="pb-2 text-center">Status</th>
+                                       <th className="pb-2 text-right">Ações</th>
                                     </tr>
-                                  );
-                                })}
-                           </tbody>
-                        </table>
-                     </div>
-                  </div>
-                </div>
-              </div>
+                                 </thead>
+                                 <tbody className="divide-y divide-slate-50">
+                                    {pagamentos
+                                      .filter(p => p.contrato_id === selectedContractForFinance.id)
+                                      .sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime())
+                                      .map(p => {
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+                                        const vencimentoDate = new Date(p.data_vencimento + 'T00:00:00');
+                                        const isFinalizado = p.status === StatusPagamento.FINALIZADO || p.status === StatusPagamento.CANCELADO || (isContractClosed && p.status !== StatusPagamento.PAGO);
+                                        const isAtrasado = !isFinalizado && p.status !== StatusPagamento.PAGO && vencimentoDate < today;
 
-              <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center transition-all">
-                <div className="flex gap-4">
-                   <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total do Contrato</span>
-                      <span className="text-lg font-black text-slate-800">
-                        {formatarMoeda(pagamentos
-                          .filter(p => p.contrato_id === selectedContractForFinance.id)
-                          .reduce((acc, p) => acc + (p.valor_esperado || 0), 0))}
-                      </span>
-                   </div>
-                </div>
-                <button 
-                  onClick={() => setFinanceModalOpen(false)}
-                  className="px-8 py-3 bg-slate-900 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
-                >
-                  Fechar Painel
-                </button>
-              </div>
+                                        return (
+                                          <tr key={p.id} className="text-sm hover:bg-slate-50/80 transition-colors">
+                                             <td className="py-3 font-bold text-slate-600">
+                                                {p.competencia_mes.toString().padStart(2, '0')}/{p.competencia_ano}
+                                             </td>
+                                             <td className="py-3 text-slate-500">
+                                                {new Date(p.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                             </td>
+                                             <td className={`py-3 font-black ${isFinalizado ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                                                {formatarMoeda(p.valor_esperado || selectedContractForFinance.valor_aluguel)}
+                                             </td>
+                                             <td className="py-3">
+                                                <div className="flex justify-center">
+                                                  {p.status === StatusPagamento.PAGO ? (
+                                                    <span className="text-[9px] font-black bg-green-50 text-green-600 px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1">
+                                                       <CheckCircle2 size={10} /> Pago
+                                                    </span>
+                                                  ) : isFinalizado ? (
+                                                    <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1 border border-slate-200">
+                                                       <Ban size={10} /> Finalizada
+                                                    </span>
+                                                  ) : isAtrasado ? (
+                                                    <span className="text-[9px] font-black bg-red-50 text-red-600 px-2 py-0.5 rounded-full uppercase tracking-tighter flex items-center gap-1 animate-pulse">
+                                                       <AlertCircle size={10} /> Atrasado
+                                                    </span>
+                                                  ) : (
+                                                    <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+                                                       Pendente
+                                                    </span>
+                                                  )}
+                                                </div>
+                                             </td>
+                                             <td className="py-3 text-right">
+                                                {p.status === StatusPagamento.PAGO ? (
+                                                  <button 
+                                                    onClick={() => {
+                                                      const contrato = selectedContractForFinance;
+                                                      const locadorNome = contrato?.proprietarios?.nome || contrato?.imoveis?.proprietarios?.nome || 'N/A';
+                                                      const locadorCpf = contrato?.proprietarios?.cpf_cnpj || contrato?.imoveis?.proprietarios?.cpf_cnpj || 'N/A';
+                                                      setReceiptData({
+                                                        inquilino: contrato?.inquilinos?.nome || 'N/A',
+                                                        cpf: contrato?.inquilinos?.cpf_cnpj || 'N/A',
+                                                        valor: p.valor_pago || 0,
+                                                        competencia: `${p.competencia_mes}/${p.competencia_ano}`,
+                                                        vencimento: p.data_vencimento ? new Date(p.data_vencimento).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A',
+                                                        locador: locadorNome,
+                                                        locador_cpf: locadorCpf,
+                                                        endereco: contrato?.imoveis?.endereco || 'N/A',
+                                                        numero: contrato?.imoveis?.numero || '',
+                                                        complemento: contrato?.imoveis?.complemento || '',
+                                                        bairro: contrato?.imoveis?.bairro || '',
+                                                        cidade: contrato?.imoveis?.cidade || '',
+                                                        estado: contrato?.imoveis?.estado || '',
+                                                        cep: contrato?.imoveis?.cep || '',
+                                                        data: p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR')
+                                                      });
+                                                      setReceiptModalOpen(true);
+                                                    }}
+                                                    className="text-slate-400 hover:text-blue-600 p-1"
+                                                    title="Ver Recibo"
+                                                  >
+                                                    <Printer size={16} />
+                                                  </button>
+                                                ) : isFinalizado ? (
+                                                  <span className="text-[10px] text-slate-400 font-medium italic">
+                                                    Encerrada
+                                                  </span>
+                                                ) : (
+                                                  <button 
+                                                    onClick={() => handleMarkAsPaid(p, p.valor_esperado || selectedContractForFinance.valor_aluguel)}
+                                                    disabled={loading}
+                                                    className={`bg-green-600 text-white px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-green-700 transition-all shadow-md shadow-green-100 flex items-center justify-center gap-2 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                  >
+                                                    {loading && <Loader2 size={10} className="animate-spin" />}
+                                                    Baixar
+                                                  </button>
+                                                )}
+                                             </td>
+                                          </tr>
+                                        );
+                                      })}
+                                 </tbody>
+                              </table>
+                           </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-between items-center transition-all">
+                      <div className="flex gap-4">
+                         <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total do Contrato</span>
+                            <span className="text-lg font-black text-slate-800">
+                              {formatarMoeda(totalEfetivo)}
+                            </span>
+                         </div>
+                      </div>
+                      <button 
+                        onClick={() => setFinanceModalOpen(false)}
+                        className="px-8 py-3 bg-slate-900 text-white rounded-xl font-black uppercase tracking-widest text-xs hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
+                      >
+                        Fechar Painel
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             </motion.div>
           </div>
         )}
@@ -6887,110 +7200,182 @@ Para resolver isso:
       
       {/* Modal de Renovação */}
       <AnimatePresence>
-        {isRenewModalOpen && contractToRenew && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col"
-            >
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-600 text-white rounded-lg">
-                    <ArchiveRestore size={20} />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-black text-indigo-900 uppercase tracking-tight italic">Renovação de Contrato</h2>
-                    <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{contractToRenew.imoveis?.apelido || contractToRenew.imoveis?.endereco}</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setIsRenewModalOpen(false)}
-                  className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+        {isRenewModalOpen && contractToRenew && (() => {
+          const currentRentVal = contractToRenew.valor_aluguel || 0;
+          const igpmSuggested = Math.round(currentRentVal * (1 + 0.0485) * 100) / 100;
+          const ipcaSuggested = Math.round(currentRentVal * (1 + 0.0425) * 100) / 100;
 
-              <form onSubmit={handleRenewContract}>
-                <div className="p-6 space-y-5">
-                  <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 flex gap-3">
-                    <Info size={18} className="text-amber-500 shrink-0" />
-                    <p className="text-[10px] text-amber-700 font-medium leading-relaxed">
-                      A renovação irá estender a data final do contrato e opcionalmente atualizar o valor do aluguel. 
-                      <strong className="block mt-1">O histórico financeiro anterior será preservado.</strong>
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                      <FileText size={10} /> Data Atual de Vencimento
-                    </label>
-                    <input 
-                      type="text" 
-                      disabled
-                      value={new Date(contractToRenew.data_fim + 'T00:00:00').toLocaleDateString('pt-BR')}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-400 cursor-not-allowed"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                      <PlusCircle size={10} /> Nova Data de Término
-                    </label>
-                    <input 
-                      type="date" 
-                      name="nova_data_fim"
-                      required
-                      defaultValue={(() => {
-                        const d = new Date(contractToRenew.data_fim + 'T00:00:00');
-                        d.setFullYear(d.getFullYear() + 1);
-                        return d.toISOString().split('T')[0];
-                      })()}
-                      className="w-full px-4 py-2.5 bg-white border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 transition-all shadow-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                      <DollarSign size={10} /> Novo Valor do Aluguel (Opcional)
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
-                      <input 
-                        type="number" 
-                        step="0.01"
-                        name="novo_valor_aluguel"
-                        defaultValue={contractToRenew.valor_aluguel}
-                        className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 transition-all shadow-sm"
-                      />
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col"
+              >
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-indigo-50">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-600 text-white rounded-lg">
+                      <ArchiveRestore size={20} />
                     </div>
-                    <p className="text-[9px] text-slate-400 font-medium italic mt-1.5">Mantenha o valor atual ou aplique o reajuste negociado.</p>
+                    <div>
+                      <h2 className="text-lg font-black text-indigo-900 uppercase tracking-tight italic">Renovação de Contrato</h2>
+                      <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{contractToRenew.imoveis?.apelido || contractToRenew.imoveis?.endereco}</p>
+                    </div>
                   </div>
+                  <button 
+                    onClick={() => setIsRenewModalOpen(false)}
+                    className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
                 </div>
 
-                <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-3">
-                  <button 
-                    type="button"
-                    onClick={() => setIsRenewModalOpen(false)}
-                    className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-all"
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    type="submit"
-                    disabled={loading}
-                    className="flex-[2] py-3 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
-                  >
-                    {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                    Confirmar Renovação
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
+                <form onSubmit={handleRenewContract}>
+                  <div className="p-6 space-y-5">
+                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-100 flex gap-3">
+                      <Info size={18} className="text-amber-500 shrink-0" />
+                      <p className="text-[10px] text-amber-700 font-medium leading-relaxed">
+                        A renovação estende a vigência e calcula automaticamente os índices oficiais (IGP-M/FGV e IPCA). 
+                        <strong className="block mt-1">O campo do novo valor é totalmente editável para arredondamentos ou negociação.</strong>
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                          <FileText size={10} /> Vencimento Atual
+                        </label>
+                        <input 
+                          type="text" 
+                          disabled
+                          value={new Date(contractToRenew.data_fim + 'T00:00:00').toLocaleDateString('pt-BR')}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-400 cursor-not-allowed"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                          <PlusCircle size={10} /> Nova Data de Término
+                        </label>
+                        <input 
+                          type="date" 
+                          name="nova_data_fim"
+                          required
+                          defaultValue={(() => {
+                            const d = new Date(contractToRenew.data_fim + 'T00:00:00');
+                            d.setFullYear(d.getFullYear() + 1);
+                            return d.toISOString().split('T')[0];
+                          })()}
+                          className="w-full px-4 py-2.5 bg-white border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-700 outline-none focus:border-indigo-400 transition-all shadow-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Simulador de Índices Automáticos */}
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">📊 Simulador de Reajuste (12 Meses)</span>
+                        <span className="text-[10px] font-bold text-slate-400">Atual: R$ {currentRentVal.toFixed(2).replace('.', ',')}</span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRenewRentValue(igpmSuggested.toFixed(2))}
+                          className="p-2.5 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl text-left transition-all group"
+                        >
+                          <span className="text-[9px] font-black text-indigo-600 block uppercase tracking-tight">IGP-M/FGV (4.85%)</span>
+                          <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-900 block mt-0.5">R$ {igpmSuggested.toFixed(2).replace('.', ',')}</span>
+                          <span className="text-[8px] text-indigo-500 font-semibold underline mt-1 block">Aplicar Sugestão</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setRenewRentValue(ipcaSuggested.toFixed(2))}
+                          className="p-2.5 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 rounded-xl text-left transition-all group"
+                        >
+                          <span className="text-[9px] font-black text-blue-600 block uppercase tracking-tight">IPCA/IBGE (4.25%)</span>
+                          <span className="text-xs font-bold text-slate-800 group-hover:text-blue-900 block mt-0.5">R$ {ipcaSuggested.toFixed(2).replace('.', ',')}</span>
+                          <span className="text-[8px] text-blue-500 font-semibold underline mt-1 block">Aplicar Sugestão</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setRenewRentValue(currentRentVal.toFixed(2))}
+                          className="p-2.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition-all group"
+                        >
+                          <span className="text-[9px] font-black text-slate-600 block uppercase tracking-tight">Manter Valor</span>
+                          <span className="text-xs font-bold text-slate-800 block mt-0.5">R$ {currentRentVal.toFixed(2).replace('.', ',')}</span>
+                          <span className="text-[8px] text-slate-500 font-semibold underline mt-1 block">Manter Atual</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center justify-between">
+                        <span className="flex items-center gap-1"><DollarSign size={10} /> Novo Valor do Aluguel (Editável)</span>
+                        <span className="text-[9px] text-indigo-600 font-bold lowercase">Arredonde ou ajuste livremente</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          name="novo_valor_aluguel"
+                          value={renewRentValue}
+                          onChange={(e) => setRenewRentValue(e.target.value)}
+                          required
+                          className="w-full pl-10 pr-4 py-3 bg-white border-2 border-indigo-200 focus:border-indigo-600 rounded-xl text-base font-black text-indigo-900 outline-none transition-all shadow-sm"
+                        />
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = parseFloat(renewRentValue) || currentRentVal;
+                            setRenewRentValue((Math.ceil(val / 10) * 10).toFixed(2));
+                          }}
+                          className="px-2.5 py-1 text-[9px] font-black bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md transition-colors"
+                        >
+                          ⬆️ Arredondar para Cima (R$ 10)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = parseFloat(renewRentValue) || currentRentVal;
+                            setRenewRentValue((Math.floor(val / 10) * 10).toFixed(2));
+                          }}
+                          className="px-2.5 py-1 text-[9px] font-black bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md transition-colors"
+                        >
+                          ⬇️ Arredondar para Baixo (R$ 10)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 border-t border-slate-100 bg-slate-50 flex gap-3">
+                    <button 
+                      type="button"
+                      onClick={() => setIsRenewModalOpen(false)}
+                      className="flex-1 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={loading}
+                      className="flex-[2] py-3 bg-indigo-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+                    >
+                      {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                      Confirmar Renovação
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* Confirmation Modal */}
@@ -7220,6 +7605,22 @@ Para resolver isso:
         contrato={contractToRescind}
         onConfirmEncerramento={handleConfirmRescisao}
         loading={loading}
+      />
+
+      {/* Modal de Reativação Segura de Contrato */}
+      <ReactivateContractModal
+        isOpen={isReactivateModalOpen}
+        onClose={() => {
+          if (!reactivateLoading) {
+            setIsReactivateModalOpen(false);
+            setContractToReactivate(null);
+            setReactivateError(null);
+          }
+        }}
+        contrato={contractToReactivate}
+        onConfirmReactivate={handleConfirmReactivate}
+        loading={reactivateLoading}
+        errorMessage={reactivateError}
       />
 
       <style jsx global>{`

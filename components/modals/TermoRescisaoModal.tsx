@@ -160,12 +160,15 @@ export const TermoRescisaoModal: React.FC<TermoRescisaoModalProps> = ({
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
             * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body {
+              height: 100%;
+            }
             body {
               font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-              color: #1e293b;
+              color: #0f172a;
               background: #f8fafc;
-              line-height: 1.6;
-              font-size: 11pt;
+              line-height: 1.48;
+              font-size: 10pt;
               -webkit-print-color-adjust: exact;
             }
             .no-print {
@@ -206,63 +209,52 @@ export const TermoRescisaoModal: React.FC<TermoRescisaoModalProps> = ({
             }
             .page {
               width: 210mm;
-              min-height: 297mm;
-              margin: 80px auto 40px auto;
+              margin: 40px auto 20px auto;
               background: white;
-              padding: 25mm 22mm;
+              padding: 10mm 12mm;
               box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+              box-sizing: border-box;
             }
             .doc-header {
               text-align: center;
               border-bottom: 2px solid #0f172a;
-              padding-bottom: 14px;
-              margin-bottom: 24px;
+              padding-bottom: 4px;
+              margin-bottom: 6px;
             }
             .doc-header h1 {
-              font-size: 15pt;
+              font-size: 11pt;
               font-weight: 800;
-              letter-spacing: 0.02em;
+              letter-spacing: 0.01em;
               color: #0f172a;
               text-transform: uppercase;
-              margin-bottom: 4px;
+              margin-bottom: 2px;
+              line-height: 1.2;
             }
             .doc-header h2 {
-              font-size: 10pt;
+              font-size: 8pt;
               font-weight: 600;
               color: #475569;
               text-transform: uppercase;
-              letter-spacing: 0.08em;
-            }
-            .section {
-              margin-bottom: 18px;
-              text-align: justify;
-              text-justify: inter-word;
-            }
-            .section-title {
-              font-size: 10.5pt;
-              font-weight: 700;
-              color: #0f172a;
-              margin-bottom: 6px;
-              text-transform: uppercase;
-              letter-spacing: 0.04em;
+              letter-spacing: 0.05em;
             }
             .partes-box {
               background: #f8fafc;
               border: 1px solid #e2e8f0;
               border-radius: 6px;
-              padding: 12px 14px;
-              margin-bottom: 16px;
-              font-size: 10pt;
-              line-height: 1.5;
+              padding: 6px 10px;
+              margin-bottom: 6px;
+              font-size: 8.5pt;
+              line-height: 1.34;
             }
             .partes-box strong {
               color: #0f172a;
             }
             .clause {
-              margin-bottom: 14px;
-              font-size: 10pt;
-              line-height: 1.6;
+              margin-bottom: 5px;
+              font-size: 8.6pt;
+              line-height: 1.34;
               text-align: justify;
+              text-justify: inter-word;
             }
             .clause strong {
               color: #0f172a;
@@ -270,12 +262,12 @@ export const TermoRescisaoModal: React.FC<TermoRescisaoModalProps> = ({
             .summary-table {
               width: 100%;
               border-collapse: collapse;
-              margin: 12px 0;
-              font-size: 9.5pt;
+              margin: 4px 0 3px 0;
+              font-size: 8.2pt;
             }
             .summary-table th, .summary-table td {
               border: 1px solid #cbd5e1;
-              padding: 6px 10px;
+              padding: 2.5px 6px;
             }
             .summary-table th {
               background: #f1f5f9;
@@ -286,45 +278,68 @@ export const TermoRescisaoModal: React.FC<TermoRescisaoModalProps> = ({
               text-align: right;
               font-weight: 600;
             }
+            .doc-footer {
+              margin-top: 26px;
+            }
+            .data-line {
+              font-size: 8.8pt;
+              text-align: right;
+              color: #334155;
+              margin-bottom: 38px;
+            }
             .signatures {
-              margin-top: 45px;
               page-break-inside: avoid;
-            }
-            .sig-row {
+              break-inside: avoid;
               display: flex;
-              justify-content: space-between;
-              gap: 30px;
-              margin-top: 40px;
+              flex-direction: column;
+              gap: 38px;
             }
-            .sig-col {
-              flex: 1;
+            .sig-block {
               text-align: center;
+              width: 72%;
+              max-width: 400px;
+              margin: 0 auto;
             }
             .sig-line {
-              border-top: 1px solid #0f172a;
-              margin-bottom: 6px;
+              border-top: 1.2px solid #0f172a;
+              margin-bottom: 5px;
+              width: 100%;
             }
             .sig-name {
-              font-size: 9.5pt;
+              font-size: 8.5pt;
               font-weight: 700;
               color: #0f172a;
               text-transform: uppercase;
             }
             .sig-role {
-              font-size: 8.5pt;
+              font-size: 7.2pt;
               color: #64748b;
+              margin-top: 2px;
+            }
+            @page {
+              size: A4 portrait;
+              margin: 8mm 12mm 8mm 12mm;
             }
             @media print {
-              body { background: white; margin: 0; padding: 0; }
+              html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                height: auto !important;
+              }
               .no-print { display: none !important; }
               .page {
-                margin: 0;
-                padding: 18mm 18mm;
-                box-shadow: none;
-                width: 100%;
-                min-height: auto;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                border: none !important;
+                page-break-inside: avoid !important;
+                page-break-after: avoid !important;
+                break-inside: avoid !important;
               }
-              @page { size: A4; margin: 0; }
             }
           </style>
         </head>
@@ -335,129 +350,129 @@ export const TermoRescisaoModal: React.FC<TermoRescisaoModalProps> = ({
           </div>
 
           <div class="page">
-            <div class="doc-header">
-              <h1>Termo de Rescisão Contratual, Distrato e Devolução de Chaves</h1>
-              <h2>Instrumento Particular de Encerramento de Locação e Quitação</h2>
-            </div>
-
-            <div class="partes-box">
-              <p><strong>LOCADOR(A) / CEDENTE:</strong> ${locadorNome}, inscrito(a) no CPF/CNPJ sob o nº ${locadorCpf}.</p>
-              <p style="margin-top: 4px;"><strong>LOCATÁRIO(A):</strong> ${locatarioNome}, inscrito(a) no CPF sob o nº ${locatarioCpf}.</p>
-              ${contrato.inquilinos?.nome_fiador ? `
-                <p style="margin-top: 4px;"><strong>FIADOR(A):</strong> ${contrato.inquilinos.nome_fiador}, inscrito(a) no CPF nº ${contrato.inquilinos.cpf_fiador || 'Não informado'}.</p>
-              ` : ''}
-              <p style="margin-top: 4px;"><strong>IMÓVEL LOCADO:</strong> ${imovelCompleto}.</p>
-            </div>
-
-            <div class="clause">
-              <strong>CLÁUSULA PRIMEIRA - DA RESCISÃO CONTRATUAL:</strong>
-              As partes retro qualificadas, de comum acordo e nos termos da Lei Federal nº 8.245/1991 (Lei do Inquilinato) e do Código Civil Brasileiro, resolvem <strong>RESCINDIR E DECLARAR ENCERRADO</strong> o Contrato de Locação celebrado em <strong>${dataInicioBR}</strong>, com término originalmente previsto para <strong>${dataFimBR}</strong>, fixando a data efetiva de rescisão e desocupação em <strong>${dataEncerramentoBR}</strong>.
-            </div>
-
-            <div class="clause">
-              <strong>CLÁUSULA SEGUNDA - DA MOTIVAÇÃO:</strong>
-              O presente distrato ocorre pelo seguinte motivo: <em>"${motivo}"</em>.
-            </div>
-
-            <div class="clause">
-              <strong>CLÁUSULA TERCEIRA - DA DEVOLUÇÃO DAS CHAVES E DESOCUPAÇÃO:</strong>
-              O(A) LOCATÁRIO(A) restitui expressamente neste ato ao(à) LOCADOR(A) a posse direta do imóvel locado, livre e desocupado de pessoas e pertences, acompanhado da totalidade das chaves pertinentes ao imóvel. A partir desta data cessa a obrigação do(a) Locatário(a) quanto ao pagamento de aluguéis vincendos.
-            </div>
-
-            <div class="clause">
-              <strong>CLÁUSULA QUARTA - DA VISTORIA DE SAÍDA:</strong>
-              Foi procedida à conferência física e vistoria final do imóvel, apurando-se a seguinte situação: <em>${statusVistoria}</em>.
-            </div>
-
-            <div class="clause">
-              <strong>CLÁUSULA QUINTA - DO ACERTO FINANCEIRO E MULTA RESCISÓRIA:</strong>
-              Para o encerramento do contrato, as partes pactuam os seguintes acertos:
-              <table class="summary-table">
-                <thead>
-                  <tr>
-                    <th>Item de Ajuste</th>
-                    <th style="width: 220px; text-align: right;">Condição / Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Multa por rescisão antecipada</td>
-                    <td class="amount">${isentarMulta ? 'ISENTA (Acordo amigável)' : formatCurrency(valorMulta)}</td>
-                  </tr>
-                  <tr>
-                    <td>Aluguel proporcional aos dias de uso</td>
-                    <td class="amount">${aluguelProporcional > 0 ? formatCurrency(aluguelProporcional) : 'Quitado'}</td>
-                  </tr>
-                  <tr>
-                    <td>Encargos / Contas de consumo / Pendências</td>
-                    <td class="amount">${pendenciasContas > 0 ? formatCurrency(pendenciasContas) : 'Quitadas'}</td>
-                  </tr>
-                  <tr style="background: #f8fafc; font-weight: 700;">
-                    <td><strong>TOTAL DEVIDO PARA QUITAÇÃO</strong></td>
-                    <td class="amount" style="color: #0f172a; font-size: 10.5pt;"><strong>${formatCurrency(totalAcerto)}</strong></td>
-                  </tr>
-                </tbody>
-              </table>
-              <p style="font-size: 9pt; color: #475569; margin-top: 4px;">
-                <strong>Detalhamento das pendências:</strong> ${descricaoPendencias || 'Sem pendências financeiras registradas.'}
-              </p>
-            </div>
-
-            ${observacoes ? `
-              <div class="clause">
-                <strong>CLÁUSULA SEXTA - DISPOSIÇÕES ESPECÍFICAS / OBSERVAÇÕES:</strong>
-                ${observacoes}
+            <div class="doc-body">
+              <div class="doc-header">
+                <h1>Termo de Rescisão Contratual, Distrato e Devolução de Chaves</h1>
+                <h2>Instrumento Particular de Encerramento de Locação e Quitação</h2>
               </div>
-            ` : ''}
 
-            <div class="clause">
-              <strong>CLÁUSULA ${observacoes ? 'SÉTIMA' : 'SEXTA'} - DA QUITAÇÃO RECÍPROCA:</strong>
-              Com o adimplemento dos eventuais valores acordados na Cláusula Quinta e a devolução das chaves, as partes outorgam-se mútua, plena, rasa, geral e irrevogável quitação de todas as obrigações principais e acessórias decorrentes da relação locatícia, nada mais tendo a exigir uma da outra, seja a que título for, em juízo ou fora dele.
+              <div class="partes-box">
+                <p><strong>LOCADOR(A) / CEDENTE:</strong> ${locadorNome}, inscrito(a) no CPF/CNPJ sob o nº ${locadorCpf}.</p>
+                <p style="margin-top: 4px;"><strong>LOCATÁRIO(A):</strong> ${locatarioNome}, inscrito(a) no CPF sob o nº ${locatarioCpf}.</p>
+                ${contrato.inquilinos?.nome_fiador ? `
+                  <p style="margin-top: 4px;"><strong>FIADOR(A):</strong> ${contrato.inquilinos.nome_fiador}, inscrito(a) no CPF nº ${contrato.inquilinos.cpf_fiador || 'Não informado'}.</p>
+                ` : ''}
+                <p style="margin-top: 4px;"><strong>IMÓVEL LOCADO:</strong> ${imovelCompleto}.</p>
+              </div>
+
+              <div class="clause">
+                <strong>CLÁUSULA PRIMEIRA - DA RESCISÃO CONTRATUAL:</strong>
+                As partes retro qualificadas, de comum acordo e nos termos da Lei Federal nº 8.245/1991 (Lei do Inquilinato) e do Código Civil Brasileiro, resolvem <strong>RESCINDIR E DECLARAR ENCERRADO</strong> o Contrato de Locação celebrado em <strong>${dataInicioBR}</strong>, com término originalmente previsto para <strong>${dataFimBR}</strong>, fixando a data efetiva de rescisão e desocupação em <strong>${dataEncerramentoBR}</strong>.
+              </div>
+
+              <div class="clause">
+                <strong>CLÁUSULA SEGUNDA - DA MOTIVAÇÃO:</strong>
+                O presente distrato ocorre pelo seguinte motivo: <em>"${motivo}"</em>.
+              </div>
+
+              <div class="clause">
+                <strong>CLÁUSULA TERCEIRA - DA DEVOLUÇÃO DAS CHAVES E DESOCUPAÇÃO:</strong>
+                O(A) LOCATÁRIO(A) restitui expressamente neste ato ao(à) LOCADOR(A) a posse direta do imóvel locado, livre e desocupado de pessoas e pertences, acompanhado da totalidade das chaves pertinentes ao imóvel. A partir desta data cessa a obrigação do(a) Locatário(a) quanto ao pagamento de aluguéis vincendos.
+              </div>
+
+              <div class="clause">
+                <strong>CLÁUSULA QUARTA - DA VISTORIA DE SAÍDA:</strong>
+                Foi procedida à conferência física e vistoria final do imóvel, apurando-se a seguinte situação: <em>${statusVistoria}</em>.
+              </div>
+
+              <div class="clause">
+                <strong>CLÁUSULA QUINTA - DO ACERTO FINANCEIRO E MULTA RESCISÓRIA:</strong>
+                Para o encerramento do contrato, as partes pactuam os seguintes acertos:
+                <table class="summary-table">
+                  <thead>
+                    <tr>
+                      <th>Item de Ajuste</th>
+                      <th style="width: 220px; text-align: right;">Condição / Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Multa por rescisão antecipada</td>
+                      <td class="amount">${isentarMulta ? 'ISENTA (Acordo amigável)' : formatCurrency(valorMulta)}</td>
+                    </tr>
+                    <tr>
+                      <td>Aluguel proporcional aos dias de uso</td>
+                      <td class="amount">${aluguelProporcional > 0 ? formatCurrency(aluguelProporcional) : 'Quitado'}</td>
+                    </tr>
+                    <tr>
+                      <td>Encargos / Contas de consumo / Pendências</td>
+                      <td class="amount">${pendenciasContas > 0 ? formatCurrency(pendenciasContas) : 'Quitadas'}</td>
+                    </tr>
+                    <tr style="background: #f8fafc; font-weight: 700;">
+                      <td><strong>TOTAL DEVIDO PARA QUITAÇÃO</strong></td>
+                      <td class="amount" style="color: #0f172a; font-size: 10.5pt;"><strong>${formatCurrency(totalAcerto)}</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p style="font-size: 9pt; color: #475569; margin-top: 4px;">
+                  <strong>Detalhamento das pendências:</strong> ${descricaoPendencias || 'Sem pendências financeiras registradas.'}
+                </p>
+              </div>
+
+              ${observacoes ? `
+                <div class="clause">
+                  <strong>CLÁUSULA SEXTA - DISPOSIÇÕES ESPECÍFICAS / OBSERVAÇÕES:</strong>
+                  ${observacoes}
+                </div>
+              ` : ''}
+
+              <div class="clause">
+                <strong>CLÁUSULA ${observacoes ? 'SÉTIMA' : 'SEXTA'} - DA QUITAÇÃO RECÍPROCA:</strong>
+                Com o adimplemento dos eventuais valores acordados na Cláusula Quinta e a devolução das chaves, as partes outorgam-se mútua, plena, rasa, geral e irrevogável quitação de todas as obrigações principais e acessórias decorrentes da relação locatícia, nada mais tendo a exigir uma da outra, seja a que título for, em juízo ou fora dele.
+              </div>
+
+              <div class="clause">
+                <strong>CLÁUSULA ${observacoes ? 'OITAVA' : 'SÉTIMA'} - DO FORO:</strong>
+                Para dirimir quaisquer dúvidas oriundas do presente instrumento, as partes elegem o foro da Comarca do imóvel, com renúncia de qualquer outro por mais privilegiado que seja.
+              </div>
             </div>
 
-            <div class="clause">
-              <strong>CLÁUSULA ${observacoes ? 'OITAVA' : 'SÉTIMA'} - DO FORO:</strong>
-              Para dirimir quaisquer dúvidas oriundas do presente instrumento, as partes elegem o foro da Comarca do imóvel, com renúncia de qualquer outro por mais privilegiado que seja.
-            </div>
+            <div class="doc-footer">
+              <p class="data-line">
+                ${contrato.imoveis?.cidade || 'Belo Horizonte'} - ${contrato.imoveis?.estado || 'MG'}, ${dataExtenso}.
+              </p>
 
-            <p style="margin-top: 24px; font-size: 10pt; text-align: right;">
-              ${contrato.imoveis?.cidade || 'Belo Horizonte'} - ${contrato.imoveis?.estado || 'MG'}, ${dataExtenso}.
-            </p>
-
-            <div class="signatures">
-              <div class="sig-row">
-                <div class="sig-col">
+              <div class="signatures">
+                <div class="sig-block">
                   <div class="sig-line"></div>
                   <div class="sig-name">${locadorNome}</div>
-                  <div class="sig-role">LOCADOR(A) / ADMINISTRADOR(A)</div>
+                  <div class="sig-role">LOCADOR(A) / ADMINISTRADOR(A) ${locadorCpf ? `(CPF: ${locadorCpf})` : ''}</div>
                 </div>
-                <div class="sig-col">
+
+                <div class="sig-block">
                   <div class="sig-line"></div>
                   <div class="sig-name">${locatarioNome}</div>
-                  <div class="sig-role">LOCATÁRIO(A)</div>
+                  <div class="sig-role">LOCATÁRIO(A) ${locatarioCpf ? `(CPF: ${locatarioCpf})` : ''}</div>
                 </div>
-              </div>
 
-              ${contrato.inquilinos?.nome_fiador ? `
-                <div class="sig-row" style="margin-top: 30px;">
-                  <div class="sig-col" style="max-width: 50%; margin: 0 auto;">
+                ${contrato.inquilinos?.nome_fiador ? `
+                  <div class="sig-block">
                     <div class="sig-line"></div>
                     <div class="sig-name">${contrato.inquilinos.nome_fiador}</div>
-                    <div class="sig-role">FIADOR(A)</div>
+                    <div class="sig-role">FIADOR(A) ${contrato.inquilinos?.cpf_fiador ? `(CPF: ${contrato.inquilinos.cpf_fiador})` : ''}</div>
                   </div>
-                </div>
-              ` : ''}
+                ` : ''}
 
-              <div class="sig-row" style="margin-top: 35px;">
-                <div class="sig-col">
+                <div class="sig-block">
                   <div class="sig-line"></div>
                   <div class="sig-name">Testemunha 1</div>
-                  <div class="sig-role">Nome e CPF: _______________________</div>
+                  <div class="sig-role">Nome e CPF: _____________________________________________</div>
                 </div>
-                <div class="sig-col">
+
+                <div class="sig-block">
                   <div class="sig-line"></div>
                   <div class="sig-name">Testemunha 2</div>
-                  <div class="sig-role">Nome e CPF: _______________________</div>
+                  <div class="sig-role">Nome e CPF: _____________________________________________</div>
                 </div>
               </div>
             </div>
@@ -771,11 +786,11 @@ export const TermoRescisaoModal: React.FC<TermoRescisaoModalProps> = ({
                 </div>
 
                 <p>
-                  <strong>1. DA RESCISÃO:</strong> Pelo presente instrumento, as partes resolvem, de mútuo acordo, rescindir integralmente o contrato de locação vigente entre as partes, dando-o por encerrado a partir de {formatDateBR(dataEncerramento)}. Motivação: <em>"{motivo}"</em>.
+                  <strong>1. DA RESCISÃO:</strong> Pelo presente instrumento, as partes resolvem, de mútuo acordo, rescindir integralmente o contrato de locação vigente entre as partes, dando-o por encerrado a partir de {formatDateBR(dataEncerramento)}. Motivação: <em>&quot;{motivo}&quot;</em>.
                 </p>
 
                 <p>
-                  <strong>2. DA DEVOLUÇÃO DE CHAVES E VISTORIA:</strong> O Locatário restitui neste ato a posse direta do imóvel locado com a entrega das chaves. Vistoria: <em>"{statusVistoria}"</em>.
+                  <strong>2. DA DEVOLUÇÃO DE CHAVES E VISTORIA:</strong> O Locatário restitui neste ato a posse direta do imóvel locado com a entrega das chaves. Vistoria: <em>&quot;{statusVistoria}&quot;</em>.
                 </p>
 
                 <p>
@@ -790,8 +805,38 @@ export const TermoRescisaoModal: React.FC<TermoRescisaoModalProps> = ({
                   <strong>4. DA QUITAÇÃO:</strong> Satisfeitas as condições, as partes outorgam-se mutuamente a mais plena, geral e irrevogável quitação de todas as obrigações do contrato rescindido.
                 </p>
 
-                <div className="text-right text-[11px] text-zinc-500 pt-3 border-t border-zinc-200">
+                <div className="text-right text-[11px] text-zinc-500 pt-3 border-t border-zinc-200 mb-6">
                   {contrato.imoveis?.cidade || 'Belo Horizonte'} - {contrato.imoveis?.estado || 'MG'}, {formatDateExtenso(dataEncerramento)}.
+                </div>
+
+                <div className="space-y-6 pt-2 max-w-sm mx-auto text-center">
+                  <div>
+                    <div className="border-t border-zinc-800 w-full mb-1"></div>
+                    <p className="text-[11px] font-bold uppercase text-zinc-900">{locadorNome}</p>
+                    <p className="text-[10px] text-zinc-500 uppercase">LOCADOR(A) / ADMINISTRADOR(A)</p>
+                  </div>
+                  <div>
+                    <div className="border-t border-zinc-800 w-full mb-1"></div>
+                    <p className="text-[11px] font-bold uppercase text-zinc-900">{locatarioNome}</p>
+                    <p className="text-[10px] text-zinc-500 uppercase">LOCATÁRIO(A)</p>
+                  </div>
+                  {contrato.inquilinos?.nome_fiador && (
+                    <div>
+                      <div className="border-t border-zinc-800 w-full mb-1"></div>
+                      <p className="text-[11px] font-bold uppercase text-zinc-900">{contrato.inquilinos.nome_fiador}</p>
+                      <p className="text-[10px] text-zinc-500 uppercase">FIADOR(A)</p>
+                    </div>
+                  )}
+                  <div>
+                    <div className="border-t border-zinc-800 w-full mb-1"></div>
+                    <p className="text-[11px] font-bold text-zinc-900">Testemunha 1</p>
+                    <p className="text-[10px] text-zinc-500">Nome e CPF: _________________________________</p>
+                  </div>
+                  <div>
+                    <div className="border-t border-zinc-800 w-full mb-1"></div>
+                    <p className="text-[11px] font-bold text-zinc-900">Testemunha 2</p>
+                    <p className="text-[10px] text-zinc-500">Nome e CPF: _________________________________</p>
+                  </div>
                 </div>
               </div>
             )}

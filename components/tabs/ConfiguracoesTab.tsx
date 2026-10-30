@@ -518,7 +518,9 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
       if (supabase && data.proprietarios && data.proprietarios.length > 0) {
         const cleanProps = data.proprietarios.map(p => sanitizeRecord(p, currentUserId));
         for (const item of cleanProps) {
-          await supabase.from('proprietarios').upsert(item, { onConflict: 'id' }).catch(() => {});
+          try {
+            await supabase.from('proprietarios').upsert(item, { onConflict: 'id' });
+          } catch {}
         }
       }
 
@@ -527,7 +529,9 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
       if (supabase && data.inquilinos && data.inquilinos.length > 0) {
         const cleanInq = data.inquilinos.map(i => sanitizeRecord(i, currentUserId));
         for (const item of cleanInq) {
-          await supabase.from('inquilinos').upsert(item, { onConflict: 'id' }).catch(() => {});
+          try {
+            await supabase.from('inquilinos').upsert(item, { onConflict: 'id' });
+          } catch {}
         }
       }
 
@@ -536,7 +540,9 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
       if (supabase && data.imoveis && data.imoveis.length > 0) {
         const cleanImov = data.imoveis.map(im => sanitizeRecord(im, currentUserId));
         for (const item of cleanImov) {
-          await supabase.from('imoveis').upsert(item, { onConflict: 'id' }).catch(() => {});
+          try {
+            await supabase.from('imoveis').upsert(item, { onConflict: 'id' });
+          } catch {}
         }
       }
 
@@ -545,7 +551,9 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
       if (supabase && data.contratos && data.contratos.length > 0) {
         const cleanContr = data.contratos.map(c => sanitizeRecord(c, currentUserId));
         for (const item of cleanContr) {
-          await supabase.from('contratos').upsert(item, { onConflict: 'id' }).catch(() => {});
+          try {
+            await supabase.from('contratos').upsert(item, { onConflict: 'id' });
+          } catch {}
         }
       }
 
@@ -554,7 +562,9 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
       if (supabase && data.pagamentos && data.pagamentos.length > 0) {
         const cleanPag = data.pagamentos.map(p => sanitizeRecord(p, currentUserId));
         for (const item of cleanPag) {
-          await supabase.from('pagamentos').upsert(item, { onConflict: 'id' }).catch(() => {});
+          try {
+            await supabase.from('pagamentos').upsert(item, { onConflict: 'id' });
+          } catch {}
         }
       }
 
@@ -570,7 +580,9 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
         if (supabase) {
           const cleanTemplates = data.contract_templates.map(t => sanitizeRecord(t, currentUserId));
           for (const item of cleanTemplates) {
-            await supabase.from('contract_templates').upsert(item, { onConflict: 'id' }).catch(() => {});
+            try {
+              await supabase.from('contract_templates').upsert(item, { onConflict: 'id' });
+            } catch {}
           }
         }
       }
@@ -968,7 +980,7 @@ export const ConfiguracoesTab: React.FC<ConfiguracoesTabProps> = ({
               <Clock className="mx-auto text-zinc-300" size={28} />
               <p className="text-xs font-medium text-zinc-600">Nenhum ponto de restauração gravado ainda.</p>
               <p className="text-[11px] text-zinc-400 max-w-sm mx-auto">
-                Clique no botão "Criar Ponto de Restauração" acima para salvar o estado completo antes de realizar modificações.
+                Clique no botão &quot;Criar Ponto de Restauração&quot; acima para salvar o estado completo antes de realizar modificações.
               </p>
             </div>
           ) : (

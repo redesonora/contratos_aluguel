@@ -1,7 +1,9 @@
 export enum StatusPagamento {
   PENDENTE = 'Pendente',
   PAGO = 'Pago',
-  ATRASADO = 'Atrasado'
+  ATRASADO = 'Atrasado',
+  FINALIZADO = 'Finalizado',
+  CANCELADO = 'Cancelado'
 }
 
 export interface Imovel {

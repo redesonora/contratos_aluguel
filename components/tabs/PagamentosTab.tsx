@@ -18,7 +18,8 @@ import {
   Archive,
   Download,
   FileDown,
-  Loader2
+  Loader2,
+  Ban
 } from 'lucide-react';
 
 interface PagamentosTabProps {
@@ -62,12 +63,31 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
   setShowArchived,
   loading
 }) => {
+  const isPaymentFinalized = (p: any) => {
+    if (p.status === StatusPagamento.FINALIZADO || p.status === StatusPagamento.CANCELADO) return true;
+    const coStatus = (p.contratos?.status || '').toLowerCase();
+    const hasEncerramento = Boolean(p.contratos?.data_encerramento);
+    return coStatus === 'finalizado' || coStatus === 'encerrado' || coStatus === 'rescindido' || hasEncerramento;
+  };
+
   const filteredPagamentos = pagamentos.filter(p => {
     const matchesSearch = !paymentSearch || 
       (p.contratos?.inquilinos?.nome || '').toLowerCase().includes(paymentSearch.toLowerCase()) ||
       (p.contratos?.imoveis?.endereco || '').toLowerCase().includes(paymentSearch.toLowerCase());
     
-    const matchesStatus = paymentStatusFilter === 'todos' || p.status === paymentStatusFilter;
+    let matchesStatus = true;
+    if (paymentStatusFilter === 'todos') {
+      matchesStatus = true;
+    } else if (paymentStatusFilter === 'Finalizado') {
+      matchesStatus = isPaymentFinalized(p) && p.status !== StatusPagamento.PAGO;
+    } else if (paymentStatusFilter === StatusPagamento.PENDENTE) {
+      matchesStatus = (p.status === StatusPagamento.PENDENTE || (!p.status && p.status !== StatusPagamento.PAGO)) && !isPaymentFinalized(p);
+    } else if (paymentStatusFilter === StatusPagamento.ATRASADO) {
+      matchesStatus = p.status === StatusPagamento.ATRASADO && !isPaymentFinalized(p);
+    } else {
+      matchesStatus = p.status === paymentStatusFilter;
+    }
+
     const matchesMonth = paymentMonthFilter === 0 || p.competencia_mes === paymentMonthFilter;
     const matchesYear = p.competencia_ano === selectedYear;
     
@@ -75,9 +95,15 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
   });
 
   const stats = {
-    totalFiltrado: filteredPagamentos.reduce((acc, p) => acc + (p.valor_esperado || 0), 0),
-    totalRecebido: filteredPagamentos.filter(p => p.status === StatusPagamento.PAGO).reduce((acc, p) => acc + (p.valor_pago || p.valor_esperado || 0), 0),
-    totalPendente: filteredPagamentos.filter(p => p.status !== StatusPagamento.PAGO).reduce((acc, p) => acc + (p.valor_esperado || 0), 0)
+    totalFiltrado: filteredPagamentos
+      .filter(p => !isPaymentFinalized(p) || p.status === StatusPagamento.PAGO)
+      .reduce((acc, p) => acc + (p.valor_esperado || 0), 0),
+    totalRecebido: filteredPagamentos
+      .filter(p => p.status === StatusPagamento.PAGO)
+      .reduce((acc, p) => acc + (p.valor_pago || p.valor_esperado || 0), 0),
+    totalPendente: filteredPagamentos
+      .filter(p => p.status !== StatusPagamento.PAGO && !isPaymentFinalized(p))
+      .reduce((acc, p) => acc + (p.valor_esperado || 0), 0)
   };
 
   return (
@@ -140,6 +166,7 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
               <option value={StatusPagamento.PENDENTE}>Pendente</option>
               <option value={StatusPagamento.PAGO}>Pago</option>
               <option value={StatusPagamento.ATRASADO}>Atrasado</option>
+              <option value="Finalizado">Finalizado / Cancelado</option>
             </select>
 
             <select 
@@ -187,7 +214,8 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
                 const vencimentoDate = new Date(p.data_vencimento + 'T00:00:00');
-                const isAtrasado = p.status !== StatusPagamento.PAGO && vencimentoDate < today;
+                const isFinalizado = isPaymentFinalized(p) && p.status !== StatusPagamento.PAGO;
+                const isAtrasado = !isFinalizado && p.status !== StatusPagamento.PAGO && vencimentoDate < today;
 
                 return (
                   <tr key={p.id} className="hover:bg-zinc-50/70 transition-colors">
@@ -207,28 +235,31 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <p className={`text-xs ${isAtrasado ? 'text-rose-600 font-medium' : 'text-zinc-600'}`}>
+                      <p className={`text-xs ${isFinalizado ? 'text-zinc-400 line-through' : isAtrasado ? 'text-rose-600 font-medium' : 'text-zinc-600'}`}>
                         {new Date(p.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </p>
                     </td>
                     <td className="px-5 py-3.5">
                       <p className="text-xs text-zinc-600">
-                        {p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : '-'}
+                        {p.data_pagamento ? new Date(p.data_pagamento).toLocaleDateString('pt-BR') : isFinalizado ? 'Cancelada' : '-'}
                       </p>
                     </td>
                     <td className="px-5 py-3.5">
-                      <p className={`font-semibold ${p.status === StatusPagamento.PAGO ? 'text-emerald-600' : 'text-zinc-900'}`}>
+                      <p className={`font-semibold ${p.status === StatusPagamento.PAGO ? 'text-emerald-600' : isFinalizado ? 'text-zinc-400' : 'text-zinc-900'}`}>
                         {formatarMoeda(p.valor_pago || p.valor_esperado || 0)}
                       </p>
                     </td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md border ${
                         p.status === StatusPagamento.PAGO ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' : 
+                        isFinalizado ? 'bg-zinc-100 text-zinc-600 border-zinc-200' :
                         isAtrasado ? 'bg-rose-50 text-rose-700 border-rose-200/60' : 
                         'bg-amber-50 text-amber-700 border-amber-200/60'
                       }`}>
                         {p.status === StatusPagamento.PAGO ? (
                           <><CheckCircle2 size={11} /> Pago</>
+                        ) : isFinalizado ? (
+                          <><Ban size={11} /> Finalizado</>
                         ) : isAtrasado ? (
                           <><AlertCircle size={11} /> Atrasado</>
                         ) : (
@@ -245,6 +276,13 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
                           >
                             <Printer size={13} /> Recibo
                           </button>
+                        ) : isFinalizado ? (
+                          <span 
+                            className="text-[11px] font-medium text-zinc-400 bg-zinc-50 border border-zinc-200/80 px-2 py-1 rounded-md inline-flex items-center gap-1"
+                            title="Contrato finalizado/encerrado - Cobrança desativada"
+                          >
+                            <Ban size={11} /> Desativada
+                          </span>
                         ) : (
                           <div className="flex items-center gap-1.5">
                             {p.observacoes && p.observacoes.startsWith('Asaas|') && (
@@ -272,7 +310,7 @@ export const PagamentosTab: React.FC<PagamentosTabProps> = ({
                           </div>
                         )}
                         
-                        {isAtrasado && p.status !== StatusPagamento.PAGO && (
+                        {isAtrasado && !isFinalizado && p.status !== StatusPagamento.PAGO && (
                           <button 
                             onClick={() => handleSendEmailNotification(p.contratos, 'ATRASO', new Date(p.data_vencimento + 'T00:00:00'))}
                             className="p-1 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
